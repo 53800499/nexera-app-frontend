@@ -38,18 +38,53 @@
   --color-white: #ffffff;
   --color-black: #101828;
 
-  --color-brand-25: #f2f7ff;
-  --color-brand-50: #ecf3ff;
-  --color-brand-100: #dde9ff;
-  --color-brand-200: #c2d6ff;
-  --color-brand-300: #9cb9ff;
-  --color-brand-400: #7592ff;
-  --color-brand-500: #465fff;
-  --color-brand-600: #3641f5;
-  --color-brand-700: #2a31d8;
-  --color-brand-800: #252dae;
-  --color-brand-900: #262e89;
-  --color-brand-950: #161950;
+  /* Primaire — bleu marine #1B3A6B */
+  --color-brand-25: #f2f6fb;
+  --color-brand-50: #e6edf6;
+  --color-brand-100: #cdd9ec;
+  --color-brand-200: #9bb3d9;
+  --color-brand-300: #698dc6;
+  --color-brand-400: #4269a4;
+  --color-brand-500: #1b3a6b;
+  --color-brand-600: #162f58;
+  --color-brand-700: #112445;
+  --color-brand-800: #0c1a32;
+  --color-brand-900: #07101f;
+  --color-brand-950: #040a14;
+
+  --color-nexera-primary: #1b3a6b;
+  --color-nexera-cabinet: #4b0082;
+  --color-nexera-entreprise: #2e6da4;
+  --color-nexera-accent: #e8552d;
+  --color-nexera-surface: #f4f7fa;
+
+  /* Cabinet — violet profond #4B0082 */
+  --color-cabinet-25: #f5eef9;
+  --color-cabinet-50: #ebddf3;
+  --color-cabinet-100: #d7bbe7;
+  --color-cabinet-200: #af77cf;
+  --color-cabinet-300: #8733b7;
+  --color-cabinet-400: #661a9c;
+  --color-cabinet-500: #4b0082;
+  --color-cabinet-600: #3c0068;
+  --color-cabinet-700: #2d004e;
+  --color-cabinet-800: #1f0035;
+  --color-cabinet-900: #10001b;
+  --color-cabinet-950: #08000e;
+
+  /* Entreprise — bleu moyen #2E6DA4 */
+  --color-entreprise-25: #eef5fa;
+  --color-entreprise-50: #dceaf5;
+  --color-entreprise-100: #b9d5eb;
+  --color-entreprise-200: #73abd7;
+  --color-entreprise-300: #4d91c4;
+  --color-entreprise-400: #3a7fb5;
+  --color-entreprise-500: #2e6da4;
+  --color-entreprise-600: #255783;
+  --color-entreprise-700: #1c4162;
+  --color-entreprise-800: #132b41;
+  --color-entreprise-900: #0a1621;
+  --color-entreprise-950: #050b10;
 
   --color-blue-light-25: #f5fbff;
   --color-blue-light-50: #f0f9ff;
@@ -64,8 +99,8 @@
   --color-blue-light-900: #0b4a6f;
   --color-blue-light-950: #062c41;
 
-  --color-gray-25: #fcfcfd;
-  --color-gray-50: #f9fafb;
+  --color-gray-25: #f8fafc;
+  --color-gray-50: #f4f7fa;
   --color-gray-100: #f2f4f7;
   --color-gray-200: #e4e7ec;
   --color-gray-300: #d0d5dd;
@@ -78,18 +113,19 @@
   --color-gray-950: #0c111d;
   --color-gray-dark: #1a2231;
 
-  --color-orange-25: #fffaf5;
-  --color-orange-50: #fff6ed;
-  --color-orange-100: #ffead5;
-  --color-orange-200: #fddcab;
-  --color-orange-300: #feb273;
-  --color-orange-400: #fd853a;
-  --color-orange-500: #fb6514;
-  --color-orange-600: #ec4a0a;
-  --color-orange-700: #c4320a;
-  --color-orange-800: #9c2a10;
-  --color-orange-900: #7e2410;
-  --color-orange-950: #511c10;
+  /* Accent — orange dynamique #E8552D */
+  --color-orange-25: #fff5f1;
+  --color-orange-50: #ffebe3;
+  --color-orange-100: #ffd7c7;
+  --color-orange-200: #ffaf8f;
+  --color-orange-300: #f88757;
+  --color-orange-400: #f06e42;
+  --color-orange-500: #e8552d;
+  --color-orange-600: #c94422;
+  --color-orange-700: #a3351a;
+  --color-orange-800: #7d2814;
+  --color-orange-900: #5c1d0f;
+  --color-orange-950: #3d130a;
 
   --color-success-25: #f6fef9;
   --color-success-50: #ecfdf3;
@@ -132,7 +168,7 @@
 
   --color-theme-pink-500: #ee46bc;
 
-  --color-theme-purple-500: #7a5af8;
+  --color-theme-purple-500: #4b0082;
 
   --shadow-theme-md:
     0px 4px 8px -2px rgba(16, 24, 40, 0.1),
@@ -148,7 +184,7 @@
     0px 20px 24px -4px rgba(16, 24, 40, 0.08),
     0px 8px 8px -4px rgba(16, 24, 40, 0.03);
   --shadow-datepicker: -5px 0 0 #262d3c, 5px 0 0 #262d3c;
-  --shadow-focus-ring: 0px 0px 0px 4px rgba(70, 95, 255, 0.12);
+  --shadow-focus-ring: 0px 0px 0px 4px rgba(27, 58, 107, 0.2);
   --shadow-slider-navigation:
     0px 1px 2px 0px rgba(16, 24, 40, 0.1), 0px 1px 3px 0px rgba(16, 24, 40, 0.1);
   --shadow-tooltip:
@@ -189,6 +225,22 @@
   }
   body {
     @apply relative font-normal font-outfit z-1 bg-gray-50;
+    background-color: var(--color-nexera-surface);
+  }
+
+  [data-workspace="cabinet"] {
+    --color-brand-25: var(--color-cabinet-25);
+    --color-brand-50: var(--color-cabinet-50);
+    --color-brand-100: var(--color-cabinet-100);
+    --color-brand-200: var(--color-cabinet-200);
+    --color-brand-300: var(--color-cabinet-300);
+    --color-brand-400: var(--color-cabinet-400);
+    --color-brand-500: var(--color-cabinet-500);
+    --color-brand-600: var(--color-cabinet-600);
+    --color-brand-700: var(--color-cabinet-700);
+    --color-brand-800: var(--color-cabinet-800);
+    --color-brand-900: var(--color-cabinet-900);
+    --color-brand-950: var(--color-cabinet-950);
   }
 }
 
@@ -201,7 +253,7 @@
 }
 
 @utility menu-item-inactive {
-  @apply text-gray-700 hover:bg-gray-100 group-hover:text-gray-700 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-300;
+  @apply text-gray-700 hover:bg-brand-50 hover:text-brand-600 group-hover:text-brand-600 dark:text-gray-300 dark:hover:bg-brand-500/10 dark:hover:text-brand-400;
 }
 
 @utility menu-item-icon {
@@ -467,13 +519,13 @@ span.flatpickr-weekday,
 .flatpickr-day.selected.nextMonthDay,
 .flatpickr-day.startRange.nextMonthDay,
 .flatpickr-day.endRange.nextMonthDay {
-  background: #465fff;
+  background: var(--color-brand-500);
   @apply !border-brand-500 !bg-brand-500 hover:!border-brand-50 hover:!bg-brand-500;
 }
 .flatpickr-day.selected.startRange + .endRange:not(:nth-child(7n + 1)),
 .flatpickr-day.startRange.startRange + .endRange:not(:nth-child(7n + 1)),
 .flatpickr-day.endRange.startRange + .endRange:not(:nth-child(7n + 1)) {
-  box-shadow: -10px 0 0 #465fff;
+  box-shadow: -10px 0 0 var(--color-brand-500);
 }
 
 .flatpickr-months .flatpickr-prev-month svg,

@@ -6,6 +6,7 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
+import { NexeraLogo } from "@/components/brand/NexeraLogo";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useState } from "react";
@@ -20,7 +21,6 @@ import {
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const { login, isLoading, error, clearError } = useAuth();
-
   const {
     register,
     control,
@@ -42,6 +42,9 @@ export default function SignInForm() {
 
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full">
+      <div className="mb-6 px-4 pt-6 lg:hidden">
+        <NexeraLogo workspace="neutral" showContext />
+      </div>
       <div className="w-full max-w-md sm:pt-10 mx-auto mb-5">
         <Link
           href={AUTH_ROUTES.dashboard}
@@ -126,7 +129,7 @@ export default function SignInForm() {
                   )}
                 />
                 <Link
-                  href={AUTH_ROUTES.resetPassword}
+                  href={AUTH_ROUTES.forgotPassword}
                   className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400"
                 >
                   Mot de passe oublié ?

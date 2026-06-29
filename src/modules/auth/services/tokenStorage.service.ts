@@ -63,7 +63,12 @@ export class TokenStorageService {
     if (!raw) return null;
 
     try {
-      return JSON.parse(raw) as AuthUser;
+      const user = JSON.parse(raw) as AuthUser;
+      if (!user.tenantType) {
+        user.tenantType =
+          user.workspace === "cabinet" ? "cabinet" : "company";
+      }
+      return user;
     } catch {
       return null;
     }

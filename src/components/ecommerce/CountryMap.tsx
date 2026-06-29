@@ -97,7 +97,7 @@ const CountryMap: React.FC<CountryMapProps> = ({ mapColor }) => {
         hover: {
           fillOpacity: 0.7,
           cursor: "pointer",
-          fill: "#465fff",
+          fill: "#1b3a6b",
           stroke: "none",
         },
         selected: {

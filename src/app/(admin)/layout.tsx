@@ -4,6 +4,12 @@ import { useSidebar } from "@/context/SidebarContext";
 import AppHeader from "@/layout/AppHeader";
 import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
+import { ErrorBoundary } from "@/shared/components/feedback";
+import { RequireEntrepriseWorkspace } from "@/modules/auth/components/RequireEntrepriseWorkspace";
+import { CrmOfflineProvider } from "@/modules/crm/offline/components/CrmOfflineProvider";
+import { QuotationsOfflineProvider } from "@/modules/devis/offline/components/QuotationsOfflineProvider";
+import { OrdersOfflineProvider } from "@/modules/commandes/offline/components/OrdersOfflineProvider";
+import { InvoicesOfflineProvider } from "@/modules/factures/offline/components/InvoicesOfflineProvider";
 import React from "react";
 
 export default function AdminLayout({
@@ -13,7 +19,6 @@ export default function AdminLayout({
 }) {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
 
-  // Dynamic class for main content margin based on sidebar state
   const mainContentMargin = isMobileOpen
     ? "ml-0"
     : isExpanded || isHovered
@@ -21,19 +26,27 @@ export default function AdminLayout({
     : "lg:ml-[90px]";
 
   return (
-    <div className="min-h-screen xl:flex">
-      {/* Sidebar and Backdrop */}
-      <AppSidebar />
-      <Backdrop />
-      {/* Main Content Area */}
-      <div
-        className={`flex-1 transition-all  duration-300 ease-in-out ${mainContentMargin}`}
-      >
-        {/* Header */}
-        <AppHeader />
-        {/* Page Content */}
-        <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">{children}</div>
+    <RequireEntrepriseWorkspace>
+      <div className="min-h-screen xl:flex">
+        <AppSidebar />
+        <Backdrop />
+        <div
+          className={`flex-1 transition-all  duration-300 ease-in-out ${mainContentMargin}`}
+        >
+          <AppHeader />
+          <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
+            <CrmOfflineProvider>
+              <QuotationsOfflineProvider>
+                <OrdersOfflineProvider>
+                  <InvoicesOfflineProvider>
+                    <ErrorBoundary>{children}</ErrorBoundary>
+                  </InvoicesOfflineProvider>
+                </OrdersOfflineProvider>
+              </QuotationsOfflineProvider>
+            </CrmOfflineProvider>
+          </div>
+        </div>
       </div>
-    </div>
+    </RequireEntrepriseWorkspace>
   );
 }

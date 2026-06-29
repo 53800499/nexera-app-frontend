@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import React, { useState } from "react";
 import { getUserDisplayName, useAuth } from "@/modules/auth";
 import { Dropdown } from "../ui/dropdown/Dropdown";
@@ -21,7 +20,6 @@ export default function UserDropdown() {
   }
 
   const displayName = user ? getUserDisplayName(user) : "Utilisateur";
-  console.log("user dans le dropdown", user);
   return (
     <div className="relative">
       <button
@@ -32,7 +30,7 @@ export default function UserDropdown() {
           <Image
             width={44}
             height={44}
-            src="/images/user/owner.jpg"
+            src="/images/user/owner1.jpg"
             alt="User"
           />
         </span>
@@ -96,14 +94,14 @@ export default function UserDropdown() {
                   fill=""
                 />
               </svg>
-              Edit profile
+              Mon profil
             </DropdownItem>
           </li>
           <li>
             <DropdownItem
               onItemClick={closeDropdown}
               tag="a"
-              href="/profile"
+              href="/parametres"
               className="flex items-center gap-3 px-3 py-2 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
             >
               <svg
@@ -121,7 +119,7 @@ export default function UserDropdown() {
                   fill=""
                 />
               </svg>
-              Account settings
+              Paramètres du compte
             </DropdownItem>
           </li>
           <li>

@@ -1,88 +1,86 @@
 import type { AuthUser } from "../types/auth.types";
-import type { ModulePermission, PermissionLevel } from "../types/user.types";
-import { PERMISSION_LEVELS, USER_ROLES } from "../types/user.types";
+import type { PermissionLevel } from "../types/user.types";
+import { PERMISSION_LEVELS } from "../types/user.types";
+import {
+  canManageClients,
+  canReadClients,
+  canReadDashboard,
+  canReadInvoices,
+  canReadOrders,
+  canReadPayments,
+  canReadQuotations,
+  canReadReminders,
+  canReadSettings,
+  canManageInvoices,
+  canManageOrders,
+  canManagePayments,
+  canManageQuotations,
+  canManageReminders,
+  canManageSettings,
+  hasAnyPermissionCode,
+  PERMISSION_CODES,
+} from "../utils/permissionCodes";
 
-const LEVEL_RANK: Record<PermissionLevel, number> = {
-  [PERMISSION_LEVELS.READ]: 1,
-  [PERMISSION_LEVELS.PARTIAL_WRITE]: 2,
-  [PERMISSION_LEVELS.WRITE]: 3,
+const MODULE_READ_CHECKERS: Record<
+  string,
+  (user: Pick<AuthUser, "permissions">) => boolean
+> = {
+  clients: canReadClients,
+  facturation: (user) =>
+    canReadQuotations(user) ||
+    canReadInvoices(user) ||
+    canReadOrders(user) ||
+    canReadPayments(user) ||
+    canReadReminders(user) ||
+    canReadClients(user),
+  dashboard: canReadDashboard,
+  settings: canReadSettings,
+  roles: (user) =>
+    hasAnyPermissionCode(user, [
+      PERMISSION_CODES.ROLES_READ,
+      PERMISSION_CODES.MANAGE_ROLES,
+      PERMISSION_CODES.MANAGE_PERMISSIONS,
+    ]),
 };
 
-const DEFAULT_PERMISSIONS: Record<string, ModulePermission[]> = {
-  [USER_ROLES.DIRIGEANT]: [
-    { module: "facturation", level: PERMISSION_LEVELS.WRITE },
-    { module: "stock", level: PERMISSION_LEVELS.WRITE },
-    { module: "comptabilite", level: PERMISSION_LEVELS.READ },
-  ],
-  [USER_ROLES.RESPONSABLE_COMMERCIAL]: [
-    { module: "facturation", level: PERMISSION_LEVELS.WRITE },
-  ],
-  [USER_ROLES.COMMERCIAL]: [
-    { module: "facturation", level: PERMISSION_LEVELS.PARTIAL_WRITE },
-  ],
-  [USER_ROLES.COMPTABLE]: [
-    { module: "facturation", level: PERMISSION_LEVELS.READ },
-    { module: "comptabilite", level: PERMISSION_LEVELS.READ },
-  ],
-  [USER_ROLES.EXPERT_COMPTABLE]: [
-    { module: "facturation", level: PERMISSION_LEVELS.READ },
-    { module: "comptabilite", level: PERMISSION_LEVELS.WRITE },
-    { module: "cabinet", level: PERMISSION_LEVELS.WRITE },
-  ],
-  [USER_ROLES.COLLABORATEUR_CABINET]: [
-    { module: "facturation", level: PERMISSION_LEVELS.READ },
-    { module: "comptabilite", level: PERMISSION_LEVELS.WRITE },
-    { module: "cabinet", level: PERMISSION_LEVELS.PARTIAL_WRITE },
-  ],
+const MODULE_WRITE_CHECKERS: Record<
+  string,
+  (user: Pick<AuthUser, "permissions">) => boolean
+> = {
+  clients: canManageClients,
+  facturation: (user) =>
+    canManageQuotations(user) ||
+    canManageInvoices(user) ||
+    canManageOrders(user) ||
+    canManagePayments(user) ||
+    canManageReminders(user) ||
+    canManageClients(user),
+  settings: canManageSettings,
+  roles: (user) =>
+    hasAnyPermissionCode(user, [
+      PERMISSION_CODES.MANAGE_ROLES,
+      PERMISSION_CODES.MANAGE_PERMISSIONS,
+    ]),
 };
 
 export class AuthorizationService {
+  /**
+   * Vérifie une permission module/niveau uniquement via les codes RBAC backend.
+   * Aucun repli sur le rôle applicatif : un tableau vide signifie aucun accès.
+   */
   hasPermission(
     user: AuthUser,
     module: string,
     requiredLevel: PermissionLevel,
   ): boolean {
-    const backendPermission = this.matchBackendPermission(
-      user.permissions,
-      module,
-      requiredLevel,
-    );
-    if (backendPermission !== null) return backendPermission;
+    if (!user.permissions?.length) return false;
 
-    const permissions = DEFAULT_PERMISSIONS[user.role] ?? [];
-    const permission = permissions.find((p) => p.module === module);
-    if (!permission) return false;
+    const checker =
+      requiredLevel === PERMISSION_LEVELS.READ
+        ? MODULE_READ_CHECKERS[module]
+        : MODULE_WRITE_CHECKERS[module];
 
-    return LEVEL_RANK[permission.level] >= LEVEL_RANK[requiredLevel];
-  }
-
-  private matchBackendPermission(
-    permissions: string[],
-    module: string,
-    requiredLevel: PermissionLevel,
-  ): boolean | null {
-    if (permissions.length === 0) return null;
-
-    const modulePrefixes: Record<string, string[]> = {
-      facturation: ["invoice", "quotation", "payment", "client", "catalog"],
-      comptabilite: ["accounting", "ledger"],
-      cabinet: ["cabinet", "dossier"],
-      stock: ["stock", "inventory"],
-    };
-
-    const prefixes = modulePrefixes[module] ?? [module];
-    const hasMatch = permissions.some((code) =>
-      prefixes.some((prefix) => code.includes(prefix)),
-    );
-
-    if (!hasMatch) return false;
-
-    if (requiredLevel === PERMISSION_LEVELS.READ) return true;
-    return permissions.some(
-      (code) =>
-        prefixes.some((prefix) => code.includes(prefix)) &&
-        (code.startsWith("manage:") || code.startsWith("write:")),
-    );
+    return checker ? checker(user) : false;
   }
 }
 

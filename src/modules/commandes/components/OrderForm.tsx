@@ -1,0 +1,466 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import {
+  useFieldArray,
+  useForm,
+  type Resolver,
+  type SubmitErrorHandler,
+} from "react-hook-form";
+import Input from "@/components/form/input/InputField";
+import Label from "@/components/form/Label";
+import { useCatalogueItems } from "@/modules/catalogue/hooks/useCatalogue";
+import type { CatalogItem, TaxRate } from "@/modules/catalogue/types/catalogue.types";
+import { useClients } from "@/modules/crm/hooks/useClients";
+import type { ClientSummary } from "@/modules/crm/types/client.types";
+import { QuotationTotalsPanel } from "@/modules/devis/components/QuotationTotalsPanel";
+import {
+  computeQuotationTotals,
+  formatMoney,
+} from "@/modules/devis/utils/quotationCalculations";
+import { useToast } from "@/shared/components/feedback";
+import { CurrencySelect } from "@/shared/components/form/CurrencySelect";
+import { applyFormApiErrors } from "@/shared/http/applyFormApiErrors";
+import {
+  focusFirstFormError,
+  scrollToFormField,
+} from "@/shared/forms/formErrorFocus";
+import type {
+  CreateOrderPayload,
+  UpdateOrderPayload,
+} from "../types/order.types";
+import {
+  defaultOrderLine,
+  orderFormSchema,
+  type OrderFormValues,
+} from "../schemas/orderForm.schema";
+
+type Props = {
+  isSubmitting: boolean;
+  submitLabel: string;
+  defaultValues?: Partial<OrderFormValues>;
+  taxRates: TaxRate[];
+  lockClient?: boolean;
+  lockQuotation?: boolean;
+  quotationLabel?: string;
+  onSubmit: (values: OrderFormValues) => Promise<void>;
+};
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-700">
+      {children}
+    </h3>
+  );
+}
+
+function ClientSearchField({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (clientId: string) => void;
+  disabled?: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const { clientsQuery } = useClients({ q: query || undefined, limit: 10 });
+  const clients = clientsQuery.data?.items ?? [];
+
+  useEffect(() => {
+    if (!value || query) return;
+    const selected = clients.find((client) => client.id === value);
+    if (selected) {
+      setSearch(`${selected.code} — ${selected.companyName}`);
+    }
+  }, [value, clients, query]);
+
+  return (
+    <div className="relative">
+      <Label>
+        Client <span className="text-red-600">*</span>
+      </Label>
+      <Input
+        value={search}
+        disabled={disabled}
+        placeholder="Rechercher un client..."
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onChange={(event) => {
+          setSearch(event.target.value);
+          setQuery(event.target.value.trim());
+          setOpen(true);
+        }}
+      />
+      {open && !disabled && clients.length > 0 ? (
+        <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+          {clients.map((client: ClientSummary) => (
+            <li key={client.id}>
+              <button
+                type="button"
+                className="w-full rounded px-2 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+                onMouseDown={() => {
+                  onChange(client.id);
+                  setSearch(`${client.code} — ${client.companyName}`);
+                  setOpen(false);
+                }}
+              >
+                <div className="font-medium">{client.companyName}</div>
+                <div className="text-xs text-gray-500">{client.code}</div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function ItemPicker({ onSelect }: { onSelect: (item: CatalogItem) => void }) {
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const { itemsQuery } = useCatalogueItems(query || undefined);
+  const items = (itemsQuery.data ?? []).filter((item) => !item.isArchived);
+
+  return (
+    <div className="relative min-w-[220px]">
+      <Input
+        value={search}
+        placeholder="Article catalogue..."
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onChange={(event) => {
+          setSearch(event.target.value);
+          setQuery(event.target.value.trim());
+          setOpen(true);
+        }}
+      />
+      {open && items.length > 0 ? (
+        <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+          {items.map((item) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                className="w-full rounded px-2 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+                onMouseDown={() => {
+                  onSelect(item);
+                  setSearch("");
+                  setQuery("");
+                  setOpen(false);
+                }}
+              >
+                <div className="font-medium">
+                  {item.reference} — {item.name}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {formatMoney(item.priceHt, "EUR")} HT
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+export function OrderForm({
+  isSubmitting,
+  submitLabel,
+  defaultValues,
+  taxRates,
+  lockClient = false,
+  lockQuotation = false,
+  quotationLabel,
+  onSubmit,
+}: Props) {
+  const toast = useToast();
+  const [formError, setFormError] = useState<string | null>(null);
+  const activeTaxRates = taxRates.filter((rate) => rate.isActive);
+  const defaultTaxId =
+    activeTaxRates.find((rate) => rate.isDefault)?.id ??
+    activeTaxRates[0]?.id ??
+    "";
+
+  const initialValues = useMemo<OrderFormValues>(
+    () => ({
+      clientId: defaultValues?.clientId ?? "",
+      quotationId: defaultValues?.quotationId ?? "",
+      issueDate:
+        defaultValues?.issueDate ?? new Date().toISOString().slice(0, 10),
+      currency: defaultValues?.currency ?? "EUR",
+      globalDiscountPct: defaultValues?.globalDiscountPct ?? 0,
+      lines:
+        defaultValues?.lines && defaultValues.lines.length > 0
+          ? defaultValues.lines
+          : [defaultOrderLine(defaultTaxId)],
+    }),
+    [defaultValues, defaultTaxId],
+  );
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    setError,
+    formState: { errors },
+  } = useForm<OrderFormValues>({
+    resolver: zodResolver(orderFormSchema) as Resolver<OrderFormValues>,
+    defaultValues: initialValues,
+  });
+
+  const { fields, append, remove } = useFieldArray({ control, name: "lines" });
+  const watchedLines = watch("lines");
+  const globalDiscountPct = watch("globalDiscountPct");
+  const currency = watch("currency");
+  const quotationId = watch("quotationId");
+
+  const totals = useMemo(
+    () =>
+      computeQuotationTotals(
+        watchedLines ?? [],
+        globalDiscountPct ?? 0,
+        activeTaxRates,
+      ),
+    [watchedLines, globalDiscountPct, activeTaxRates],
+  );
+
+  const handleFormSubmit = async (values: OrderFormValues) => {
+    setFormError(null);
+    try {
+      await onSubmit(values);
+    } catch (error) {
+      const { message, firstField } = applyFormApiErrors(error, setError);
+      if (message) {
+        setFormError(message);
+        toast.error("Enregistrement impossible", message);
+      }
+      if (firstField) {
+        window.setTimeout(() => scrollToFormField(firstField), 0);
+      }
+    }
+  };
+
+  const handleInvalidSubmit: SubmitErrorHandler<OrderFormValues> = (
+    fieldErrors,
+  ) => {
+    const firstError = focusFirstFormError(fieldErrors);
+    if (!firstError) return;
+    setFormError(firstError.message);
+    toast.error("Formulaire incomplet", firstError.message);
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit(handleFormSubmit, handleInvalidSubmit)}
+      className="space-y-8"
+      noValidate
+    >
+      {formError ? (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+          {formError}
+        </p>
+      ) : null}
+
+      <section className="space-y-4">
+        <SectionTitle>En-tête</SectionTitle>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="md:col-span-2" data-form-field="clientId">
+            <ClientSearchField
+              value={watch("clientId")}
+              disabled={lockClient}
+              onChange={(clientId) =>
+                setValue("clientId", clientId, { shouldValidate: true })
+              }
+            />
+            {errors.clientId ? (
+              <p className="mt-1 text-xs text-red-600">{errors.clientId.message}</p>
+            ) : null}
+          </div>
+          {quotationId ? (
+            <div className="md:col-span-2">
+              <Label>Devis source</Label>
+              {lockQuotation && quotationLabel ? (
+                <Link
+                  href={`/devis/${quotationId}`}
+                  className="mt-1 block text-sm font-medium text-brand-600 hover:underline"
+                >
+                  {quotationLabel}
+                </Link>
+              ) : (
+                <Input {...register("quotationId")} disabled={lockQuotation} />
+              )}
+            </div>
+          ) : null}
+          <div data-form-field="issueDate">
+            <Label>
+              Date du BC <span className="text-red-600">*</span>
+            </Label>
+            <Input type="date" {...register("issueDate")} />
+            {errors.issueDate ? (
+              <p className="mt-1 text-xs text-red-600">{errors.issueDate.message}</p>
+            ) : null}
+          </div>
+          <div>
+            <Label>Devise</Label>
+            <CurrencySelect {...register("currency")} />
+          </div>
+          <div data-form-field="globalDiscountPct">
+            <Label>Remise globale (%)</Label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              {...register("globalDiscountPct", { valueAsNumber: true })}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4" data-form-field="lines">
+        <SectionTitle>Lignes</SectionTitle>
+        {errors.lines?.message ? (
+          <p className="text-xs text-red-600">{errors.lines.message}</p>
+        ) : null}
+        <div className="space-y-3">
+          {fields.map((field, index) => (
+            <div
+              key={field.id}
+              data-form-field={`lines.${index}`}
+              className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-800 md:grid-cols-12"
+            >
+              <div className="md:col-span-3">
+                <ItemPicker
+                  onSelect={(item) => {
+                    setValue(`lines.${index}.itemId`, item.id);
+                    setValue(`lines.${index}.description`, item.name);
+                    setValue(`lines.${index}.unitPriceHt`, item.priceHt);
+                    setValue(
+                      `lines.${index}.taxRateId`,
+                      item.defaultTaxRateId || defaultTaxId,
+                    );
+                  }}
+                />
+              </div>
+              <div className="md:col-span-3">
+                <Label>Description</Label>
+                <Input {...register(`lines.${index}.description`)} />
+              </div>
+              <div className="md:col-span-1">
+                <Label>Qté</Label>
+                <Input
+                  type="number"
+                  min={0.01}
+                  step="0.01"
+                  {...register(`lines.${index}.quantity`, { valueAsNumber: true })}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label>Prix unit. HT</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  {...register(`lines.${index}.unitPriceHt`, { valueAsNumber: true })}
+                />
+              </div>
+              <div className="md:col-span-1">
+                <Label>Rem. %</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  {...register(`lines.${index}.discountPct`, { valueAsNumber: true })}
+                />
+              </div>
+              <div className="md:col-span-1">
+                <Label>TVA</Label>
+                <select
+                  className="h-11 w-full rounded-lg border border-gray-300 px-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                  {...register(`lines.${index}.taxRateId`)}
+                >
+                  {activeTaxRates.map((rate) => (
+                    <option key={rate.id} value={rate.id}>
+                      {rate.rate}%
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-end md:col-span-1">
+                <button
+                  type="button"
+                  onClick={() => remove(index)}
+                  disabled={fields.length <= 1}
+                  className="h-11 w-full rounded-lg border border-red-200 text-sm text-red-600 disabled:opacity-40"
+                >
+                  Suppr.
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => append(defaultOrderLine(defaultTaxId))}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+        >
+          Ajouter une ligne
+        </button>
+      </section>
+
+      <QuotationTotalsPanel totals={totals} currency={currency} />
+
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
+      >
+        {isSubmitting ? "Enregistrement..." : submitLabel}
+      </button>
+    </form>
+  );
+}
+
+function buildOrderLines(values: OrderFormValues) {
+  return values.lines.map((line) => ({
+    ...(line.itemId ? { itemId: line.itemId } : {}),
+    description: line.description.trim(),
+    quantity: line.quantity,
+    unitPriceHt: line.unitPriceHt,
+    ...(line.discountPct > 0 ? { discountPct: line.discountPct } : {}),
+    taxRateId: line.taxRateId,
+  }));
+}
+
+export function buildCreateOrderPayload(
+  values: OrderFormValues,
+): CreateOrderPayload {
+  return {
+    clientId: values.clientId,
+    issueDate: values.issueDate,
+    currency: values.currency,
+    discountPct: values.globalDiscountPct,
+    ...(values.quotationId ? { quotationId: values.quotationId } : {}),
+    lines: buildOrderLines(values),
+  };
+}
+
+export function buildUpdateOrderPayload(
+  values: OrderFormValues,
+): UpdateOrderPayload {
+  return {
+    issueDate: values.issueDate,
+    currency: values.currency,
+    discountPct: values.globalDiscountPct,
+    lines: buildOrderLines(values),
+  };
+}

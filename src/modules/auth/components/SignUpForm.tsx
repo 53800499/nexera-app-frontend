@@ -4,13 +4,17 @@ import Alert from "@/components/ui/alert/Alert";
 import Checkbox from "@/components/form/input/Checkbox";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
+import Radio from "@/components/form/input/Radio";
 import Button from "@/components/ui/button/Button";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
+import { NexeraLogo } from "@/components/brand/NexeraLogo";
+import { useSignupWorkspace } from "../context/SignupWorkspaceContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { AUTH_ROUTES } from "../constants/routes";
+import { WORKSPACE_LABELS } from "../constants/roles";
 import { useAuth } from "../hooks/useAuth";
 import {
   signUpSchema,
@@ -25,6 +29,7 @@ export default function SignUpForm() {
     register,
     control,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
@@ -33,10 +38,19 @@ export default function SignUpForm() {
       lastName: "",
       email: "",
       password: "",
+      tenantType: "company",
       tenantName: "",
       acceptTerms: false,
     },
   });
+
+  const tenantType = watch("tenantType");
+  const isCabinet = tenantType === "cabinet";
+  const signupWorkspace = useSignupWorkspace();
+
+  useEffect(() => {
+    signupWorkspace?.setWorkspace(isCabinet ? "cabinet" : "entreprise");
+  }, [isCabinet, signupWorkspace]);
 
   const onSubmit = handleSubmit(async (values) => {
     clearError();
@@ -46,6 +60,7 @@ export default function SignUpForm() {
       email: values.email,
       password: values.password,
       tenantName: values.tenantName,
+      tenantType: values.tenantType,
     });
   });
 
@@ -61,13 +76,21 @@ export default function SignUpForm() {
         </Link>
       </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
+        <div className="mb-6 lg:hidden">
+          <NexeraLogo
+            workspace={isCabinet ? "cabinet" : "entreprise"}
+            showContext
+          />
+        </div>
         <div>
           <div className="mb-5 sm:mb-8">
             <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
               Créer un compte
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Inscrivez votre entreprise sur NEXERA ERP
+              {isCabinet
+                ? "Inscrivez votre cabinet comptable sur NEXERA"
+                : "Inscrivez votre entreprise sur NEXERA ERP"}
             </p>
           </div>
 
@@ -79,6 +102,36 @@ export default function SignUpForm() {
 
           <form onSubmit={onSubmit}>
             <div className="space-y-5">
+              <div>
+                <Label>
+                  Type d&apos;organisation <span className="text-error-500">*</span>
+                </Label>
+                <Controller
+                  name="tenantType"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:gap-6">
+                      <Radio
+                        id="tenant-company"
+                        name="tenantType"
+                        value="company"
+                        checked={field.value === "company"}
+                        onChange={field.onChange}
+                        label={WORKSPACE_LABELS.entreprise}
+                      />
+                      <Radio
+                        id="tenant-cabinet"
+                        name="tenantType"
+                        value="cabinet"
+                        checked={field.value === "cabinet"}
+                        onChange={field.onChange}
+                        label={WORKSPACE_LABELS.cabinet}
+                      />
+                    </div>
+                  )}
+                />
+              </div>
+
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
                   <Label>
@@ -108,11 +161,12 @@ export default function SignUpForm() {
 
               <div>
                 <Label>
-                  Nom de l&apos;entreprise <span className="text-error-500">*</span>
+                  {isCabinet ? "Nom du cabinet" : "Nom de l'entreprise"}{" "}
+                  <span className="text-error-500">*</span>
                 </Label>
                 <Input
                   type="text"
-                  placeholder="Raison sociale"
+                  placeholder={isCabinet ? "Cabinet Dupont & Associés" : "Raison sociale"}
                   {...register("tenantName")}
                   error={Boolean(errors.tenantName)}
                   hint={errors.tenantName?.message}
@@ -125,7 +179,7 @@ export default function SignUpForm() {
                 </Label>
                 <Input
                   type="email"
-                  placeholder="vous@entreprise.com"
+                  placeholder={isCabinet ? "vous@cabinet.com" : "vous@entreprise.com"}
                   {...register("email")}
                   error={Boolean(errors.email)}
                   hint={errors.email?.message}

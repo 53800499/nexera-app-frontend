@@ -1,6 +1,8 @@
 export { AuthProvider } from "./components/AuthProvider";
 export { default as SignInForm } from "./components/SignInForm";
 export { default as SignUpForm } from "./components/SignUpForm";
+export { default as ForgotPasswordForm } from "./components/ForgotPasswordForm";
+export { default as ResetPasswordForm } from "./components/ResetPasswordForm";
 export { AuthSessionPdfDocument } from "./components/AuthSessionPdfDocument";
 export { useAuth } from "./hooks/useAuth";
 export { usePermission } from "./hooks/usePermission";

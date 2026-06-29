@@ -6,12 +6,15 @@ export type AuthTokens = {
   expiresAt: number;
 };
 
+export type TenantType = "company" | "cabinet";
+
 export type AuthUser = {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
   tenantId: string;
+  tenantType: TenantType;
   role: UserRole;
   roles: string[];
   permissions: string[];
@@ -35,6 +38,7 @@ export type RegisterDirigeantData = {
   firstName: string;
   lastName: string;
   tenantName: string;
+  tenantType?: TenantType;
 };
 
 export type AuthApiResponse = {
@@ -46,6 +50,7 @@ export type AuthApiResponse = {
     firstName: string;
     lastName: string;
     tenantId: string;
+    tenantType: TenantType;
     roles: string[];
     permissions: string[];
   };

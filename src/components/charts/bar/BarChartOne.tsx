@@ -1,21 +1,66 @@
 "use client";
-import React from "react";
 
 import { ApexOptions } from "apexcharts";
-
 import dynamic from "next/dynamic";
-// Dynamically import the ReactApexChart component
+
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
 });
 
-export default function BarChartOne() {
+export type BarChartSeries = {
+  name: string;
+  data: number[];
+};
+
+type BarChartOneProps = {
+  categories?: string[];
+  series?: BarChartSeries[];
+  colors?: string[];
+  height?: number;
+  showLegend?: boolean;
+  tooltipFormatter?: (value: number) => string;
+  chartId?: string;
+  minWidth?: string;
+};
+
+const DEFAULT_CATEGORIES = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+const DEFAULT_SERIES: BarChartSeries[] = [
+  {
+    name: "Sales",
+    data: [168, 385, 201, 298, 187, 195, 291, 110, 215, 390, 280, 112],
+  },
+];
+
+export default function BarChartOne({
+  categories = DEFAULT_CATEGORIES,
+  series = DEFAULT_SERIES,
+  colors = ["#1b3a6b"],
+  height = 180,
+  showLegend = true,
+  tooltipFormatter,
+  chartId = "chartOne",
+  minWidth = "1000px",
+}: BarChartOneProps) {
   const options: ApexOptions = {
-    colors: ["#465fff"],
+    colors,
     chart: {
       fontFamily: "Outfit, sans-serif",
       type: "bar",
-      height: 180,
+      height,
       toolbar: {
         show: false,
       },
@@ -37,20 +82,7 @@ export default function BarChartOne() {
       colors: ["transparent"],
     },
     xaxis: {
-      categories: [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ],
+      categories,
       axisBorder: {
         show: false,
       },
@@ -59,7 +91,7 @@ export default function BarChartOne() {
       },
     },
     legend: {
-      show: true,
+      show: showLegend,
       position: "top",
       horizontalAlign: "left",
       fontFamily: "Outfit",
@@ -79,30 +111,24 @@ export default function BarChartOne() {
     fill: {
       opacity: 1,
     },
-
     tooltip: {
       x: {
         show: false,
       },
       y: {
-        formatter: (val: number) => `${val}`,
+        formatter: tooltipFormatter ?? ((val: number) => `${val}`),
       },
     },
   };
-  const series = [
-    {
-      name: "Sales",
-      data: [168, 385, 201, 298, 187, 195, 291, 110, 215, 390, 280, 112],
-    },
-  ];
+
   return (
     <div className="max-w-full overflow-x-auto custom-scrollbar">
-      <div id="chartOne" className="min-w-[1000px]">
+      <div id={chartId} style={{ minWidth }}>
         <ReactApexChart
           options={options}
           series={series}
           type="bar"
-          height={180}
+          height={height}
         />
       </div>
     </div>
