@@ -1,4 +1,5 @@
 import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
+import { isOfflineError } from "@/shared/core/OfflineError";
 import { isBrowserOnline } from "@/shared/hooks/useNetworkStatus";
 import { withTimeout } from "@/shared/lib/withTimeout";
 import { crmOfflineRepository } from "@/modules/crm/offline/services/crmOfflineRepository";
@@ -178,11 +179,12 @@ async function readWithOfflineFallback<T>(
       clearOrdersOfflineIfOnline();
     }
     return data;
-  } catch {
-    if (!isBrowserOnline()) {
+  } catch (error) {
+    if (!isBrowserOnline() || isOfflineError(error)) {
       setOrdersOffline(true);
+      return offlineData;
     }
-    return offlineData;
+    throw error;
   }
 }
 
@@ -223,18 +225,30 @@ export const ordersOfflineService = {
   },
 
   async byId(id: string): Promise<OrderDetail> {
-    return readWithOfflineFallback(
-      async () => {
-        const order = await ordersApi.byId(id);
-        await ordersOfflineRepository.upsertOrder(order, "synced");
-        return order;
-      },
-      async () => {
-        const cached = await ordersOfflineRepository.getOrder(id);
-        if (!cached) throw new Error("Commande introuvable hors-ligne");
-        return cached;
-      },
-    );
+    const readCached = async () => {
+      const cached = await ordersOfflineRepository.getOrder(id);
+      if (!cached) throw new Error("Commande introuvable hors-ligne");
+      return cached;
+    };
+
+    if (isOfflineMode()) {
+      return readCached();
+    }
+
+    try {
+      const order = await withTimeout(ordersApi.byId(id), API_READ_TIMEOUT_MS);
+      await ordersOfflineRepository.upsertOrder(order, "synced");
+      if (isBrowserOnline()) {
+        clearOrdersOfflineIfOnline();
+      }
+      return order;
+    } catch (error) {
+      if (!isBrowserOnline() || isOfflineError(error)) {
+        setOrdersOffline(true);
+        return readCached();
+      }
+      throw error;
+    }
   },
 
   async create(payload: CreateOrderPayload): Promise<OrderDetail> {

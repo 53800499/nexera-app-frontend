@@ -6,8 +6,10 @@ import { useFieldArray, useForm, type Resolver, type SubmitErrorHandler } from "
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { CurrencySelect } from "@/shared/components/form/CurrencySelect";
-import { useToast } from "@/shared/components/feedback";
+import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
+import { LoadingBlock, useActionFeedback } from "@/shared/components/feedback";
 import { applyFormApiErrors } from "@/shared/http/applyFormApiErrors";
+import { resolveFormErrorMessage } from "@/shared/http/resolveFormErrorMessage";
 import {
   focusFirstFormError,
   scrollToFormField,
@@ -171,7 +173,7 @@ export function QuotationForm({
   lockClient = false,
   onSubmit,
 }: Props) {
-  const toast = useToast();
+  const { showResult } = useActionFeedback();
   const [formError, setFormError] = useState<string | null>(null);
   const paymentTermsQuery = usePaymentTerms();
   const paymentTerms = paymentTermsQuery.data ?? [];
@@ -187,7 +189,7 @@ export function QuotationForm({
       issueDate:
         defaultValues?.issueDate ?? new Date().toISOString().slice(0, 10),
       validUntil: defaultValues?.validUntil ?? "",
-      currency: defaultValues?.currency ?? "EUR",
+      currency: defaultValues?.currency ?? DEFAULT_CURRENCY,
       globalDiscountPct: defaultValues?.globalDiscountPct ?? 0,
       paymentTermId: defaultValues?.paymentTermId ?? "",
       notes: defaultValues?.notes ?? "",
@@ -233,14 +235,21 @@ export function QuotationForm({
     try {
       await onSubmit(values);
     } catch (error) {
-      const { message, firstField } = applyFormApiErrors(error, setError);
-      if (message) {
-        setFormError(message);
-        toast.error("Enregistrement impossible", message);
-      }
+      const { message, firstField } = applyFormApiErrors(error, setError, {
+        internalNotes: "legalMentions",
+      });
+      const displayMessage = message ?? resolveFormErrorMessage(error);
+      setFormError(displayMessage);
+      void showResult({
+        variant: "error",
+        title: "Enregistrement impossible",
+        message: firstField
+          ? `${displayMessage} Le champ concerné est mis en évidence ci-dessous.`
+          : displayMessage,
+      });
       if (firstField) {
         window.setTimeout(() => scrollToFormField(firstField), 0);
-      } else if (message) {
+      } else {
         document
           .getElementById("quotation-form-error")
           ?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -255,7 +264,11 @@ export function QuotationForm({
     if (!firstError) return;
 
     setFormError(firstError.message);
-    toast.error("Formulaire incomplet", firstError.message);
+    void showResult({
+      variant: "error",
+      title: "Formulaire incomplet",
+      message: `${firstError.message} Corrigez le champ indiqué puis réessayez.`,
+    });
   };
 
   return (
@@ -329,13 +342,19 @@ export function QuotationForm({
           <p className="text-xs text-red-600">{errors.lines.message}</p>
         ) : null}
         <div className="space-y-3">
-          {fields.map((field, index) => (
+          {fields.map((field, index) => {
+            const lineErrors = errors.lines?.[index];
+            return (
             <div
               key={field.id}
               data-form-field={`lines.${index}`}
-              className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-800 md:grid-cols-12"
+              className={`grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-12 ${
+                lineErrors
+                  ? "border-red-300 dark:border-red-500/40"
+                  : "border-gray-200 dark:border-gray-800"
+              }`}
             >
-              <div className="md:col-span-3">
+              <div className="md:col-span-3 mt-0 md:mt-6">
                 <ItemPicker
                   onSelect={(item) => {
                     setValue(`lines.${index}.itemId`, item.id);
@@ -348,42 +367,87 @@ export function QuotationForm({
                   }}
                 />
               </div>
-              <div className="md:col-span-3">
+              <div
+                className="md:col-span-3"
+                data-form-field={`lines.${index}.description`}
+              >
                 <Label>Description</Label>
-                <Input {...register(`lines.${index}.description`)} />
+                <Input
+                  {...register(`lines.${index}.description`)}
+                  error={Boolean(lineErrors?.description)}
+                />
+                {lineErrors?.description ? (
+                  <p className="mt-1 text-xs text-red-600">
+                    {lineErrors.description.message}
+                  </p>
+                ) : null}
               </div>
-              <div className="md:col-span-1">
+              <div
+                className="md:col-span-1"
+                data-form-field={`lines.${index}.quantity`}
+              >
                 <Label>Qté</Label>
                 <Input
                   type="number"
                   min={0.01}
                   step="0.01"
+                  error={Boolean(lineErrors?.quantity)}
                   {...register(`lines.${index}.quantity`, { valueAsNumber: true })}
                 />
+                {lineErrors?.quantity ? (
+                  <p className="mt-1 text-xs text-red-600">
+                    {lineErrors.quantity.message}
+                  </p>
+                ) : null}
               </div>
-              <div className="md:col-span-2">
+              <div
+                className="md:col-span-2"
+                data-form-field={`lines.${index}.unitPriceHt`}
+              >
                 <Label>Prix unit. HT</Label>
                 <Input
                   type="number"
                   min={0}
                   step="0.01"
+                  error={Boolean(lineErrors?.unitPriceHt)}
                   {...register(`lines.${index}.unitPriceHt`, { valueAsNumber: true })}
                 />
+                {lineErrors?.unitPriceHt ? (
+                  <p className="mt-1 text-xs text-red-600">
+                    {lineErrors.unitPriceHt.message}
+                  </p>
+                ) : null}
               </div>
-              <div className="md:col-span-1">
+              <div
+                className="md:col-span-1"
+                data-form-field={`lines.${index}.discountPct`}
+              >
                 <Label>Rem. %</Label>
                 <Input
                   type="number"
                   min={0}
                   max={100}
                   step="0.01"
+                  error={Boolean(lineErrors?.discountPct)}
                   {...register(`lines.${index}.discountPct`, { valueAsNumber: true })}
                 />
+                {lineErrors?.discountPct ? (
+                  <p className="mt-1 text-xs text-red-600">
+                    {lineErrors.discountPct.message}
+                  </p>
+                ) : null}
               </div>
-              <div className="md:col-span-1">
+              <div
+                className="md:col-span-1"
+                data-form-field={`lines.${index}.taxRateId`}
+              >
                 <Label>TVA</Label>
                 <select
-                  className="h-11 w-full rounded-lg border border-gray-300 px-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                  className={`h-11 w-full rounded-lg border px-2 text-sm dark:bg-gray-900 ${
+                    lineErrors?.taxRateId
+                      ? "border-red-500 dark:border-red-500"
+                      : "border-gray-300 dark:border-gray-700"
+                  }`}
                   {...register(`lines.${index}.taxRateId`)}
                 >
                   {activeTaxRates.map((rate) => (
@@ -392,6 +456,11 @@ export function QuotationForm({
                     </option>
                   ))}
                 </select>
+                {lineErrors?.taxRateId ? (
+                  <p className="mt-1 text-xs text-red-600">
+                    {lineErrors.taxRateId.message}
+                  </p>
+                ) : null}
               </div>
               <div className="flex items-end md:col-span-1">
                 <button
@@ -404,7 +473,8 @@ export function QuotationForm({
                 </button>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
         <button
           type="button"
@@ -421,17 +491,21 @@ export function QuotationForm({
           <div className="space-y-3">
             <div data-form-field="paymentTermId">
               <Label>Conditions de paiement</Label>
-              <select
-                className="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm dark:border-gray-700 dark:bg-gray-900"
-                {...register("paymentTermId")}
-              >
-                <option value="">— Aucune —</option>
-                {paymentTerms.map((term) => (
-                  <option key={term.id} value={term.id}>
-                    {term.name}
-                  </option>
-                ))}
-              </select>
+              {paymentTermsQuery.isLoading ? (
+                <LoadingBlock label="Chargement des conditions de paiement..." />
+              ) : (
+                <select
+                  className="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm dark:border-gray-700 dark:bg-gray-900"
+                  {...register("paymentTermId")}
+                >
+                  <option value="">— Aucune —</option>
+                  {paymentTerms.map((term) => (
+                    <option key={term.id} value={term.id}>
+                      {term.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               {errors.paymentTermId ? (
                 <p className="mt-1 text-xs text-red-600">
                   {errors.paymentTermId.message}

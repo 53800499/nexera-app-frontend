@@ -64,6 +64,14 @@ export const catalogueApi = {
       { method: "DELETE" },
     ),
 
+  unarchiveItem: async (id: string): Promise<CatalogItem> => {
+    const item = await authorizedFetch<CatalogItem>(
+      `/catalogue/items/${id}/activate`,
+      { method: "PATCH" },
+    );
+    return { ...item, isArchived: false };
+  },
+
   // Prices
   listPrices: (itemId: string) =>
     authorizedFetch<CatalogItemPrice[]>(`/catalogue/items/${itemId}/prices`),

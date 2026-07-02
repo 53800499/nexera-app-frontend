@@ -14,7 +14,7 @@ export const CURRENCY_CODES = {
 
 export type CurrencyCode = (typeof CURRENCY_CODES)[keyof typeof CURRENCY_CODES];
 
-export const DEFAULT_CURRENCY: CurrencyCode = CURRENCY_CODES.EUR;
+export const DEFAULT_CURRENCY: CurrencyCode = CURRENCY_CODES.XOF;
 
 export const CURRENCY_LABELS: Record<CurrencyCode, string> = {
   EUR: "Euro",

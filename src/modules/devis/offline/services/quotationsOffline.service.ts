@@ -1,7 +1,12 @@
 import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
+import { isOfflineError } from "@/shared/core/OfflineError";
 import { isBrowserOnline } from "@/shared/hooks/useNetworkStatus";
 import { withTimeout } from "@/shared/lib/withTimeout";
 import { crmOfflineRepository } from "@/modules/crm/offline/services/crmOfflineRepository";
+import { ordersApi } from "@/modules/commandes/services/ordersApi.service";
+import { ordersOfflineRepository } from "@/modules/commandes/offline/services/ordersOfflineRepository";
+import { invoicesApi } from "@/modules/factures/services/invoicesApi.service";
+import { invoicesOfflineRepository } from "@/modules/factures/offline/services/invoicesOfflineRepository";
 import { quotationsApi } from "../../services/quotationsApi.service";
 import type {
   ChangeQuotationStatusPayload,
@@ -16,6 +21,10 @@ import type {
   SendQuotationResult,
   UpdateQuotationPayload,
 } from "../../types/quotation.types";
+import {
+  createQuotationPreviewUrl,
+  downloadQuotationPdf,
+} from "../../pdf/quotationPdf.service";
 import {
   clearQuotationsOfflineIfOnline,
   setQuotationsOfflineMode,
@@ -180,11 +189,12 @@ async function readWithOfflineFallback<T>(
       clearQuotationsOfflineIfOnline();
     }
     return data;
-  } catch {
-    if (!isBrowserOnline()) {
+  } catch (error) {
+    if (!isBrowserOnline() || isOfflineError(error)) {
       setQuotationsOffline(true);
+      return offlineData;
     }
-    return offlineData;
+    throw error;
   }
 }
 
@@ -319,27 +329,26 @@ export const quotationsOfflineService = {
   ): Promise<ConvertQuotationResult> {
     assertOnlineForAction();
     const result = await quotationsApi.convert(id, payload);
-    const quotation = await quotationsOfflineRepository.getQuotation(id);
-    if (quotation) {
-      await quotationsOfflineRepository.upsertQuotation(
-        {
-          ...quotation,
-          status: "converted",
-          convertedToOrderId:
-            payload.target === "order" ? result.targetId : quotation.convertedToOrderId,
-          convertedToInvoiceId:
-            payload.target === "invoice"
-              ? result.targetId
-              : quotation.convertedToInvoiceId,
-        },
-        "synced",
-      );
+
+    const quotation = await quotationsApi.byId(id);
+    await quotationsOfflineRepository.upsertQuotation(quotation, "synced");
+
+    if (result.target === "order") {
+      const order = await ordersApi.byId(result.targetId);
+      await ordersOfflineRepository.upsertOrder(order, "synced");
+    } else {
+      const invoice = await invoicesApi.byId(result.targetId);
+      await invoicesOfflineRepository.upsertInvoice(invoice, "synced");
     }
+
     return result;
   },
 
-  async openAuthenticatedAsset(url: string) {
-    assertOnlineForAction();
-    return quotationsApi.openAuthenticatedAsset(url);
+  async openQuotationPreview(quotation: QuotationDetail) {
+    return createQuotationPreviewUrl(quotation);
+  },
+
+  async downloadQuotationPdfFile(quotation: QuotationDetail) {
+    await downloadQuotationPdf(quotation);
   },
 };

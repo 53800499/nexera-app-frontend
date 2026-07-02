@@ -2,15 +2,17 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, type Resolver, type SubmitErrorHandler } from "react-hook-form";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { useClients } from "@/modules/crm/hooks/useClients";
 import type { ClientSummary } from "@/modules/crm/types/client.types";
-import { useToast } from "@/shared/components/feedback";
+import { useActionFeedback } from "@/shared/components/feedback";
 import { CurrencySelect } from "@/shared/components/form/CurrencySelect";
+import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
 import { applyFormApiErrors } from "@/shared/http/applyFormApiErrors";
+import { resolveFormErrorMessage } from "@/shared/http/resolveFormErrorMessage";
 import {
   focusFirstFormError,
   scrollToFormField,
@@ -108,7 +110,7 @@ export function PaymentForm({
   defaultClientId,
   onSubmit,
 }: Props) {
-  const toast = useToast();
+  const { showResult } = useActionFeedback();
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
@@ -125,7 +127,7 @@ export function PaymentForm({
       amount: 0,
       paymentMethod: "wire",
       allocationMode: "fifo",
-      currency: "EUR",
+      currency: DEFAULT_CURRENCY,
       exchangeRate: 1,
       paymentDate: new Date().toISOString().slice(0, 10),
       reference: "",
@@ -143,11 +145,14 @@ export function PaymentForm({
   const contextQuery = useClientPaymentContext(clientId);
   const context = contextQuery.data;
   const openInvoices = context?.openInvoices ?? [];
+  const syncedClientIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!context) return;
-    setValue("currency", context.defaultCurrency || "EUR");
-  }, [context, setValue]);
+    if (!context || !clientId) return;
+    if (syncedClientIdRef.current === clientId) return;
+    syncedClientIdRef.current = clientId;
+    setValue("currency", context.defaultCurrency || DEFAULT_CURRENCY);
+  }, [clientId, context, setValue]);
 
   const manualTotal = useMemo(
     () => (imputations ?? []).reduce((sum, row) => sum + (row.amount || 0), 0),
@@ -182,12 +187,21 @@ export function PaymentForm({
       await onSubmit(values);
     } catch (error) {
       const { message, firstField } = applyFormApiErrors(error, setError);
-      if (message) {
-        setFormError(message);
-        toast.error("Enregistrement impossible", message);
-      }
+      const displayMessage = message ?? resolveFormErrorMessage(error);
+      setFormError(displayMessage);
+      void showResult({
+        variant: "error",
+        title: "Enregistrement impossible",
+        message: firstField
+          ? `${displayMessage} Le champ concerné est mis en évidence ci-dessous.`
+          : displayMessage,
+      });
       if (firstField) {
         window.setTimeout(() => scrollToFormField(firstField), 0);
+      } else {
+        document
+          .getElementById("payment-form-error")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }
   };
@@ -198,7 +212,11 @@ export function PaymentForm({
     const firstError = focusFirstFormError(fieldErrors);
     if (!firstError) return;
     setFormError(firstError.message);
-    toast.error("Formulaire incomplet", firstError.message);
+    void showResult({
+      variant: "error",
+      title: "Formulaire incomplet",
+      message: `${firstError.message} Corrigez le champ indiqué puis réessayez.`,
+    });
   };
 
   return (
@@ -208,7 +226,10 @@ export function PaymentForm({
       noValidate
     >
       {formError ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+        <p
+          id="payment-form-error"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+        >
           {formError}
         </p>
       ) : null}

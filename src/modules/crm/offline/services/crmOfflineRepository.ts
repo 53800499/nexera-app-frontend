@@ -99,6 +99,19 @@ export const crmOfflineRepository = {
     return null;
   },
 
+  async getClientIncludingArchived(id: string): Promise<ClientDetail | null> {
+    const db = getCrmOfflineDb();
+    if (!db) return null;
+
+    const byId = await db.clients.get(id);
+    if (byId) return parseClient(byId);
+
+    const byServerId = await db.clients.where("serverId").equals(id).first();
+    if (byServerId) return parseClient(byServerId);
+
+    return null;
+  },
+
   async listClients(): Promise<ClientSummary[]> {
     const db = getCrmOfflineDb();
     if (!db) return [];
@@ -169,6 +182,24 @@ export const crmOfflineRepository = {
     await db.clients.update(id, {
       isDeleted: true,
       syncStatus: "pending",
+      updatedAt: new Date().toISOString(),
+    });
+  },
+
+  async restoreClient(id: string, syncStatus: SyncStatus = "pending") {
+    const db = getCrmOfflineDb();
+    if (!db) return;
+
+    const record = await db.clients.get(id);
+    if (!record) return;
+
+    const client = parseClient(record);
+    client.isArchived = false;
+
+    await db.clients.update(id, {
+      data: JSON.stringify(client),
+      isDeleted: false,
+      syncStatus,
       updatedAt: new Date().toISOString(),
     });
   },

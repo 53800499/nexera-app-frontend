@@ -55,6 +55,7 @@ export const crmSyncQueue = {
       "createClient",
       "updateClient",
       "archiveClient",
+      "unarchiveClient",
       "addContact",
       "updateContact",
       "removeContact",

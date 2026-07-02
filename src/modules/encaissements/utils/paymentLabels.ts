@@ -1,4 +1,5 @@
 import type { PaymentMethod } from "../types/payment.types";
+import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   wire: "Virement",
@@ -13,7 +14,10 @@ export function paymentMethodLabel(method: string) {
   return PAYMENT_METHOD_LABELS[key] ?? method;
 }
 
-export function formatPaymentMoney(value: number, currency = "EUR") {
+export function formatPaymentMoney(
+  value: number,
+  currency: string = DEFAULT_CURRENCY,
+) {
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency,

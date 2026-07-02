@@ -7,19 +7,53 @@ import { useAuthStore } from "@/modules/auth/store/authStore";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { RequirePermission } from "../components/RequirePermission";
-import { RoleForm } from "../components/RoleForm";
+import {
+  buildCreateRolePayload,
+  RoleForm,
+} from "../components/RoleForm";
 import { usePermissions } from "../hooks/usePermissions";
 import { useRoles } from "../hooks/useRoles";
+import type { RoleFormValues } from "../schemas/roleForm.schema";
 
 export default function CreateRolePage() {
   const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const tenantId = useAuthStore((state) => state.user?.tenantId ?? "");
   const { permissionsQuery } = usePermissions();
   const { createMutation } = useRoles();
+
+  const submit = async (values: RoleFormValues) => {
+    await runAction({
+      confirm: {
+        title: "Créer ce rôle ?",
+        message: `Le rôle « ${values.name} » (${values.code.toUpperCase()}) sera ajouté avec les permissions sélectionnées.`,
+        confirmLabel: "Créer",
+      },
+      loadingMessage: "Création du rôle...",
+      success: {
+        title: "Rôle créé",
+        message: values.name,
+      },
+      redirectTo: (role) => `/roles/${role.id}`,
+      redirectMessage: "Ouverture de la fiche rôle...",
+      error: {
+        title: "Création impossible",
+        message:
+          "Vérifiez le nom, le code (unique par organisation) et les permissions sélectionnées.",
+      },
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () =>
+        createMutation.mutateAsync(buildCreateRolePayload(values, tenantId)),
+    });
+  };
 
   return (
     <RequirePermission permission="manage:roles">
@@ -56,27 +90,12 @@ export default function CreateRolePage() {
         {permissionsQuery.data ? (
           <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
             <RoleForm
+              formKey="create"
               permissions={permissionsQuery.data}
-              isSubmitting={createMutation.isPending}
+              isSubmitting={createMutation.isPending || isBusy}
               submitLabel="Créer le rôle"
-              onSubmit={async (values) => {
-                try {
-                  const role = await createMutation.mutateAsync({
-                    name: values.name,
-                    code: values.code.toUpperCase(),
-                    description: values.description || undefined,
-                    tenantId,
-                    permissionIds: values.permissionIds,
-                  });
-                  toast.success("Rôle créé", role.name);
-                  router.push(`/roles/${role.id}`);
-                } catch {
-                  toast.error(
-                    "Création impossible",
-                    "Vérifiez que le code est unique pour ce tenant.",
-                  );
-                }
-              }}
+              onCancel={() => router.push("/roles")}
+              onSubmit={submit}
             />
           </div>
         ) : null}

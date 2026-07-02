@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeftIcon } from "@/icons";
-import { useToast } from "@/shared/components/feedback";
+import {
+  useActionFeedback,
+  useActionFeedbackStore,
+} from "@/shared/components/feedback";
 import { RequireCrmAccess } from "../components/RequireCrmAccess";
 import {
   buildCreateClientPayload,
@@ -15,10 +17,14 @@ import type { ClientFormValues } from "../schemas/clientForm.schema";
 import { useClients } from "../hooks/useClients";
 import { ClientDuplicateError } from "../types/client.types";
 import type { DuplicateMatch } from "../types/client.types";
+import { resolveFormErrorMessage } from "@/shared/http/resolveFormErrorMessage";
 
 export default function CreateClientPage() {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction, showResult, confirm, redirectWithLoader } =
+    useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { createMutation } = useClients();
   const [duplicates, setDuplicates] = useState<DuplicateMatch[] | null>(null);
   const [pendingValues, setPendingValues] = useState<ClientFormValues | null>(
@@ -29,22 +35,99 @@ export default function CreateClientPage() {
     values: ClientFormValues,
     confirmDuplicate = false,
   ) => {
+    const formatDuplicateDetails = (items: DuplicateMatch[]) =>
+      items
+        .map((dup) => {
+          const reasons =
+            dup.matchedOn.length > 0
+              ? dup.matchedOn.join(", ")
+              : "critères similaires";
+          return `- ${dup.companyName} (${dup.code}) — ${reasons}`;
+        })
+        .join("\n");
+
+    if (confirmDuplicate) {
+      const client = await runAction({
+        loadingMessage: "Création du client...",
+        success: {
+          title: "Client créé",
+          message: values.companyName,
+        },
+        error: {
+          title: "Création impossible",
+          message: "Vérifiez les champs obligatoires et réessayez.",
+        },
+        redirectTo: (created) => `/clients/${created.id}`,
+        redirectMessage: "Ouverture de la fiche client...",
+        rethrowOnError: true,
+        action: () =>
+          createMutation.mutateAsync(
+            buildCreateClientPayload(values, true),
+          ),
+      });
+
+      if (client) {
+        setDuplicates(null);
+        setPendingValues(null);
+      }
+      return;
+    }
+
+    const userConfirmed = await confirm({
+      title: "Créer ce client ?",
+      message: `Confirmer la création de la fiche ${values.companyName}.`,
+      confirmLabel: "Créer",
+    });
+    if (!userConfirmed) return;
+
     try {
-      const client = await createMutation.mutateAsync(
-        buildCreateClientPayload(values, confirmDuplicate),
-      );
-      toast.success("Client créé", client.companyName);
-      router.push(`/clients/${client.id}`);
+      await runAction({
+        loadingMessage: "Création du client...",
+        showResultOnError: false,
+        showResultOnSuccess: false,
+        rethrowOnError: true,
+        action: async () => {
+          const client = await createMutation.mutateAsync(
+            buildCreateClientPayload(values, false),
+          );
+          await showResult({
+            variant: "success",
+            title: "Client créé",
+            message: client.companyName,
+          });
+          redirectWithLoader(
+            `/clients/${client.id}`,
+            "Ouverture de la fiche client...",
+          );
+          return client;
+        },
+      });
     } catch (error) {
       if (error instanceof ClientDuplicateError) {
-        setDuplicates(error.duplicates);
-        setPendingValues(values);
+        const details = formatDuplicateDetails(error.duplicates);
+        const forceCreate = await confirm({
+          title: "Doublon potentiel détecté",
+          message:
+            "Clients similaires trouvés :\n" +
+            details +
+            "\n\nVoulez-vous créer le client malgré tout ?",
+          confirmLabel: "Créer malgré tout",
+          variant: "warning",
+        });
+        if (forceCreate) {
+          await submitClient(values, true);
+        } else {
+          setDuplicates(error.duplicates);
+          setPendingValues(values);
+        }
         return;
       }
-      toast.error(
-        "Création impossible",
-        "Vérifiez les champs obligatoires et réessayez.",
-      );
+
+      await showResult({
+        variant: "error",
+        title: "Création impossible",
+        message: resolveFormErrorMessage(error),
+      });
     }
   };
 
@@ -71,18 +154,18 @@ export default function CreateClientPage() {
         {duplicates && pendingValues ? (
           <DuplicateClientAlert
             duplicates={duplicates}
-            isSubmitting={createMutation.isPending}
+            isSubmitting={isBusy}
             onCancel={() => {
               setDuplicates(null);
               setPendingValues(null);
             }}
-            onConfirm={() => submitClient(pendingValues, true)}
+            onConfirm={() => void submitClient(pendingValues, true)}
           />
         ) : null}
 
         <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
           <ClientForm
-            isSubmitting={createMutation.isPending}
+            isSubmitting={isBusy}
             submitLabel="Créer le client"
             onSubmit={(values) => submitClient(values)}
           />

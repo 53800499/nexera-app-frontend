@@ -6,19 +6,24 @@ import Input from "@/components/form/input/InputField";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { RequireUserAccess } from "../components/RequireUserAccess";
 import { UsersStatsBar } from "../components/UsersStatsBar";
 import { UsersTable } from "../components/UsersTable";
 import { useUserAccess } from "../hooks/useUserAccess";
 import { useUsers } from "../hooks/useUsers";
+import type { UserSummary } from "../types/user.types";
 import { getUserFullName } from "../utils/userFormatters";
 
 type StatusFilter = "all" | "active" | "inactive";
 
 export default function UsersListPage() {
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { canManageUsers } = useUserAccess();
   const { usersQuery, toggleStatusMutation, removeMutation } = useUsers();
   const [search, setSearch] = useState("");
@@ -55,6 +60,58 @@ export default function UsersListPage() {
       inactive: users.filter((user) => !user.isActive).length,
     };
   }, [usersQuery.data]);
+
+  const handleToggleStatus = (user: UserSummary) => {
+    const fullName = getUserFullName(user);
+    void runAction({
+      confirm: {
+        title: user.isActive ? "Désactiver cet utilisateur ?" : "Activer cet utilisateur ?",
+        message: user.isActive
+          ? `${fullName} ne pourra plus se connecter.`
+          : `${fullName} pourra à nouveau accéder à l'application.`,
+        confirmLabel: user.isActive ? "Désactiver" : "Activer",
+        variant: user.isActive ? "warning" : "default",
+      },
+      loadingMessage: "Mise à jour du statut...",
+      success: {
+        title: user.isActive ? "Utilisateur désactivé" : "Utilisateur activé",
+        message: fullName,
+      },
+      error: {
+        title: "Action impossible",
+        message:
+          "Le statut n'a pas pu être modifié. Vérifiez vos droits et le compte concerné.",
+      },
+      action: () =>
+        toggleStatusMutation.mutateAsync({
+          id: user.id,
+          isActive: !user.isActive,
+        }),
+    });
+  };
+
+  const handleRemove = (user: UserSummary) => {
+    const fullName = getUserFullName(user);
+    void runAction({
+      confirm: {
+        title: "Supprimer ce compte ?",
+        message: `Le compte de ${fullName} sera désactivé définitivement.`,
+        confirmLabel: "Supprimer",
+        variant: "danger",
+      },
+      loadingMessage: "Suppression en cours...",
+      success: {
+        title: "Compte supprimé",
+        message: fullName,
+      },
+      error: {
+        title: "Suppression impossible",
+        message:
+          "Ce compte ne peut pas être supprimé. Vérifiez qu'il ne s'agit pas de votre propre compte ou du dernier administrateur.",
+      },
+      action: () => removeMutation.mutateAsync(user.id),
+    });
+  };
 
   return (
     <RequireUserAccess>
@@ -120,7 +177,7 @@ export default function UsersListPage() {
         {usersQuery.isError ? (
           <ErrorState
             title="Échec du chargement"
-            message="Impossible de charger la liste des utilisateurs."
+            message="Impossible de charger la liste des utilisateurs. Vérifiez votre connexion puis réessayez."
             onRetry={() => usersQuery.refetch()}
           />
         ) : null}
@@ -129,39 +186,9 @@ export default function UsersListPage() {
           <UsersTable
             users={filteredUsers}
             canManage={canManageUsers}
-            onToggleStatus={(user) => {
-              toggleStatusMutation.mutate(
-                { id: user.id, isActive: !user.isActive },
-                {
-                  onSuccess: () => {
-                    toast.success(
-                      user.isActive ? "Utilisateur désactivé" : "Utilisateur activé",
-                      getUserFullName(user),
-                    );
-                  },
-                  onError: () => {
-                    toast.error("Action impossible", "Le statut n'a pas pu être modifié.");
-                  },
-                },
-              );
-            }}
-            onRemove={(user) => {
-              if (
-                !window.confirm(
-                  `Désactiver définitivement le compte de ${getUserFullName(user)} ?`,
-                )
-              ) {
-                return;
-              }
-              removeMutation.mutate(user.id, {
-                onSuccess: () => {
-                  toast.success("Compte désactivé", getUserFullName(user));
-                },
-                onError: () => {
-                  toast.error("Suppression impossible", "Réessayez plus tard.");
-                },
-              });
-            }}
+            isBusy={isBusy}
+            onToggleStatus={handleToggleStatus}
+            onRemove={handleRemove}
           />
         ) : null}
       </div>

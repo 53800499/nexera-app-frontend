@@ -1,3 +1,5 @@
+import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
+
 export function getDefaultDashboardPeriod() {
   const now = new Date();
   const from = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -7,7 +9,10 @@ export function getDefaultDashboardPeriod() {
   };
 }
 
-export function formatDashboardMoney(value: number, currency = "EUR") {
+export function formatDashboardMoney(
+  value: number,
+  currency: string = DEFAULT_CURRENCY,
+) {
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency,
@@ -15,7 +20,10 @@ export function formatDashboardMoney(value: number, currency = "EUR") {
   }).format(value);
 }
 
-export function formatDashboardMoneyPrecise(value: number, currency = "EUR") {
+export function formatDashboardMoneyPrecise(
+  value: number,
+  currency: string = DEFAULT_CURRENCY,
+) {
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency,

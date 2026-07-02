@@ -6,7 +6,8 @@ import { ChevronLeftIcon } from "@/icons";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { PermissionsMatrix } from "../components/PermissionsMatrix";
 import { RequirePermission } from "../components/RequirePermission";
@@ -14,7 +15,10 @@ import { usePermissions } from "../hooks/usePermissions";
 import { useRoles } from "../hooks/useRoles";
 
 export default function PermissionsMatrixPage() {
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { rolesQuery, togglePermissionMutation } = useRoles();
   const { permissionsQuery } = usePermissions();
   const [updatingCell, setUpdatingCell] = useState<{
@@ -24,6 +28,35 @@ export default function PermissionsMatrixPage() {
 
   const isLoading = rolesQuery.isLoading || permissionsQuery.isLoading;
   const isError = rolesQuery.isError || permissionsQuery.isError;
+
+  const handleToggle = async (
+    roleId: string,
+    permissionId: string,
+    enabled: boolean,
+  ) => {
+    setUpdatingCell({ roleId, permissionId });
+    try {
+      await runAction({
+        showResultOnSuccess: false,
+        loadingMessage: enabled
+          ? "Ajout de la permission..."
+          : "Retrait de la permission...",
+        error: {
+          title: "Modification impossible",
+          message:
+            "La permission n'a pas pu être mise à jour. Vérifiez vos droits et que le rôle existe encore.",
+        },
+        action: () =>
+          togglePermissionMutation.mutateAsync({
+            roleId,
+            permissionId,
+            enabled,
+          }),
+      });
+    } finally {
+      setUpdatingCell(null);
+    }
+  };
 
   return (
     <RequirePermission permission="manage:roles">
@@ -63,27 +96,10 @@ export default function PermissionsMatrixPage() {
           <PermissionsMatrix
             roles={rolesQuery.data}
             permissions={permissionsQuery.data}
-            isUpdating={togglePermissionMutation.isPending}
+            isUpdating={togglePermissionMutation.isPending || isBusy}
             updatingCell={updatingCell}
             onToggle={(roleId, permissionId, enabled) => {
-              setUpdatingCell({ roleId, permissionId });
-              togglePermissionMutation.mutate(
-                { roleId, permissionId, enabled },
-                {
-                  onSuccess: () => {
-                    toast.success(
-                      enabled ? "Permission ajoutée" : "Permission retirée",
-                    );
-                  },
-                  onError: () => {
-                    toast.error(
-                      "Modification impossible",
-                      "La permission n'a pas pu être mise à jour.",
-                    );
-                  },
-                  onSettled: () => setUpdatingCell(null),
-                },
-              );
+              void handleToggle(roleId, permissionId, enabled);
             }}
           />
         ) : null}

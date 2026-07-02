@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ChevronLeftIcon } from "@/icons";
 import Input from "@/components/form/input/InputField";
@@ -10,8 +9,10 @@ import { DataTable, type DataTableColumn } from "@/shared/components/table";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
+import { resolveFormErrorMessage } from "@/shared/http/resolveFormErrorMessage";
 import { formatMoney } from "@/modules/devis/utils/quotationCalculations";
 import { ManualReminderForm } from "@/modules/relances/components/ManualReminderForm";
 import { ReminderLevelBadge } from "@/modules/relances/components/ReminderLevelBadge";
@@ -26,13 +27,14 @@ import {
   reminderTypeLabel,
 } from "@/modules/relances/utils/reminderLabels";
 import { canSendManualReminder } from "@/modules/relances/utils/reminderStatusRules";
-import { invoicesApi } from "../services/invoicesApi.service";
+import { useInvoicePdf } from "../pdf/useInvoicePdf";
+import { InvoicePdfPreviewModal } from "../components/InvoicePdfPreviewModal";
 import { RequireInvoiceAccess } from "../components/RequireInvoiceAccess";
 import { InvoicePaymentForm } from "../components/InvoicePaymentForm";
 import { InvoiceStatusBadge } from "../components/InvoiceStatusBadge";
 import { useInvoiceAccess } from "../hooks/useInvoiceAccess";
 import { useInvoice, useInvoices } from "../hooks/useInvoices";
-import type { InvoiceDetail, InvoiceLine } from "../types/invoice.types";
+import type { InvoiceLine } from "../types/invoice.types";
 import {
   invoiceStatusLabel,
   invoiceTypeLabel,
@@ -103,8 +105,11 @@ const lineColumns = (currency: string): DataTableColumn<InvoiceLine>[] => [
 ];
 
 export default function InvoiceDetailsPage({ id }: { id: string }) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction, showResult } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
+  const { preview, openPreview, downloadPdf, closePreview } = useInvoicePdf();
   const { canManageInvoices } = useInvoiceAccess();
   const invoiceQuery = useInvoice(id);
   const {
@@ -115,6 +120,7 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
     recordPaymentMutation,
   } = useInvoices();
   const [creditAmount, setCreditAmount] = useState<number | "">("");
+  const [creditAmountError, setCreditAmountError] = useState<string | null>(null);
   const [showCreditForm, setShowCreditForm] = useState(false);
   const [showReminderForm, setShowReminderForm] = useState(false);
 
@@ -130,38 +136,90 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
   const lines = invoice?.lines ?? [];
   const invoiceReminders = invoiceRemindersQuery.data ?? [];
 
-  const openPdf = () => {
-    void invoicesApi.openAuthenticatedAsset(invoicesApi.pdfUrl(id));
+  const handlePreview = () => {
+    if (!invoice) return;
+    void runAction({
+      loadingMessage: "Génération de l'aperçu...",
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () => openPreview(invoice),
+    }).catch((error) => {
+      void showResult({
+        variant: "error",
+        title: "Aperçu impossible",
+        message: resolveFormErrorMessage(error),
+      });
+    });
   };
 
-  const runAction = async (
-    label: string,
-    action: () => Promise<InvoiceDetail | void>,
-  ) => {
-    try {
-      await action();
-      toast.success(label, invoice?.number);
-      await invoiceQuery.refetch();
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Réessayez ou contactez un administrateur.";
-      toast.error("Action impossible", message);
-    }
+  const handleDownloadPdf = () => {
+    if (!invoice) return;
+    void runAction({
+      loadingMessage: "Génération du PDF...",
+      success: { title: "PDF téléchargé" },
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () => downloadPdf(invoice),
+    }).catch((error) => {
+      void showResult({
+        variant: "error",
+        title: "Génération PDF impossible",
+        message: resolveFormErrorMessage(error),
+      });
+    });
   };
 
   const createCreditNote = async () => {
+    setCreditAmountError(null);
+
+    if (creditAmount !== "" && creditAmount > invoice!.amountDue) {
+      const message = `Le montant ne peut pas dépasser le reste dû (${invoice!.amountDue.toFixed(2)} ${invoice!.currency}).`;
+      setCreditAmountError(message);
+      void showResult({
+        variant: "error",
+        title: "Avoir impossible",
+        message,
+      });
+      return;
+    }
+
     const payload =
       creditAmount !== "" && creditAmount > 0
         ? { amountTtc: creditAmount }
         : {};
-    const result = await creditNoteMutation.mutateAsync({ id, payload });
-    toast.success("Avoir créé", result.number);
-    setShowCreditForm(false);
-    setCreditAmount("");
-    await invoiceQuery.refetch();
-    router.push(`/factures/${result.id}`);
+
+    await runAction({
+      confirm: {
+        title: "Créer un avoir ?",
+        message: "Un nouvel avoir sera généré à partir de cette facture.",
+        confirmLabel: "Créer l'avoir",
+        variant: "warning",
+      },
+      loadingMessage: "Création de l'avoir...",
+      success: {
+        title: "Avoir créé",
+        message: "Redirection vers le nouvel avoir.",
+      },
+      redirectTo: (creditNote) => `/factures/${creditNote.id}`,
+      redirectMessage: "Ouverture de l'avoir...",
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: async () => {
+        const created = await creditNoteMutation.mutateAsync({ id, payload });
+        setShowCreditForm(false);
+        setCreditAmount("");
+        await invoiceQuery.refetch();
+        return created;
+      },
+    }).catch((error) => {
+      const message = resolveFormErrorMessage(error);
+      setCreditAmountError(message);
+      void showResult({
+        variant: "error",
+        title: "Création d'avoir impossible",
+        message,
+      });
+    });
   };
 
   return (
@@ -222,13 +280,26 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
                   {canIssueInvoice(status) ? (
                     <button
                       type="button"
-                      disabled={issueMutation.isPending}
                       onClick={() =>
-                        runAction("Facture émise", () =>
-                          issueMutation.mutateAsync(invoice.id),
-                        )
+                        void runAction({
+                          confirm: {
+                            title: "Émettre la facture ?",
+                            message:
+                              "La facture passera au statut émis et ne pourra plus être modifiée librement.",
+                            confirmLabel: "Émettre",
+                          },
+                          loadingMessage: "Émission de la facture...",
+                          success: {
+                            title: "Facture émise",
+                            message: invoice.number,
+                          },
+                          action: async () => {
+                            await issueMutation.mutateAsync(invoice.id);
+                            await invoiceQuery.refetch();
+                          },
+                        })
                       }
-                      className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
+                      className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
                     >
                       Émettre
                     </button>
@@ -236,11 +307,29 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
                   {canSendInvoice(status) ? (
                     <button
                       type="button"
-                      disabled={sendMutation.isPending}
                       onClick={() =>
-                        runAction("Facture envoyée", () =>
-                          sendMutation.mutateAsync({ id: invoice.id }),
-                        )
+                        void runAction({
+                          confirm: {
+                            title: "Envoyer la facture ?",
+                            message:
+                              "La facture sera marquée comme envoyée au client.",
+                            confirmLabel: "Envoyer",
+                          },
+                          loadingMessage: "Envoi de la facture...",
+                          success: {
+                            title: "Facture envoyée",
+                            message: invoice.number,
+                          },
+                          error: {
+                            title: "Envoi impossible",
+                            message:
+                              "Vérifiez le statut de la facture, l'e-mail du client et la configuration d'envoi dans Paramètres.",
+                          },
+                          action: async () => {
+                            await sendMutation.mutateAsync({ id: invoice.id });
+                            await invoiceQuery.refetch();
+                          },
+                        })
                       }
                       className="rounded-lg border border-indigo-300 px-4 py-2 text-sm text-indigo-700 hover:bg-indigo-50"
                     >
@@ -248,13 +337,22 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
                     </button>
                   ) : null}
                   {canDownloadInvoicePdf(status) ? (
-                    <button
-                      type="button"
-                      onClick={openPdf}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-                    >
-                      PDF
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={handlePreview}
+                        className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                      >
+                        Aperçu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDownloadPdf}
+                        className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                      >
+                        PDF
+                      </button>
+                    </>
                   ) : null}
                   {canCreateCreditNote(status) ? (
                     <button
@@ -268,27 +366,22 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
                   {canDeleteInvoice(status) ? (
                     <button
                       type="button"
-                      disabled={removeMutation.isPending}
-                      onClick={() => {
-                        if (
-                          !window.confirm("Supprimer ce brouillon de facture ?")
-                        ) {
-                          return;
-                        }
-                        removeMutation.mutate(invoice.id, {
-                          onSuccess: () => {
-                            toast.success("Facture supprimée");
-                            router.push("/factures");
+                      onClick={() =>
+                        void runAction({
+                          confirm: {
+                            title: "Supprimer ce brouillon ?",
+                            message:
+                              "Cette facture sera définitivement supprimée.",
+                            confirmLabel: "Supprimer",
+                            variant: "danger",
                           },
-                          onError: (error) =>
-                            toast.error(
-                              "Suppression impossible",
-                              error instanceof Error
-                                ? error.message
-                                : undefined,
-                            ),
-                        });
-                      }}
+                          loadingMessage: "Suppression en cours...",
+                          success: { title: "Facture supprimée" },
+                          redirectTo: "/factures",
+                          redirectMessage: "Retour à la liste des factures...",
+                          action: () => removeMutation.mutateAsync(invoice.id),
+                        })
+                      }
                       className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
                       Supprimer
@@ -309,7 +402,7 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
                 <h2 className="mb-3 font-medium">Nouvel avoir</h2>
                 <div className="flex flex-wrap items-end gap-3">
-                  <div className="min-w-[200px]">
+                  <div className="min-w-[200px]" data-form-field="amountTtc">
                     <Label>Montant TTC (optionnel)</Label>
                     <Input
                       type="number"
@@ -318,32 +411,32 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
                       step="0.01"
                       placeholder={`Max ${invoice.amountDue}`}
                       value={creditAmount}
-                      onChange={(event) =>
+                      error={Boolean(creditAmountError)}
+                      onChange={(event) => {
+                        setCreditAmountError(null);
                         setCreditAmount(
                           event.target.value
                             ? Number(event.target.value)
                             : "",
-                        )
-                      }
+                        );
+                      }}
                     />
-                    <p className="mt-1 text-xs text-gray-500">
-                      Laissez vide pour un avoir total basé sur les lignes.
-                    </p>
+                    {creditAmountError ? (
+                      <p className="mt-1 text-xs text-red-600">
+                        {creditAmountError}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Laissez vide pour un avoir total basé sur les lignes.
+                      </p>
+                    )}
                   </div>
                   <button
                     type="button"
-                    disabled={creditNoteMutation.isPending}
-                    onClick={() => {
-                      void createCreditNote().catch((error) => {
-                        toast.error(
-                          "Création impossible",
-                          error instanceof Error ? error.message : undefined,
-                        );
-                      });
-                    }}
-                    className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-60"
+                    onClick={() => void createCreditNote()}
+                    className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
                   >
-                    {creditNoteMutation.isPending ? "Création..." : "Confirmer"}
+                    Confirmer
                   </button>
                 </div>
               </div>
@@ -486,24 +579,39 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
                 <InvoicePaymentForm
                   amountDue={invoice.amountDue}
                   currency={invoice.currency}
-                  isSubmitting={recordPaymentMutation.isPending}
+                  isSubmitting={isBusy}
                   onSubmit={async (values) => {
-                    await recordPaymentMutation.mutateAsync({
-                      id: invoice.id,
-                      payload: {
-                        amount: values.amount,
-                        paymentMethod: values.paymentMethod,
-                        ...(values.paymentDate
-                          ? { paymentDate: values.paymentDate }
-                          : {}),
-                        ...(values.reference
-                          ? { reference: values.reference }
-                          : {}),
-                        ...(values.notes ? { notes: values.notes } : {}),
+                    await runAction({
+                      confirm: {
+                        title: "Enregistrer le paiement ?",
+                        message: `Montant : ${values.amount} ${invoice.currency}`,
+                        confirmLabel: "Enregistrer",
+                      },
+                      loadingMessage: "Enregistrement du paiement...",
+                      success: {
+                        title: "Paiement enregistré",
+                        message: invoice.number,
+                      },
+                      showResultOnError: false,
+                      rethrowOnError: true,
+                      action: async () => {
+                        await recordPaymentMutation.mutateAsync({
+                          id: invoice.id,
+                          payload: {
+                            amount: values.amount,
+                            paymentMethod: values.paymentMethod,
+                            ...(values.paymentDate
+                              ? { paymentDate: values.paymentDate }
+                              : {}),
+                            ...(values.reference
+                              ? { reference: values.reference }
+                              : {}),
+                            ...(values.notes ? { notes: values.notes } : {}),
+                          },
+                        });
+                        await invoiceQuery.refetch();
                       },
                     });
-                    toast.success("Paiement enregistré", invoice.number);
-                    await invoiceQuery.refetch();
                   }}
                 />
               </div>
@@ -524,23 +632,39 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
                 </div>
                 {showReminderForm ? (
                   <ManualReminderForm
-                    isSubmitting={sendManualMutation.isPending}
+                    isSubmitting={sendManualMutation.isPending || isBusy}
                     onCancel={() => setShowReminderForm(false)}
                     onSubmit={async (values: ManualReminderFormValues) => {
-                      await sendManualMutation.mutateAsync({
-                        invoiceId: invoice.id,
-                        payload: {
-                          message: values.message,
-                          channel: values.channel,
-                          ...(values.subject?.trim()
-                            ? { subject: values.subject.trim() }
-                            : {}),
-                          ...(values.level ? { level: values.level } : {}),
+                      await runAction({
+                        confirm: {
+                          title: "Envoyer la relance ?",
+                          message:
+                            "Un message de relance sera envoyé au client selon le canal choisi.",
+                          confirmLabel: "Envoyer",
+                        },
+                        loadingMessage: "Envoi de la relance...",
+                        success: {
+                          title: "Relance envoyée",
+                          message: invoice.number,
+                        },
+                        showResultOnError: false,
+                        rethrowOnError: true,
+                        action: async () => {
+                          await sendManualMutation.mutateAsync({
+                            invoiceId: invoice.id,
+                            payload: {
+                              message: values.message,
+                              channel: values.channel,
+                              ...(values.subject?.trim()
+                                ? { subject: values.subject.trim() }
+                                : {}),
+                              ...(values.level ? { level: values.level } : {}),
+                            },
+                          });
+                          setShowReminderForm(false);
+                          await invoiceRemindersQuery.refetch();
                         },
                       });
-                      toast.success("Relance envoyée", invoice.number);
-                      setShowReminderForm(false);
-                      await invoiceRemindersQuery.refetch();
                     }}
                   />
                 ) : (
@@ -660,6 +784,11 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
           </>
         ) : null}
       </div>
+      <InvoicePdfPreviewModal
+        preview={preview}
+        invoiceNumber={invoice?.number}
+        onClose={closePreview}
+      />
     </RequireInvoiceAccess>
   );
 }

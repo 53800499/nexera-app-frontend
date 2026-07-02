@@ -3,6 +3,7 @@ import { AppError, AUTH_ERRORS } from "@/shared/core/AppError";
 import { OfflineError } from "@/shared/core/OfflineError";
 import { isBrowserOnline } from "@/shared/hooks/useNetworkStatus";
 import { fetchWithOfflineGuard } from "@/shared/http/fetchWithOfflineGuard";
+import { refreshAccessToken } from "@/shared/http/refreshAccessToken";
 import { tokenStorage } from "@/modules/auth/services/tokenStorage.service";
 import type {
   CheckDuplicatesResult,
@@ -25,6 +26,7 @@ type ListParams = {
 async function authorizedFetch<T>(
   path: string,
   options: RequestInit = {},
+  retryOnAuthFail = true,
 ): Promise<T> {
   if (!isBrowserOnline()) {
     throw new OfflineError();
@@ -44,6 +46,13 @@ async function authorizedFetch<T>(
     ...options,
     headers,
   });
+
+  if (response.status === 401 && path !== "/auth/refresh" && retryOnAuthFail) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      return authorizedFetch<T>(path, options, false);
+    }
+  }
 
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as {
@@ -93,7 +102,12 @@ async function authorizedFetch<T>(
     return undefined as T;
   }
 
-  return response.json() as Promise<T>;
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+
+  return JSON.parse(text) as T;
 }
 
 export const clientsApi = {
@@ -138,10 +152,31 @@ export const clientsApi = {
       body: JSON.stringify(payload),
     }),
 
-  archive: (id: string) =>
-    authorizedFetch<{ message: string; archived: boolean }>(`/clients/${id}`, {
-      method: "DELETE",
-    }),
+  archive: async (id: string) => {
+    try {
+      await authorizedFetch<void>(`/clients/${id}/deactivate`, {
+        method: "PATCH",
+      });
+      return { message: "Client archivé", archived: true };
+    } catch (error) {
+      if (error instanceof AppError && error.statusCode === 404) {
+        return authorizedFetch<{ message: string; archived: boolean }>(
+          `/clients/${id}`,
+          { method: "DELETE" },
+        );
+      }
+      throw error;
+    }
+  },
+
+  unarchive: async (id: string): Promise<ClientDetail> => {
+    const result = await authorizedFetch<ClientDetail>(
+      `/clients/${id}/activate`,
+      { method: "PATCH" },
+    );
+
+    return { ...result, isArchived: false };
+  },
 
   addContact: (clientId: string, payload: CreateContactPayload) =>
     authorizedFetch<Contact>(`/clients/${clientId}/contacts`, {

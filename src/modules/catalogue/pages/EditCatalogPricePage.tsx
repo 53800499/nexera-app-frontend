@@ -1,12 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeftIcon } from "@/icons";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { RequireCatalogAccess } from "../components/RequireCatalogAccess";
 import { CatalogPriceForm } from "../components/CatalogPriceForm";
@@ -26,8 +26,10 @@ export default function EditCatalogPricePage({
   itemId: string;
   priceId: string;
 }) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction, redirectWithLoader } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const priceQuery = useCatalogPrice(priceId);
   const { updatePriceMutation } = useUpdateCatalogPrice(itemId, priceId);
 
@@ -109,19 +111,36 @@ export default function EditCatalogPricePage({
                     mode="edit"
                     price={priceQuery.data}
                     defaultValues={priceToEditFormValues(priceQuery.data)}
-                    isSubmitting={updatePriceMutation.isPending}
+                    isSubmitting={isBusy}
                     submitLabel="Enregistrer les modifications"
-                    onCancel={() => router.push(backHref)}
+                    onCancel={() =>
+                      redirectWithLoader(backHref, "Retour à la fiche article...")
+                    }
                     onSubmit={async (values) => {
-                      try {
-                        await updatePriceMutation.mutateAsync(
-                          buildUpdatePricePayload(values),
-                        );
-                        toast.success("Tarif mis à jour");
-                        router.push(backHref);
-                      } catch {
-                        toast.error("Modification impossible");
-                      }
+                      const itemName =
+                        priceQuery.data.item?.name ?? "l'article";
+                      await runAction({
+                        confirm: {
+                          title: "Enregistrer les modifications ?",
+                          message: `Mettre à jour le tarif de ${itemName}.`,
+                          confirmLabel: "Enregistrer",
+                        },
+                        loadingMessage: "Enregistrement du tarif...",
+                        success: {
+                          title: "Tarif mis à jour",
+                          message: itemName,
+                        },
+                        error: {
+                          title: "Modification impossible",
+                          message: "Vérifiez les champs et réessayez.",
+                        },
+                        redirectTo: backHref,
+                        redirectMessage: "Retour à la fiche article...",
+                        action: () =>
+                          updatePriceMutation.mutateAsync(
+                            buildUpdatePricePayload(values),
+                          ),
+                      });
                     }}
                   />
                 </div>

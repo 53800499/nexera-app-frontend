@@ -1,12 +1,13 @@
 import type { QuotationTotals } from "../utils/quotationCalculations";
 import { formatMoney } from "../utils/quotationCalculations";
+import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
 
 type Props = {
   totals: QuotationTotals;
   currency?: string;
 };
 
-export function QuotationTotalsPanel({ totals, currency = "EUR" }: Props) {
+export function QuotationTotalsPanel({ totals, currency = DEFAULT_CURRENCY }: Props) {
   return (
     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/50">
       <h3 className="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">

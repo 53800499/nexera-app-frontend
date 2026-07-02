@@ -1,12 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeftIcon } from "@/icons";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { RequireCatalogAccess } from "../components/RequireCatalogAccess";
 import { CatalogPriceForm } from "../components/CatalogPriceForm";
@@ -14,8 +14,10 @@ import { useCatalogItem, useCatalogItemPrices } from "../hooks/useCatalogue";
 import { buildCreatePricePayload } from "../utils/catalogPriceMappers";
 
 export default function CreateCatalogPricePage({ itemId }: { itemId: string }) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction, redirectWithLoader } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const itemQuery = useCatalogItem(itemId);
   const { createPriceMutation } = useCatalogItemPrices(itemId);
 
@@ -77,19 +79,37 @@ export default function CreateCatalogPricePage({ itemId }: { itemId: string }) {
               <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
                 <CatalogPriceForm
                   mode="create"
-                  isSubmitting={createPriceMutation.isPending}
+                  isSubmitting={isBusy}
                   submitLabel="Ajouter le tarif"
-                  onCancel={() => router.push(`/catalogue/${itemId}`)}
+                  onCancel={() =>
+                    redirectWithLoader(
+                      `/catalogue/${itemId}`,
+                      "Retour à la fiche article...",
+                    )
+                  }
                   onSubmit={async (values, clientId) => {
-                    try {
-                      await createPriceMutation.mutateAsync(
-                        buildCreatePricePayload(values, clientId),
-                      );
-                      toast.success("Tarif ajouté");
-                      router.push(`/catalogue/${itemId}`);
-                    } catch {
-                      toast.error("Impossible d'ajouter le tarif");
-                    }
+                    await runAction({
+                      confirm: {
+                        title: "Ajouter ce tarif ?",
+                        message: `Confirmer l'ajout d'un tarif spécifique pour ${itemQuery.data.name}.`,
+                        confirmLabel: "Ajouter",
+                      },
+                      loadingMessage: "Ajout du tarif...",
+                      success: {
+                        title: "Tarif ajouté",
+                        message: itemQuery.data.name,
+                      },
+                      error: {
+                        title: "Impossible d'ajouter le tarif",
+                        message: "Vérifiez les champs et réessayez.",
+                      },
+                      redirectTo: `/catalogue/${itemId}`,
+                      redirectMessage: "Retour à la fiche article...",
+                      action: () =>
+                        createPriceMutation.mutateAsync(
+                          buildCreatePricePayload(values, clientId),
+                        ),
+                    });
                   }}
                 />
               </div>

@@ -1,12 +1,30 @@
 import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
 import { ApiValidationError } from "@/shared/core/ApiValidationError";
+import { fieldDisplayRank } from "@/shared/forms/formErrorFocus";
+import { resolveFormErrorMessage } from "./resolveFormErrorMessage";
 
 const API_FIELD_ORDER = [
+  "email",
+  "firstName",
+  "lastName",
+  "password",
+  "roleIds",
+  "name",
+  "code",
+  "description",
+  "permissionIds",
+  "isActive",
+  "requestPasswordReset",
   "clientId",
+  "orderId",
+  "quotationId",
+  "invoiceType",
   "issueDate",
+  "dueDate",
   "expiryDate",
   "validUntil",
   "currency",
+  "exchangeRate",
   "discountPct",
   "globalDiscountPct",
   "paymentTermId",
@@ -14,17 +32,45 @@ const API_FIELD_ORDER = [
   "notes",
   "internalNotes",
   "legalMentions",
+  "amount",
+  "paymentMethod",
+  "paymentDate",
+  "allocationMode",
+  "imputations",
+  "reference",
+  "cancelReason",
+  "reason",
+  "message",
+  "subject",
+  "channel",
+  "level",
+  "isEnabled",
+  "level1DaysAfterDue",
+  "level2DaysAfterDue",
+  "level3DaysAfterDue",
+  "commercialEmail",
+  "directorEmail",
+  "amountTtc",
   "lines",
   "status",
   "target",
 ] as const;
 
-/** Champs API → champs formulaire React Hook Form. */
+/** Champs API → champs formulaire React Hook Form (surcharge possible par formulaire). */
 const API_FIELD_TO_FORM: Record<string, string> = {
   discountPct: "globalDiscountPct",
   expiryDate: "validUntil",
-  internalNotes: "legalMentions",
   paymentTerms: "paymentTermId",
+  reason: "cancelReason",
+};
+
+const API_LINE_SUBFIELD_TO_FORM: Record<string, string> = {
+  discountPct: "discountPct",
+  unitPriceHt: "unitPriceHt",
+  taxRateId: "taxRateId",
+  description: "description",
+  quantity: "quantity",
+  itemId: "itemId",
 };
 
 export type FormApiErrorResult = {
@@ -32,24 +78,45 @@ export type FormApiErrorResult = {
   firstField: string | null;
 };
 
+function normalizeApiFieldKey(
+  field: string,
+  fieldMap?: Record<string, string>,
+): string {
+  const lineMatch = field.match(/^lines[\[.](\d+)[\].](\w+)$/i);
+  if (lineMatch) {
+    const [, index, subField] = lineMatch;
+    const mapped = API_LINE_SUBFIELD_TO_FORM[subField] ?? subField;
+    return `lines.${index}.${mapped}`;
+  }
+
+  const mapping = { ...API_FIELD_TO_FORM, ...fieldMap };
+  return mapping[field] ?? field;
+}
+
 export function applyFormApiErrors<T extends FieldValues>(
   error: unknown,
   setError: UseFormSetError<T>,
+  fieldMap?: Record<string, string>,
 ): FormApiErrorResult {
   if (!(error instanceof ApiValidationError)) {
     return {
-      message: error instanceof Error ? error.message : null,
+      message: resolveFormErrorMessage(error),
       firstField: null,
     };
   }
 
   let firstField: string | null = null;
+  let firstFieldRank = Number.POSITIVE_INFINITY;
 
   const assignField = (field: string, message: string) => {
     if (field === "root") return;
-    const formField = API_FIELD_TO_FORM[field] ?? field;
+    const formField = normalizeApiFieldKey(field, fieldMap);
     setError(formField as Path<T>, { type: "server", message });
-    if (!firstField) firstField = formField;
+    const rank = fieldDisplayRank(formField);
+    if (rank < firstFieldRank) {
+      firstFieldRank = rank;
+      firstField = formField;
+    }
   };
 
   for (const field of API_FIELD_ORDER) {

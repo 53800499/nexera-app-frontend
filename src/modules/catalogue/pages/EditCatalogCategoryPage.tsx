@@ -1,12 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeftIcon } from "@/icons";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { RequireCatalogAccess } from "../components/RequireCatalogAccess";
 import { CatalogCategoryForm } from "../components/CatalogCategoryForm";
@@ -17,12 +17,14 @@ import {
 } from "../utils/catalogCategoryMappers";
 
 export default function EditCatalogCategoryPage({ id }: { id: string }) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction, redirectWithLoader } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const categoryQuery = useCatalogCategory(id);
   const { categoriesQuery, updateCategoryMutation } = useCatalogCategories();
 
-  const isLoading = categoryQuery.isLoading || categoriesQuery.isLoading;
+  const isPageLoading = categoryQuery.isLoading || categoriesQuery.isLoading;
 
   return (
     <RequireCatalogAccess requireManage>
@@ -35,7 +37,7 @@ export default function EditCatalogCategoryPage({ id }: { id: string }) {
           Retour au catalogue
         </Link>
 
-        {isLoading && <LoadingBlock label="Chargement de la catégorie..." />}
+        {isPageLoading && <LoadingBlock label="Chargement de la catégorie..." />}
 
         {categoryQuery.isError && (
           <ErrorState
@@ -67,20 +69,36 @@ export default function EditCatalogCategoryPage({ id }: { id: string }) {
                 categories={categoriesQuery.data}
                 excludeCategoryId={id}
                 defaultValues={categoryToFormValues(categoryQuery.data)}
-                isSubmitting={updateCategoryMutation.isPending}
+                isSubmitting={isBusy}
                 submitLabel="Enregistrer les modifications"
-                onCancel={() => router.push("/catalogue")}
+                onCancel={() =>
+                  redirectWithLoader("/catalogue", "Retour au catalogue...")
+                }
                 onSubmit={async (values) => {
-                  try {
-                    await updateCategoryMutation.mutateAsync({
-                      id,
-                      payload: buildUpdateCategoryPayload(values),
-                    });
-                    toast.success("Catégorie mise à jour");
-                    router.push("/catalogue");
-                  } catch {
-                    toast.error("Modification impossible");
-                  }
+                  const categoryName = categoryQuery.data.name;
+                  await runAction({
+                    confirm: {
+                      title: "Enregistrer les modifications ?",
+                      message: `Mettre à jour la catégorie ${categoryName}.`,
+                      confirmLabel: "Enregistrer",
+                    },
+                    loadingMessage: "Enregistrement de la catégorie...",
+                    success: {
+                      title: "Catégorie mise à jour",
+                      message: categoryName,
+                    },
+                    error: {
+                      title: "Modification impossible",
+                      message: "Vérifiez les champs et réessayez.",
+                    },
+                    redirectTo: "/catalogue",
+                    redirectMessage: "Retour au catalogue...",
+                    action: () =>
+                      updateCategoryMutation.mutateAsync({
+                        id,
+                        payload: buildUpdateCategoryPayload(values),
+                      }),
+                  });
                 }}
               />
             </div>

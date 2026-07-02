@@ -4,6 +4,8 @@ import { useState } from "react";
 import { DuplicateClientAlert } from "../components/DuplicateClientAlert";
 import type { DuplicateMatch } from "../types/client.types";
 import { useCheckDuplicates } from "../hooks/useCheckDuplicates";
+import { useActionFeedback } from "@/shared/components/feedback";
+import { resolveFormErrorMessage } from "@/shared/http/resolveFormErrorMessage";
 
 type Props = {
   siret?: string;
@@ -18,9 +20,19 @@ export function ClientDuplicateChecker({
   email,
   companyName,
 }: Props) {
+  const { runAction, showResult } = useActionFeedback();
   const checkDuplicates = useCheckDuplicates();
   const [duplicates, setDuplicates] = useState<DuplicateMatch[] | null>(null);
   const [checked, setChecked] = useState(false);
+
+  const formatDuplicateDetails = (items: DuplicateMatch[]) =>
+    items
+      .map((dup) => {
+        const reasons =
+          dup.matchedOn.length > 0 ? dup.matchedOn.join(", ") : "critères similaires";
+        return `- ${dup.companyName} (${dup.code}) — ${reasons}`;
+      })
+      .join("\n");
 
   const runCheck = async () => {
     const hasCriteria =
@@ -35,17 +47,43 @@ export function ClientDuplicateChecker({
       return;
     }
 
+    let foundDuplicates: DuplicateMatch[] = [];
     try {
-      const result = await checkDuplicates.mutateAsync({
-        siret: siret?.trim() || undefined,
-        taxId: taxId?.trim() || undefined,
-        email: email?.trim() || undefined,
-        companyName: companyName?.trim() || undefined,
+      await runAction({
+        loadingMessage: "Vérification des doublons...",
+        showResultOnSuccess: false,
+        showResultOnError: false,
+        action: async () => {
+          const result = await checkDuplicates.mutateAsync({
+            siret: siret?.trim() || undefined,
+            taxId: taxId?.trim() || undefined,
+            email: email?.trim() || undefined,
+            companyName: companyName?.trim() || undefined,
+          });
+          setChecked(true);
+          setDuplicates(result.hasDuplicates ? result.duplicates : null);
+          foundDuplicates = result.hasDuplicates ? result.duplicates : [];
+          return result;
+        },
       });
-      setChecked(true);
-      setDuplicates(result.hasDuplicates ? result.duplicates : null);
-    } catch {
-      setDuplicates(null);
+    } catch (error) {
+      await showResult({
+        variant: "error",
+        title: "Vérification impossible",
+        message: resolveFormErrorMessage(error),
+      });
+      return;
+    }
+
+    if (foundDuplicates.length > 0) {
+      await showResult({
+        variant: "error",
+        title: "Doublons potentiels détectés",
+        message:
+          "Clients similaires trouvés :\n" +
+          formatDuplicateDetails(foundDuplicates) +
+          "\n\nVous pouvez poursuivre la création après vérification.",
+      });
     }
   };
 
@@ -53,13 +91,10 @@ export function ClientDuplicateChecker({
     return (
       <button
         type="button"
-        onClick={runCheck}
-        disabled={checkDuplicates.isPending}
-        className="text-sm font-medium text-brand-500 hover:text-brand-600 disabled:opacity-50"
+        onClick={() => void runCheck()}
+        className="text-sm font-medium text-brand-500 hover:text-brand-600 mr-6"
       >
-        {checkDuplicates.isPending
-          ? "Vérification des doublons..."
-          : "Vérifier les doublons potentiels"}
+        Vérifier les doublons potentiels
       </button>
     );
   }

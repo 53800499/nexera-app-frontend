@@ -6,16 +6,51 @@ import { ChevronLeftIcon } from "@/icons";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
+import {
+  buildCreateUserPayload,
+  UserForm,
+} from "../components/UserForm";
 import { RequireUserAccess } from "../components/RequireUserAccess";
-import { UserForm } from "../components/UserForm";
+import type { CreateUserFormValues } from "../schemas/userForm.schema";
 import { useUsers } from "../hooks/useUsers";
 
 export default function CreateUserPage() {
   const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { rolesQuery, createMutation } = useUsers();
+
+  const submit = async (values: CreateUserFormValues) => {
+    await runAction({
+      confirm: {
+        title: "Créer cet utilisateur ?",
+        message:
+          "Un compte sera créé et un e-mail d'invitation sera envoyé si aucun mot de passe n'est défini.",
+        confirmLabel: "Créer",
+      },
+      loadingMessage: "Création de l'utilisateur...",
+      success: {
+        title: "Utilisateur créé",
+        message: `${values.firstName} ${values.lastName} a été ajouté.`,
+      },
+      redirectTo: (user) => `/utilisateurs/${user.id}`,
+      redirectMessage: "Ouverture de la fiche utilisateur...",
+      error: {
+        title: "Création impossible",
+        message:
+          "Vérifiez l'e-mail, le mot de passe (8 caractères min.) et les rôles sélectionnés.",
+      },
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () =>
+        createMutation.mutateAsync(buildCreateUserPayload(values)),
+    });
+  };
 
   return (
     <RequireUserAccess requireManage>
@@ -45,7 +80,7 @@ export default function CreateUserPage() {
         {rolesQuery.isError ? (
           <ErrorState
             title="Échec du chargement"
-            message="Impossible de charger les rôles disponibles."
+            message="Impossible de charger les rôles disponibles. Vérifiez votre connexion puis réessayez."
             onRetry={() => rolesQuery.refetch()}
           />
         ) : null}
@@ -54,33 +89,12 @@ export default function CreateUserPage() {
           <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 lg:p-6">
             <UserForm
               mode="create"
+              formKey="create"
               roles={rolesQuery.data}
-              isSubmitting={createMutation.isPending}
+              isSubmitting={createMutation.isPending || isBusy}
               submitLabel="Créer l'utilisateur"
               onCancel={() => router.push("/utilisateurs")}
-              onSubmit={async (values) => {
-                try {
-                  await createMutation.mutateAsync({
-                    email: values.email,
-                    firstName: values.firstName,
-                    lastName: values.lastName,
-                    password: values.password || undefined,
-                    isActive: values.isActive,
-                    requestPasswordReset: values.requestPasswordReset,
-                    roleIds: values.roleIds ?? [],
-                  });
-                  toast.success(
-                    "Utilisateur créé",
-                    `${values.firstName} ${values.lastName} a été ajouté.`,
-                  );
-                  router.push("/utilisateurs");
-                } catch {
-                  toast.error(
-                    "Création impossible",
-                    "Vérifiez les informations saisies et réessayez.",
-                  );
-                }
-              }}
+              onSubmit={submit}
             />
           </div>
         ) : null}

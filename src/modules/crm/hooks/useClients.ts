@@ -84,6 +84,17 @@ export function useClients(params: ListParams = {}) {
     },
   });
 
+  const unarchiveMutation = useMutation({
+    ...crmMutationOptions,
+    mutationFn: (id: string) => clientsOfflineService.unarchive(id),
+    onSuccess: (client, id) => {
+      queryClient.setQueryData(["clients", id], client);
+      queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ["clients", id] });
+      void refreshCrmSyncMeta();
+    },
+  });
+
   const addContactMutation = useMutation({
     ...crmMutationOptions,
     mutationFn: ({
@@ -136,6 +147,7 @@ export function useClients(params: ListParams = {}) {
     createMutation,
     updateMutation,
     archiveMutation,
+    unarchiveMutation,
     addContactMutation,
     updateContactMutation,
     removeContactMutation,

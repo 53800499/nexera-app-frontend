@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ChevronLeftIcon } from "@/icons";
 import { DataTable, type DataTableColumn } from "@/shared/components/table";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { formatMoney } from "@/modules/devis/utils/quotationCalculations";
 import { RequireOrderAccess } from "../components/RequireOrderAccess";
@@ -72,8 +72,10 @@ const lineColumns = (currency: string): DataTableColumn<OrderLine>[] => [
 ];
 
 export default function OrderDetailsPage({ id }: { id: string }) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { canManageOrders } = useOrderAccess();
   const orderQuery = useOrder(id);
   const {
@@ -87,30 +89,30 @@ export default function OrderDetailsPage({ id }: { id: string }) {
   const status = order ? normalizeOrderStatus(order.status) : null;
   const discountPct = order?.discountPct ?? 0;
 
-  const runAction = async (
-    label: string,
-    action: () => Promise<OrderDetail | void>,
-  ) => {
-    try {
-      await action();
-      toast.success(label, order?.number);
-      await orderQuery.refetch();
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Réessayez ou contactez un administrateur.";
-      toast.error("Action impossible", message);
-    }
-  };
-
   const createInvoice = async (
     payload: Parameters<typeof createInvoiceMutation.mutateAsync>[0]["payload"],
   ) => {
-    const result = await createInvoiceMutation.mutateAsync({ id, payload });
-    toast.success("Facture créée", result.invoice.number);
-    await orderQuery.refetch();
-    router.push(`/factures/${result.invoice.id}`);
+    await runAction({
+      confirm: {
+        title: "Créer la facture ?",
+        message: "Une facture sera générée à partir de ce bon de commande.",
+        confirmLabel: "Créer la facture",
+      },
+      loadingMessage: "Création de la facture...",
+      success: {
+        title: "Facture créée",
+        message: order?.number,
+      },
+      redirectTo: (result) => `/factures/${result.invoice.id}`,
+      redirectMessage: "Ouverture de la facture...",
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: async () => {
+        const result = await createInvoiceMutation.mutateAsync({ id, payload });
+        await orderQuery.refetch();
+        return result;
+      },
+    });
   };
 
   return (
@@ -165,13 +167,29 @@ export default function OrderDetailsPage({ id }: { id: string }) {
                   {canConfirmOrder(status) ? (
                     <button
                       type="button"
-                      disabled={confirmMutation.isPending}
                       onClick={() =>
-                        runAction("BC confirmé", () =>
-                          confirmMutation.mutateAsync(order.id),
-                        )
+                        void runAction({
+                          confirm: {
+                            title: "Confirmer ce bon de commande ?",
+                            message:
+                              "Le BC passera au statut confirmé. Cette action est irréversible.",
+                            confirmLabel: "Confirmer",
+                          },
+                          loadingMessage: "Confirmation en cours...",
+                          success: {
+                            title: "BC confirmé",
+                            message: order.number,
+                          },
+                          action: async () => {
+                            const updated = await confirmMutation.mutateAsync(
+                              order.id,
+                            );
+                            await orderQuery.refetch();
+                            return updated;
+                          },
+                        })
                       }
-                      className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
+                      className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
                     >
                       Confirmer
                     </button>
@@ -179,19 +197,32 @@ export default function OrderDetailsPage({ id }: { id: string }) {
                   {canCancelOrder(status) ? (
                     <button
                       type="button"
-                      disabled={cancelMutation.isPending}
-                      onClick={() => {
-                        if (
-                          !window.confirm(
-                            "Annuler ce bon de commande ? Cette action est irréversible.",
-                          )
-                        ) {
-                          return;
-                        }
-                        runAction("BC annulé", () =>
-                          cancelMutation.mutateAsync(order.id),
-                        );
-                      }}
+                      onClick={() =>
+                        void runAction({
+                          confirm: {
+                            title: "Annuler ce bon de commande ?",
+                            message:
+                              "Cette action est irréversible.",
+                            confirmLabel: "Annuler le BC",
+                            variant: "danger",
+                          },
+                          loadingMessage: "Annulation en cours...",
+                          success: {
+                            title: "BC annulé",
+                            message: order.number,
+                          },
+                          error: {
+                            title: "Annulation impossible",
+                          },
+                          action: async () => {
+                            const updated = await cancelMutation.mutateAsync(
+                              order.id,
+                            );
+                            await orderQuery.refetch();
+                            return updated;
+                          },
+                        })
+                      }
                       className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
                       Annuler
@@ -200,27 +231,25 @@ export default function OrderDetailsPage({ id }: { id: string }) {
                   {canDeleteOrder(status) ? (
                     <button
                       type="button"
-                      disabled={removeMutation.isPending}
-                      onClick={() => {
-                        if (
-                          !window.confirm("Supprimer ce brouillon de BC ?")
-                        ) {
-                          return;
-                        }
-                        removeMutation.mutate(order.id, {
-                          onSuccess: () => {
-                            toast.success("BC supprimé");
-                            router.push("/commandes");
+                      onClick={() =>
+                        void runAction({
+                          confirm: {
+                            title: "Supprimer ce brouillon ?",
+                            message:
+                              "Ce bon de commande sera définitivement supprimé.",
+                            confirmLabel: "Supprimer",
+                            variant: "danger",
                           },
-                          onError: (error) =>
-                            toast.error(
-                              "Suppression impossible",
-                              error instanceof Error
-                                ? error.message
-                                : undefined,
-                            ),
-                        });
-                      }}
+                          loadingMessage: "Suppression en cours...",
+                          success: { title: "BC supprimé" },
+                          redirectTo: "/commandes",
+                          redirectMessage: "Retour à la liste des commandes...",
+                          error: {
+                            title: "Suppression impossible",
+                          },
+                          action: () => removeMutation.mutateAsync(order.id),
+                        })
+                      }
                       className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
                       Supprimer
@@ -312,7 +341,7 @@ export default function OrderDetailsPage({ id }: { id: string }) {
                 <OrderInvoiceForm
                   currency={order.currency}
                   remainingTtc={order.billing.remainingToInvoice}
-                  isSubmitting={createInvoiceMutation.isPending}
+                  isSubmitting={isBusy}
                   onSubmit={createInvoice}
                 />
               </div>

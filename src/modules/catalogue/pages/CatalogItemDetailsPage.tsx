@@ -6,7 +6,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
 } from "@/shared/components/feedback";
 import { RequireCatalogAccess } from "../components/RequireCatalogAccess";
 import { CatalogItemDetailsCard } from "../components/CatalogItemDetailsCard";
@@ -15,10 +15,10 @@ import { useCatalogAccess } from "../hooks/useCatalogAccess";
 import { useCatalogItem, useCatalogueItems } from "../hooks/useCatalogue";
 
 export default function CatalogItemDetailsPage({ id }: { id: string }) {
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
   const { canManageCatalogue } = useCatalogAccess();
   const itemQuery = useCatalogItem(id);
-  const { archiveItemMutation } = useCatalogueItems();
+  const { archiveItemMutation, unarchiveItemMutation } = useCatalogueItems();
 
   return (
     <RequireCatalogAccess>
@@ -54,7 +54,7 @@ export default function CatalogItemDetailsPage({ id }: { id: string }) {
         {!itemQuery.isLoading && !itemQuery.isError && !itemQuery.data && (
           <EmptyState
             title="Article introuvable"
-            description="Cet article n'existe pas ou a été archivé."
+            description="Cet article n'existe pas."
             action={
               <Link
                 href="/catalogue"
@@ -77,41 +77,82 @@ export default function CatalogItemDetailsPage({ id }: { id: string }) {
                   Détail, tarifs spécifiques et archivage.
                 </p>
               </div>
-              {canManageCatalogue && !itemQuery.data.isArchived ? (
+              {canManageCatalogue ? (
                 <div className="flex flex-wrap gap-2">
-                  <Link
-                    href={`/catalogue/${itemQuery.data.id}/modifier`}
-                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-                  >
-                    Modifier
-                  </Link>
-                  <button
-                    type="button"
-                    className="rounded-lg border border-error-300 px-4 py-2 text-sm font-medium text-error-600 hover:bg-error-50 dark:border-error-500/40"
-                    disabled={archiveItemMutation.isPending}
-                    onClick={() => {
-                      if (
-                        !window.confirm(
-                          "Archiver cet article ? Il ne pourra plus être utilisé dans de nouvelles transactions.",
-                        )
-                      ) {
-                        return;
+                  {!itemQuery.data.isArchived ? (
+                    <>
+                      <Link
+                        href={`/catalogue/${itemQuery.data.id}/modifier`}
+                        className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
+                      >
+                        Modifier
+                      </Link>
+                      <button
+                        type="button"
+                        className="rounded-lg border border-error-300 px-4 py-2 text-sm font-medium text-error-600 hover:bg-error-50 dark:border-error-500/40"
+                        onClick={() =>
+                          void runAction({
+                            confirm: {
+                              title: "Archiver cet article ?",
+                              message:
+                                "Il ne pourra plus être utilisé dans de nouvelles transactions.",
+                              confirmLabel: "Archiver",
+                              variant: "warning",
+                            },
+                            loadingMessage: "Archivage de l'article...",
+                            success: {
+                              title: "Article archivé",
+                              message: itemQuery.data.name,
+                            },
+                            error: {
+                              title: "Archivage impossible",
+                              message:
+                                "L'article est peut-être utilisé dans des transactions (RM-A04).",
+                            },
+                            action: async () => {
+                              await archiveItemMutation.mutateAsync(
+                                itemQuery.data.id,
+                              );
+                              await itemQuery.refetch();
+                            },
+                          })
+                        }
+                      >
+                        Archiver
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="rounded-lg border border-success-300 px-4 py-2 text-sm font-medium text-success-600 hover:bg-success-50 dark:border-success-500/40"
+                      onClick={() =>
+                        void runAction({
+                          confirm: {
+                            title: "Désarchiver cet article ?",
+                            message:
+                              "L'article redeviendra actif et utilisable dans de nouvelles transactions.",
+                            confirmLabel: "Désarchiver",
+                          },
+                          loadingMessage: "Désarchivage de l'article...",
+                          success: {
+                            title: "Article désarchivé",
+                            message: itemQuery.data.name,
+                          },
+                          error: {
+                            title: "Impossible de désarchiver l'article",
+                          },
+                          action: async () => {
+                            await unarchiveItemMutation.mutateAsync(
+                              itemQuery.data.id,
+                            );
+                            await itemQuery.refetch();
+                          },
+                        })
                       }
-                      archiveItemMutation.mutate(itemQuery.data.id, {
-                        onSuccess: () => {
-                          toast.success("Article archivé");
-                          itemQuery.refetch();
-                        },
-                        onError: () =>
-                          toast.error(
-                            "Archivage impossible",
-                            "L'article est peut-être utilisé dans des transactions (RM-A04).",
-                          ),
-                      });
-                    }}
-                  >
-                    Archiver
-                  </button>
+                    >
+                      Désarchiver
+                    </button>
+                  )}
                 </div>
               ) : null}
             </div>

@@ -93,7 +93,7 @@ export default function RemindersHistoryPage({
         {remindersQuery.isError && (
           <ErrorState
             title="Échec du chargement"
-            message="Impossible de charger l'historique des relances."
+            message="Impossible de charger l'historique des relances. Vérifiez les filtres saisis ou réessayez."
             onRetry={() => remindersQuery.refetch()}
           />
         )}

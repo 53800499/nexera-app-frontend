@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ChevronLeftIcon } from "@/icons";
-import { useToast } from "@/shared/components/feedback";
+import {
+  useActionFeedback,
+  useActionFeedbackStore,
+} from "@/shared/components/feedback";
 import {
   buildCreatePaymentPayload,
   PaymentForm,
@@ -17,16 +19,32 @@ type Props = {
 };
 
 export default function CreatePaymentPage({ defaultClientId }: Props) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { createMutation } = usePayments();
 
   const submit = async (values: PaymentFormValues) => {
-    const payment = await createMutation.mutateAsync(
-      buildCreatePaymentPayload(values),
-    );
-    toast.success("Encaissement enregistré");
-    router.push(`/encaissements/${payment.id}`);
+    await runAction({
+      confirm: {
+        title: "Enregistrer cet encaissement ?",
+        message:
+          "Le montant sera enregistré et imputé sur les factures ouvertes du client.",
+        confirmLabel: "Enregistrer",
+      },
+      loadingMessage: "Enregistrement de l'encaissement...",
+      success: {
+        title: "Encaissement enregistré",
+        message: "Le paiement a été enregistré avec succès.",
+      },
+      redirectTo: (payment) => `/encaissements/${payment.id}`,
+      redirectMessage: "Ouverture de l'encaissement...",
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () =>
+        createMutation.mutateAsync(buildCreatePaymentPayload(values)),
+    });
   };
 
   return (
@@ -45,12 +63,13 @@ export default function CreatePaymentPage({ defaultClientId }: Props) {
             Nouveau paiement
           </h1>
           <p className="text-sm text-gray-500">
-            Sélectionnez un client, saisissez le montant reçu et imputez les factures ouvertes.
+            Sélectionnez un client, saisissez le montant reçu et imputez les
+            factures ouvertes.
           </p>
         </div>
 
         <PaymentForm
-          isSubmitting={createMutation.isPending}
+          isSubmitting={createMutation.isPending || isBusy}
           submitLabel="Enregistrer l'encaissement"
           defaultClientId={defaultClientId}
           onSubmit={submit}

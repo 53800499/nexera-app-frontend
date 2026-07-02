@@ -6,7 +6,8 @@ import {
   EmptyState,
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { RequirePermission } from "../components/RequirePermission";
 import { RoleDetailsCard } from "../components/RoleDetailsCard";
@@ -15,10 +16,41 @@ import { usePermissions } from "../hooks/usePermissions";
 import { useRole, useRoles } from "../hooks/useRoles";
 
 export default function RoleDetailsPage({ id }: { id: string }) {
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const roleQuery = useRole(id);
   const { permissionsQuery } = usePermissions();
   const { updateMutation } = useRoles();
+
+  const handleSavePermissions = async (permissionIds: string[]) => {
+    const role = roleQuery.data;
+    if (!role) return;
+
+    await runAction({
+      confirm: {
+        title: "Enregistrer les permissions ?",
+        message: `Les droits du rôle « ${role.name} » seront mis à jour (${permissionIds.length} permission(s)).`,
+        confirmLabel: "Enregistrer",
+      },
+      loadingMessage: "Mise à jour des permissions...",
+      success: {
+        title: "Permissions mises à jour",
+        message: role.name,
+      },
+      error: {
+        title: "Échec de la sauvegarde",
+        message:
+          "Les permissions n'ont pas pu être enregistrées. Vérifiez vos droits et que les permissions sélectionnées sont valides.",
+      },
+      action: () =>
+        updateMutation.mutateAsync({
+          id: role.id,
+          payload: { permissionIds },
+        }),
+    });
+  };
 
   return (
     <RequirePermission permission="manage:roles">
@@ -98,24 +130,8 @@ export default function RoleDetailsPage({ id }: { id: string }) {
               <RolePermissionsEditor
                 role={roleQuery.data}
                 permissions={permissionsQuery.data}
-                isSaving={updateMutation.isPending}
-                onSave={async (permissionIds) => {
-                  try {
-                    await updateMutation.mutateAsync({
-                      id: roleQuery.data.id,
-                      payload: { permissionIds },
-                    });
-                    toast.success(
-                      "Permissions mises à jour",
-                      roleQuery.data.name,
-                    );
-                  } catch {
-                    toast.error(
-                      "Échec de la sauvegarde",
-                      "Les permissions n'ont pas pu être enregistrées.",
-                    );
-                  }
-                }}
+                isSaving={updateMutation.isPending || isBusy}
+                onSave={handleSavePermissions}
               />
             ) : null}
           </>

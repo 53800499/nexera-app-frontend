@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryEnabled } from "@/shared/hooks/useQueryEnabled";
+import { readReferenceDataWithCache } from "@/shared/offline/referenceDataOffline.service";
 import { settingsApi } from "../services/settingsApi.service";
 import type {
   CreateCurrencyPayload,
@@ -66,8 +67,14 @@ export function useTaxRates() {
 
   return useQuery({
     queryKey: TAX_RATES_KEY,
-    queryFn: settingsApi.listTaxRates,
+    queryFn: () =>
+      readReferenceDataWithCache({
+        key: "tax-rates",
+        onlineReader: () => settingsApi.listTaxRates(),
+        hasUsableCache: (rates) => rates.length > 0,
+      }),
     enabled: queryEnabled,
+    placeholderData: (previous) => previous,
   });
 }
 

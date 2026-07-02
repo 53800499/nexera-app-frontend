@@ -1,12 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeftIcon } from "@/icons";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { RequireCrmAccess } from "../components/RequireCrmAccess";
 import { ClientEditForm } from "../components/ClientEditForm";
@@ -15,8 +15,10 @@ import { clientToEditValues } from "../utils/clientMappers";
 import { useClient, useClients } from "../hooks/useClients";
 
 export default function EditClientPage({ id }: { id: string }) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const clientQuery = useClient(id);
   const { updateMutation } = useClients();
 
@@ -81,25 +83,33 @@ export default function EditClientPage({ id }: { id: string }) {
                 <ClientEditForm
                   clientCode={clientQuery.data.code}
                   defaultValues={clientToEditValues(clientQuery.data)}
-                  isSubmitting={updateMutation.isPending}
+                  isSubmitting={isBusy}
                   submitLabel="Enregistrer les modifications"
                   onSubmit={async (values) => {
-                    try {
-                      await updateMutation.mutateAsync({
-                        id,
-                        payload: buildUpdateClientPayload(values),
-                      });
-                      toast.success(
-                        "Client mis à jour",
-                        clientQuery.data.companyName,
-                      );
-                      router.push(`/clients/${id}`);
-                    } catch {
-                      toast.error(
-                        "Modification impossible",
-                        "Vérifiez les champs et réessayez.",
-                      );
-                    }
+                    const companyName = clientQuery.data.companyName;
+                    await runAction({
+                      confirm: {
+                        title: "Enregistrer les modifications ?",
+                        message: `Mettre à jour la fiche de ${companyName}.`,
+                        confirmLabel: "Enregistrer",
+                      },
+                      loadingMessage: "Enregistrement du client...",
+                      success: {
+                        title: "Client mis à jour",
+                        message: companyName,
+                      },
+                      error: {
+                        title: "Modification impossible",
+                        message: "Vérifiez les champs et réessayez.",
+                      },
+                      redirectTo: `/clients/${id}`,
+                      redirectMessage: "Retour à la fiche client...",
+                      action: () =>
+                        updateMutation.mutateAsync({
+                          id,
+                          payload: buildUpdateClientPayload(values),
+                        }),
+                    });
                   }}
                 />
               </div>

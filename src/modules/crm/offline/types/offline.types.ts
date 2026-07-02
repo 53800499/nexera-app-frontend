@@ -4,6 +4,7 @@ export type SyncOperationType =
   | "createClient"
   | "updateClient"
   | "archiveClient"
+  | "unarchiveClient"
   | "addContact"
   | "updateContact"
   | "removeContact";

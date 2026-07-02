@@ -1,12 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeftIcon } from "@/icons";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { RequireCatalogAccess } from "../components/RequireCatalogAccess";
 import { CatalogItemForm } from "../components/CatalogItemForm";
@@ -19,14 +19,16 @@ import {
 import { useCatalogAccess } from "../hooks/useCatalogAccess";
 
 export default function CreateCatalogItemPage() {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { canReadTaxRates } = useCatalogAccess();
   const { createItemMutation } = useCatalogueItems();
   const { categoriesQuery } = useCatalogCategories();
   const taxRatesQuery = useTaxRates();
 
-  const isLoading = categoriesQuery.isLoading || taxRatesQuery.isLoading;
+  const isPageLoading = categoriesQuery.isLoading || taxRatesQuery.isLoading;
 
   return (
     <RequireCatalogAccess requireManage>
@@ -49,7 +51,7 @@ export default function CreateCatalogItemPage() {
           </p>
         </div>
 
-        {isLoading && <LoadingBlock label="Chargement des données..." />}
+        {isPageLoading && <LoadingBlock label="Chargement des données..." />}
 
         {!canReadTaxRates && !taxRatesQuery.isLoading ? (
           <ErrorState
@@ -71,21 +73,32 @@ export default function CreateCatalogItemPage() {
             <CatalogItemForm
               categories={categoriesQuery.data}
               taxRates={taxRatesQuery.data}
-              isSubmitting={createItemMutation.isPending}
+              isSubmitting={isBusy}
               submitLabel="Créer l'article"
               onSubmit={async (values) => {
-                try {
-                  const item = await createItemMutation.mutateAsync(
-                    buildCreateItemPayload(values),
-                  );
-                  toast.success("Article créé", item.name);
-                  router.push(`/catalogue/${item.id}`);
-                } catch {
-                  toast.error(
-                    "Création impossible",
-                    "Vérifiez les champs obligatoires et réessayez.",
-                  );
-                }
+                await runAction({
+                  confirm: {
+                    title: "Créer cet article ?",
+                    message: `Confirmer la création de « ${values.name} » dans le catalogue.`,
+                    confirmLabel: "Créer",
+                  },
+                  loadingMessage: "Création de l'article...",
+                  success: {
+                    title: "Article créé",
+                    message: values.name,
+                  },
+                  error: {
+                    title: "Création impossible",
+                    message:
+                      "Vérifiez les champs obligatoires et réessayez.",
+                  },
+                  redirectTo: (created) => `/catalogue/${created.id}`,
+                  redirectMessage: "Ouverture de la fiche article...",
+                  action: () =>
+                    createItemMutation.mutateAsync(
+                      buildCreateItemPayload(values),
+                    ),
+                });
               }}
             />
           </div>

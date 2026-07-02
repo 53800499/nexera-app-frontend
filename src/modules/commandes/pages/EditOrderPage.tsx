@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ChevronLeftIcon } from "@/icons";
 import { useTaxRates } from "@/modules/catalogue/hooks/useCatalogue";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import {
   buildUpdateOrderPayload,
@@ -20,23 +20,44 @@ import { orderToFormValues } from "../utils/orderFormMapping";
 import { canEditOrder } from "../utils/orderStatusRules";
 
 export default function EditOrderPage({ id }: { id: string }) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const orderQuery = useOrder(id);
   const { updateMutation } = useOrders();
   const taxRatesQuery = useTaxRates();
 
-  const submit = async (values: OrderFormValues) => {
-    const order = await updateMutation.mutateAsync({
-      id,
-      payload: buildUpdateOrderPayload(values),
-    });
-    toast.success("BC mis à jour", order.number);
-    router.push(`/commandes/${order.id}`);
-  };
-
   const order = orderQuery.data;
   const canEdit = order ? canEditOrder(order.status) : false;
+  const isPageLoading =
+    (orderQuery.isPending && !orderQuery.data) ||
+    (canEdit && taxRatesQuery.isLoading && !taxRatesQuery.data);
+
+  const submit = async (values: OrderFormValues) => {
+    const number = order?.number ?? "BC";
+    await runAction({
+      confirm: {
+        title: "Enregistrer les modifications ?",
+        message: `Mettre à jour le bon de commande ${number}.`,
+        confirmLabel: "Enregistrer",
+      },
+      loadingMessage: "Enregistrement du bon de commande...",
+      success: {
+        title: "BC mis à jour",
+        message: number,
+      },
+      redirectTo: `/commandes/${id}`,
+      redirectMessage: "Retour au détail du BC...",
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () =>
+        updateMutation.mutateAsync({
+          id,
+          payload: buildUpdateOrderPayload(values),
+        }),
+    });
+  };
 
   return (
     <RequireOrderAccess requireManage>
@@ -49,8 +70,8 @@ export default function EditOrderPage({ id }: { id: string }) {
           Retour au BC
         </Link>
 
-        {orderQuery.isPending && !orderQuery.data && (
-          <LoadingBlock label="Chargement du bon de commande..." />
+        {isPageLoading && (
+          <LoadingBlock label="Chargement du formulaire de commande..." />
         )}
 
         {orderQuery.isError && (
@@ -76,6 +97,14 @@ export default function EditOrderPage({ id }: { id: string }) {
           />
         ) : null}
 
+        {taxRatesQuery.isError && canEdit ? (
+          <ErrorState
+            title="Configuration TVA indisponible"
+            message="Impossible de charger les taux de TVA."
+            onRetry={() => taxRatesQuery.refetch()}
+          />
+        ) : null}
+
         {order && canEdit && taxRatesQuery.data ? (
           <>
             <div>
@@ -84,7 +113,7 @@ export default function EditOrderPage({ id }: { id: string }) {
               </h1>
             </div>
             <OrderForm
-              isSubmitting={updateMutation.isPending}
+              isSubmitting={isBusy}
               submitLabel="Enregistrer"
               taxRates={taxRatesQuery.data}
               lockClient
@@ -94,8 +123,6 @@ export default function EditOrderPage({ id }: { id: string }) {
               onSubmit={submit}
             />
           </>
-        ) : order && canEdit && taxRatesQuery.isLoading ? (
-          <LoadingBlock label="Chargement des taux de TVA..." />
         ) : null}
       </div>
     </RequireOrderAccess>

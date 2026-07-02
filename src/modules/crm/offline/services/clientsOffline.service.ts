@@ -1,4 +1,6 @@
 import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
+import { AppError } from "@/shared/core/AppError";
+import { isOfflineError } from "@/shared/core/OfflineError";
 import { isBrowserOnline } from "@/shared/hooks/useNetworkStatus";
 import { clearCrmOfflineIfOnline, setCrmOfflineMode } from "../utils/crmOfflineState";
 import { withTimeout } from "@/shared/lib/withTimeout";
@@ -103,11 +105,12 @@ async function readWithOfflineFallback<T>(
       clearCrmOfflineIfOnline();
     }
     return data;
-  } catch {
-    if (!isBrowserOnline()) {
+  } catch (error) {
+    if (!isBrowserOnline() || isOfflineError(error)) {
       setCrmOffline(true);
+      return offlineData;
     }
-    return offlineData;
+    throw error;
   }
 }
 
@@ -152,18 +155,38 @@ export const clientsOfflineService = {
   },
 
   async byId(id: string): Promise<ClientDetail> {
-    return readWithOfflineFallback(
-      async () => {
-        const client = await clientsApi.byId(id);
-        await crmOfflineRepository.upsertClient(client, "synced");
-        return client;
-      },
-      async () => {
-        const cached = await crmOfflineRepository.getClient(id);
-        if (!cached) throw new Error("Client introuvable hors-ligne");
-        return cached;
-      },
-    );
+    const readCached = async () => {
+      const cached = await crmOfflineRepository.getClientIncludingArchived(id);
+      if (!cached) throw new Error("Client introuvable hors-ligne");
+      return cached;
+    };
+
+    if (isOfflineMode()) {
+      return readCached();
+    }
+
+    try {
+      const client = await withTimeout(clientsApi.byId(id), API_READ_TIMEOUT_MS);
+      await crmOfflineRepository.upsertClient(client, "synced");
+      if (isBrowserOnline()) {
+        clearCrmOfflineIfOnline();
+      }
+      return client;
+    } catch (error) {
+      if (!isBrowserOnline() || isOfflineError(error)) {
+        setCrmOffline(true);
+        return readCached();
+      }
+
+      // Permet d'afficher la fiche locale d'un client archivé
+      // quand l'API ne le renvoie plus (ex: 404 sur archivés).
+      if (error instanceof AppError && error.statusCode === 404) {
+        const cached = await crmOfflineRepository.getClientIncludingArchived(id);
+        if (cached) return cached;
+      }
+
+      throw error;
+    }
   },
 
   async checkDuplicates(payload: {
@@ -245,10 +268,10 @@ export const clientsOfflineService = {
   async archive(id: string) {
     if (!isOfflineMode()) {
       const result = await clientsApi.archive(id);
-      const client = await crmOfflineRepository.getClient(id);
-      if (client) {
+      const cached = await crmOfflineRepository.getClientIncludingArchived(id);
+      if (cached) {
         await crmOfflineRepository.upsertClient(
-          { ...client, isArchived: true },
+          { ...cached, isArchived: true },
           "synced",
         );
       }
@@ -262,6 +285,29 @@ export const clientsOfflineService = {
       payload: crmSyncQueue.payload({}),
     });
     return { message: "Archivage en attente de synchronisation", archived: true };
+  },
+
+  async unarchive(id: string): Promise<ClientDetail> {
+    if (!isOfflineMode()) {
+      const client = await clientsApi.unarchive(id);
+      const normalized = { ...client, isArchived: false };
+      await crmOfflineRepository.upsertClient(normalized, "synced");
+      return normalized;
+    }
+
+    const existing = await crmOfflineRepository.getClientIncludingArchived(id);
+    if (!existing) {
+      throw new AppError("Client introuvable", "CLIENT_NOT_FOUND", 404);
+    }
+
+    await crmOfflineRepository.restoreClient(id, "pending");
+    await crmSyncQueue.enqueue({
+      operation: "unarchiveClient",
+      entityId: id,
+      payload: crmSyncQueue.payload({}),
+    });
+
+    return { ...existing, isArchived: false };
   },
 
   async addContact(clientId: string, payload: CreateContactPayload) {

@@ -1,17 +1,22 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeftIcon } from "@/icons";
-import { LoadingBlock, useToast } from "@/shared/components/feedback";
+import {
+  LoadingBlock,
+  useActionFeedback,
+  useActionFeedbackStore,
+} from "@/shared/components/feedback";
 import { RequireCatalogAccess } from "../components/RequireCatalogAccess";
 import { CatalogCategoryForm } from "../components/CatalogCategoryForm";
 import { useCatalogCategories } from "../hooks/useCatalogue";
 import { buildCreateCategoryPayload } from "../utils/catalogCategoryMappers";
 
 export default function CreateCatalogCategoryPage() {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction, redirectWithLoader } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { categoriesQuery, createCategoryMutation } = useCatalogCategories();
 
   return (
@@ -42,19 +47,34 @@ export default function CreateCatalogCategoryPage() {
           <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
             <CatalogCategoryForm
               categories={categoriesQuery.data}
-              isSubmitting={createCategoryMutation.isPending}
+              isSubmitting={isBusy}
               submitLabel="Créer la catégorie"
-              onCancel={() => router.push("/catalogue")}
+              onCancel={() =>
+                redirectWithLoader("/catalogue", "Retour au catalogue...")
+              }
               onSubmit={async (values) => {
-                try {
-                  await createCategoryMutation.mutateAsync(
-                    buildCreateCategoryPayload(values),
-                  );
-                  toast.success("Catégorie créée");
-                  router.push("/catalogue");
-                } catch {
-                  toast.error("Création impossible");
-                }
+                await runAction({
+                  confirm: {
+                    title: "Créer cette catégorie ?",
+                    message: `Confirmer la création de « ${values.name} ».`,
+                    confirmLabel: "Créer",
+                  },
+                  loadingMessage: "Création de la catégorie...",
+                  success: {
+                    title: "Catégorie créée",
+                    message: values.name,
+                  },
+                  error: {
+                    title: "Création impossible",
+                    message: "Vérifiez les champs et réessayez.",
+                  },
+                  redirectTo: "/catalogue",
+                  redirectMessage: "Retour au catalogue...",
+                  action: () =>
+                    createCategoryMutation.mutateAsync(
+                      buildCreateCategoryPayload(values),
+                    ),
+                });
               }}
             />
           </div>

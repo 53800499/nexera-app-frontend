@@ -8,12 +8,16 @@ import Label from "@/components/form/Label";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
+import { resolveFormErrorMessage } from "@/shared/http/resolveFormErrorMessage";
+import { PaymentPdfPreviewModal } from "../components/PaymentPdfPreviewModal";
 import { RequirePaymentAccess } from "../components/RequirePaymentAccess";
 import { PaymentStatusBadge } from "../components/PaymentStatusBadge";
 import { usePaymentAccess } from "../hooks/usePaymentAccess";
 import { usePayment, usePayments } from "../hooks/usePayments";
+import { usePaymentPdf } from "../pdf/usePaymentPdf";
 import {
   formatPaymentMoney,
   paymentMethodLabel,
@@ -24,34 +28,100 @@ function formatDate(value: string) {
 }
 
 export default function PaymentDetailsPage({ id }: { id: string }) {
-  const toast = useToast();
+  const { runAction, showResult } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { canManagePayments } = usePaymentAccess();
   const paymentQuery = usePayment(id);
   const { cancelMutation } = usePayments();
+  const { preview, openPreview, downloadPdf, closePreview } = usePaymentPdf();
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelReasonError, setCancelReasonError] = useState<string | null>(
+    null,
+  );
   const [showCancelForm, setShowCancelForm] = useState(false);
 
   const payment = paymentQuery.data;
+  const paymentLabel =
+    payment?.reference?.trim() ||
+    `${payment?.clientName ?? "Client"} — ${payment ? formatDate(payment.paymentDate) : ""}`;
+
+  const handlePreview = () => {
+    if (!payment) return;
+    void runAction({
+      loadingMessage: "Génération de l'aperçu...",
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () => openPreview(payment),
+    }).catch((error) => {
+      void showResult({
+        variant: "error",
+        title: "Aperçu impossible",
+        message: resolveFormErrorMessage(error),
+      });
+    });
+  };
+
+  const handleDownloadPdf = () => {
+    if (!payment) return;
+    void runAction({
+      loadingMessage: "Génération du PDF...",
+      success: { title: "PDF téléchargé" },
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () => downloadPdf(payment),
+    }).catch((error) => {
+      void showResult({
+        variant: "error",
+        title: "Génération PDF impossible",
+        message: resolveFormErrorMessage(error),
+      });
+    });
+  };
 
   const handleCancel = async () => {
+    setCancelReasonError(null);
+
     if (!cancelReason.trim()) {
-      toast.error("Motif obligatoire", "Indiquez la raison de l'annulation.");
+      const message = "Indiquez la raison de l'annulation pour continuer.";
+      setCancelReasonError(message);
+      void showResult({
+        variant: "error",
+        title: "Motif obligatoire",
+        message,
+      });
       return;
     }
-    try {
-      await cancelMutation.mutateAsync({
-        id,
-        payload: { reason: cancelReason.trim() },
-      });
-      toast.success("Encaissement annulé");
-      setShowCancelForm(false);
-      await paymentQuery.refetch();
-    } catch (error) {
-      toast.error(
-        "Annulation impossible",
-        error instanceof Error ? error.message : undefined,
-      );
-    }
+
+    await runAction({
+      confirm: {
+        title: "Annuler cet encaissement ?",
+        message:
+          "Cette action est irréversible. Les imputations seront annulées.",
+        confirmLabel: "Confirmer l'annulation",
+        variant: "danger",
+      },
+      loadingMessage: "Annulation en cours...",
+      success: {
+        title: "Encaissement annulé",
+        message: "L'encaissement a été annulé avec succès.",
+      },
+      error: {
+        title: "Annulation impossible",
+        message:
+          "Vérifiez le motif saisi et le statut de l'encaissement, puis réessayez.",
+      },
+      action: async () => {
+        await cancelMutation.mutateAsync({
+          id,
+          payload: { reason: cancelReason.trim() },
+        });
+        setShowCancelForm(false);
+        setCancelReason("");
+        await paymentQuery.refetch();
+      },
+    });
   };
 
   return (
@@ -72,7 +142,7 @@ export default function PaymentDetailsPage({ id }: { id: string }) {
         {paymentQuery.isError && (
           <ErrorState
             title="Encaissement introuvable"
-            message="Impossible de charger cet encaissement."
+            message="Impossible de charger cet encaissement. Vérifiez l'identifiant ou réessayez."
             onRetry={() => paymentQuery.refetch()}
           />
         )}
@@ -93,15 +163,34 @@ export default function PaymentDetailsPage({ id }: { id: string }) {
                 </p>
               </div>
 
-              {canManagePayments && !payment.isCancelled ? (
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowCancelForm((value) => !value)}
-                  className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                  disabled={isBusy}
+                  onClick={handlePreview}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:hover:bg-gray-800"
                 >
-                  Annuler l&apos;encaissement
+                  Aperçu
                 </button>
-              ) : null}
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={handleDownloadPdf}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:hover:bg-gray-800"
+                >
+                  PDF
+                </button>
+                {canManagePayments && !payment.isCancelled ? (
+                  <button
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => setShowCancelForm((value) => !value)}
+                    className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
+                  >
+                    Annuler l&apos;encaissement
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             {showCancelForm && !payment.isCancelled ? (
@@ -110,18 +199,26 @@ export default function PaymentDetailsPage({ id }: { id: string }) {
                   Annulation (motif obligatoire)
                 </h2>
                 <div className="space-y-3">
-                  <div>
+                  <div data-form-field="cancelReason">
                     <Label>Motif</Label>
                     <Input
                       value={cancelReason}
-                      onChange={(event) => setCancelReason(event.target.value)}
+                      onChange={(event) => {
+                        setCancelReason(event.target.value);
+                        setCancelReasonError(null);
+                      }}
                       placeholder="Erreur de saisie, chèque impayé..."
                     />
+                    {cancelReasonError ? (
+                      <p className="mt-1 text-xs text-red-600">
+                        {cancelReasonError}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      disabled={cancelMutation.isPending}
+                      disabled={cancelMutation.isPending || isBusy}
                       onClick={() => void handleCancel()}
                       className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
                     >
@@ -129,7 +226,10 @@ export default function PaymentDetailsPage({ id }: { id: string }) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowCancelForm(false)}
+                      onClick={() => {
+                        setShowCancelForm(false);
+                        setCancelReasonError(null);
+                      }}
                       className="rounded-lg border border-gray-300 px-4 py-2 text-sm"
                     >
                       Fermer
@@ -241,6 +341,12 @@ export default function PaymentDetailsPage({ id }: { id: string }) {
             ) : null}
           </>
         ) : null}
+
+        <PaymentPdfPreviewModal
+          preview={preview}
+          paymentLabel={paymentLabel}
+          onClose={closePreview}
+        />
       </div>
     </RequirePaymentAccess>
   );

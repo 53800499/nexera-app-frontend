@@ -1,12 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeftIcon } from "@/icons";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { RequireCatalogAccess } from "../components/RequireCatalogAccess";
 import { CatalogItemForm } from "../components/CatalogItemForm";
@@ -23,15 +23,17 @@ import {
 import { useCatalogAccess } from "../hooks/useCatalogAccess";
 
 export default function EditCatalogItemPage({ id }: { id: string }) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { canReadTaxRates } = useCatalogAccess();
   const itemQuery = useCatalogItem(id);
   const { updateItemMutation } = useCatalogueItems();
   const { categoriesQuery } = useCatalogCategories();
   const taxRatesQuery = useTaxRates();
 
-  const isLoading =
+  const isPageLoading =
     itemQuery.isLoading ||
     categoriesQuery.isLoading ||
     taxRatesQuery.isLoading;
@@ -47,7 +49,7 @@ export default function EditCatalogItemPage({ id }: { id: string }) {
           Retour à la fiche
         </Link>
 
-        {isLoading && <LoadingBlock label="Chargement de l'article..." />}
+        {isPageLoading && <LoadingBlock label="Chargement de l'article..." />}
 
         {itemQuery.isError && (
           <ErrorState
@@ -100,22 +102,33 @@ export default function EditCatalogItemPage({ id }: { id: string }) {
                   categories={categoriesQuery.data}
                   taxRates={taxRatesQuery.data}
                   defaultValues={itemToFormValues(itemQuery.data)}
-                  isSubmitting={updateItemMutation.isPending}
+                  isSubmitting={isBusy}
                   submitLabel="Enregistrer les modifications"
                   onSubmit={async (values) => {
-                    try {
-                      await updateItemMutation.mutateAsync({
-                        id,
-                        payload: buildUpdateItemPayload(values),
-                      });
-                      toast.success("Article mis à jour", itemQuery.data.name);
-                      router.push(`/catalogue/${id}`);
-                    } catch {
-                      toast.error(
-                        "Modification impossible",
-                        "Vérifiez les champs et réessayez.",
-                      );
-                    }
+                    const itemName = itemQuery.data.name;
+                    await runAction({
+                      confirm: {
+                        title: "Enregistrer les modifications ?",
+                        message: `Mettre à jour la fiche de ${itemName}.`,
+                        confirmLabel: "Enregistrer",
+                      },
+                      loadingMessage: "Enregistrement de l'article...",
+                      success: {
+                        title: "Article mis à jour",
+                        message: itemName,
+                      },
+                      error: {
+                        title: "Modification impossible",
+                        message: "Vérifiez les champs et réessayez.",
+                      },
+                      redirectTo: `/catalogue/${id}`,
+                      redirectMessage: "Retour à la fiche article...",
+                      action: () =>
+                        updateItemMutation.mutateAsync({
+                          id,
+                          payload: buildUpdateItemPayload(values),
+                        }),
+                    });
                   }}
                 />
               </div>

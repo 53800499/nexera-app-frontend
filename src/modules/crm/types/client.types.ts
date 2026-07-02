@@ -134,7 +134,9 @@ export type CreateClientPayload = {
 
 export type UpdateClientPayload = Partial<
   Omit<CreateClientPayload, "primaryContact" | "confirmDuplicate">
->;
+> & {
+  isArchived?: boolean;
+};
 
 export class ClientDuplicateError extends Error {
   duplicates: DuplicateMatch[];

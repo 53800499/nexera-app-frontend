@@ -104,6 +104,12 @@ export default function QuotationsListPage() {
           <LoadingBlock label="Chargement des devis..." />
         )}
 
+        {quotationsQuery.isFetching && quotationsQuery.data && (
+          <p className="text-center text-xs text-gray-400">
+            Actualisation de la liste...
+          </p>
+        )}
+
         {quotationsQuery.isError && (
           <ErrorState
             title="Échec du chargement"

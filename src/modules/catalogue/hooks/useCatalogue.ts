@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TAX_RATES_KEY } from "@/modules/parametres";
 import { useQueryEnabled } from "@/shared/hooks/useQueryEnabled";
+import { catalogueReferenceService } from "../services/catalogueReference.service";
 import { catalogueApi } from "../services/catalogueApi.service";
 import type {
   CreateCatalogCategoryPayload,
@@ -23,8 +24,9 @@ export function useCatalogueItems(q?: string) {
 
   const itemsQuery = useQuery({
     queryKey: [...CATALOG_ITEMS_KEY, search],
-    queryFn: () => catalogueApi.listItems(search || undefined),
+    queryFn: () => catalogueReferenceService.listItems(search || undefined),
     enabled: queryEnabled,
+    placeholderData: (previous) => previous,
   });
 
   const createItemMutation = useMutation({
@@ -46,8 +48,18 @@ export function useCatalogueItems(q?: string) {
 
   const archiveItemMutation = useMutation({
     mutationFn: (id: string) => catalogueApi.archiveItem(id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: CATALOG_ITEMS_KEY });
+      queryClient.invalidateQueries({ queryKey: ["catalogue", "items", id] });
+    },
+  });
+
+  const unarchiveItemMutation = useMutation({
+    mutationFn: (id: string) => catalogueApi.unarchiveItem(id),
+    onSuccess: (item, id) => {
+      queryClient.setQueryData(["catalogue", "items", id], item);
+      queryClient.invalidateQueries({ queryKey: CATALOG_ITEMS_KEY });
+      queryClient.invalidateQueries({ queryKey: ["catalogue", "items", id] });
     },
   });
 
@@ -56,6 +68,7 @@ export function useCatalogueItems(q?: string) {
     createItemMutation,
     updateItemMutation,
     archiveItemMutation,
+    unarchiveItemMutation,
   };
 }
 
@@ -128,8 +141,9 @@ export function useTaxRates() {
 
   return useQuery({
     queryKey: TAX_RATES_KEY,
-    queryFn: catalogueApi.listTaxRates,
+    queryFn: () => catalogueReferenceService.listTaxRates(),
     enabled: queryEnabled,
+    placeholderData: (previous) => previous,
   });
 }
 

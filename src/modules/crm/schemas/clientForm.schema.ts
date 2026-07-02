@@ -4,7 +4,7 @@ import { currencySchema } from "@/shared/constants/currencies";
 const addressSchema = z.object({
   street: z.string().min(1, "Rue requise"),
   city: z.string().min(1, "Ville requise"),
-  postalCode: z.string().min(1, "Code postal requis"),
+  postalCode: z.string().optional(),
   country: z.string().min(1, "Pays requis"),
 });
 
@@ -16,7 +16,7 @@ const contactSchema = z.object({
   phone: z.string().optional(),
 });
 
-export const clientFormSchema = z.object({
+const clientFormBaseSchema = z.object({
   clientType: z.enum(["company", "individual"]),
   companyName: z.string().min(2, "Raison sociale requise"),
   tradeName: z.string().optional(),
@@ -35,11 +35,51 @@ export const clientFormSchema = z.object({
   remindersDisabledReason: z.string().optional(),
 });
 
+function withPostalCodeRule<
+  T extends z.ZodObject<z.ZodRawShape, z.core.$strip>
+>(schema: T) {
+  return schema.superRefine((values, ctx) => {
+    const form = values as {
+      clientType?: "company" | "individual";
+      billingAddress?: { postalCode?: string };
+      useShippingAddress?: boolean;
+      shippingAddress?: { postalCode?: string };
+    };
+
+    const postalCodeRequired = form.clientType === "company";
+    if (!postalCodeRequired) return;
+
+    const billingPostalCode = form.billingAddress?.postalCode?.trim() ?? "";
+    if (!billingPostalCode) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["billingAddress", "postalCode"],
+        message: "Code postal requis",
+      });
+    }
+
+    if (form.useShippingAddress) {
+      const shippingPostalCode = form.shippingAddress?.postalCode?.trim() ?? "";
+      if (!shippingPostalCode) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["shippingAddress", "postalCode"],
+          message: "Code postal requis",
+        });
+      }
+    }
+  });
+}
+
+export const clientFormSchema = withPostalCodeRule(clientFormBaseSchema);
+
 export type ClientFormValues = z.infer<typeof clientFormSchema>;
 
-export const clientEditSchema = clientFormSchema.omit({
-  primaryContact: true,
-});
+export const clientEditSchema = withPostalCodeRule(
+  clientFormBaseSchema.omit({
+    primaryContact: true,
+  }),
+);
 
 export type ClientEditFormValues = z.infer<typeof clientEditSchema>;
 

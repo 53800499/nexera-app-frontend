@@ -4,7 +4,7 @@ import Link from "next/link";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
 } from "@/shared/components/feedback";
 import { useCatalogCategories } from "../hooks/useCatalogue";
 import type { CatalogCategory } from "../types/catalogue.types";
@@ -14,16 +14,28 @@ type Props = {
 };
 
 export function CatalogCategoriesPanel({ canManage }: Props) {
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
   const { categoriesQuery, deleteCategoryMutation } = useCatalogCategories();
 
   const onDelete = (category: CatalogCategory) => {
-    if (!window.confirm(`Supprimer la catégorie « ${category.name} » ?`)) {
-      return;
-    }
-    deleteCategoryMutation.mutate(category.id, {
-      onSuccess: () => toast.success("Catégorie supprimée"),
-      onError: () => toast.error("Suppression impossible"),
+    void runAction({
+      confirm: {
+        title: "Supprimer cette catégorie ?",
+        message: `La catégorie « ${category.name} » sera définitivement supprimée.`,
+        confirmLabel: "Supprimer",
+        variant: "danger",
+      },
+      loadingMessage: "Suppression de la catégorie...",
+      success: {
+        title: "Catégorie supprimée",
+        message: category.name,
+      },
+      error: {
+        title: "Suppression impossible",
+        message:
+          "La catégorie est peut-être utilisée par des articles ou contient des sous-catégories.",
+      },
+      action: () => deleteCategoryMutation.mutateAsync(category.id),
     });
   };
 
@@ -111,7 +123,6 @@ export function CatalogCategoriesPanel({ canManage }: Props) {
                         <button
                           type="button"
                           className="rounded border border-error-300 px-2 py-1 text-xs text-error-600 hover:bg-error-50"
-                          disabled={deleteCategoryMutation.isPending}
                           onClick={() => onDelete(category)}
                         >
                           Supprimer

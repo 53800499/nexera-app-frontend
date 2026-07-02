@@ -6,7 +6,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
 } from "@/shared/components/feedback";
 import { RequireCrmAccess } from "../components/RequireCrmAccess";
 import { ClientContactsSection } from "../components/ClientContactsSection";
@@ -16,10 +16,10 @@ import { useCrmAccess } from "../hooks/useCrmAccess";
 import { useClient, useClients } from "../hooks/useClients";
 
 export default function ClientDetailsPage({ id }: { id: string }) {
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
   const { canManageClients } = useCrmAccess();
   const clientQuery = useClient(id);
-  const { archiveMutation } = useClients();
+  const { archiveMutation, unarchiveMutation } = useClients();
 
   return (
     <RequireCrmAccess>
@@ -78,38 +78,76 @@ export default function ClientDetailsPage({ id }: { id: string }) {
                   Historique des transactions et gestion des contacts.
                 </p>
               </div>
-              {canManageClients && !clientQuery.data.isArchived ? (
+              {canManageClients ? (
                 <div className="flex flex-wrap gap-2">
-                  <Link
-                    href={`/clients/${clientQuery.data.id}/modifier`}
-                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-                  >
-                    Modifier
-                  </Link>
-                  <button
-                  type="button"
-                  className="rounded-lg border border-error-300 px-4 py-2 text-sm font-medium text-error-600 hover:bg-error-50 dark:border-error-500/40"
-                  disabled={archiveMutation.isPending}
-                  onClick={() => {
-                    if (
-                      !window.confirm(
-                        "Archiver ce client ? Il restera visible dans l'historique des transactions.",
-                      )
-                    ) {
-                      return;
-                    }
-                    archiveMutation.mutate(clientQuery.data.id, {
-                      onSuccess: () => {
-                        toast.success("Client archivé");
-                        clientQuery.refetch();
-                      },
-                      onError: () =>
-                        toast.error("Impossible d'archiver le client"),
-                    });
-                  }}
-                >
-                  Archiver
-                </button>
+                  {!clientQuery.data.isArchived ? (
+                    <>
+                      <Link
+                        href={`/clients/${clientQuery.data.id}/modifier`}
+                        className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
+                      >
+                        Modifier
+                      </Link>
+                      <button
+                        type="button"
+                        className="rounded-lg border border-error-300 px-4 py-2 text-sm font-medium text-error-600 hover:bg-error-50 dark:border-error-500/40"
+                        onClick={() =>
+                          void runAction({
+                            confirm: {
+                              title: "Archiver ce client ?",
+                              message:
+                                "Il restera visible dans l'historique des transactions mais ne pourra plus être modifié.",
+                              confirmLabel: "Archiver",
+                              variant: "warning",
+                            },
+                            loadingMessage: "Archivage du client...",
+                            success: {
+                              title: "Client archivé",
+                              message: clientQuery.data.companyName,
+                            },
+                            error: {
+                              title: "Impossible d'archiver le client",
+                            },
+                            action: async () => {
+                              await archiveMutation.mutateAsync(clientQuery.data.id);
+                              await clientQuery.refetch();
+                            },
+                          })
+                        }
+                      >
+                        Archiver
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="rounded-lg border border-success-300 px-4 py-2 text-sm font-medium text-success-600 hover:bg-success-50 dark:border-success-500/40"
+                      onClick={() =>
+                        void runAction({
+                          confirm: {
+                            title: "Désarchiver ce client ?",
+                            message:
+                              "Le client redeviendra actif et à nouveau modifiable.",
+                            confirmLabel: "Désarchiver",
+                          },
+                          loadingMessage: "Désarchivage du client...",
+                          success: {
+                            title: "Client désarchivé",
+                            message: clientQuery.data.companyName,
+                          },
+                          error: {
+                            title: "Impossible de désarchiver le client",
+                          },
+                          action: async () => {
+                            await unarchiveMutation.mutateAsync(clientQuery.data.id);
+                            await clientQuery.refetch();
+                          },
+                        })
+                      }
+                    >
+                      Désarchiver
+                    </button>
+                  )}
                 </div>
               ) : null}
             </div>

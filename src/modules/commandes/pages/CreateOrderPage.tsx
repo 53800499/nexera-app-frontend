@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ChevronLeftIcon } from "@/icons";
 import { useTaxRates } from "@/modules/catalogue/hooks/useCatalogue";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import {
   buildCreateOrderPayload,
@@ -28,17 +28,32 @@ export default function CreateOrderPage({
   defaultQuotationId,
   quotationLabel,
 }: Props) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { createMutation } = useOrders();
   const taxRatesQuery = useTaxRates();
 
   const submit = async (values: OrderFormValues) => {
-    const order = await createMutation.mutateAsync(
-      buildCreateOrderPayload(values),
-    );
-    toast.success("Bon de commande créé", order.number);
-    router.push(`/commandes/${order.id}`);
+    await runAction({
+      confirm: {
+        title: "Enregistrer ce bon de commande ?",
+        message: "Le BC sera créé en brouillon.",
+        confirmLabel: "Enregistrer",
+      },
+      loadingMessage: "Enregistrement du bon de commande...",
+      success: {
+        title: "Bon de commande créé",
+        message: "Brouillon enregistré avec succès.",
+      },
+      redirectTo: (order) => `/commandes/${order.id}`,
+      redirectMessage: "Ouverture du bon de commande...",
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () =>
+        createMutation.mutateAsync(buildCreateOrderPayload(values)),
+    });
   };
 
   return (
@@ -57,7 +72,8 @@ export default function CreateOrderPage({
             Nouveau bon de commande
           </h1>
           <p className="text-sm text-gray-500">
-            Sélectionnez un client, ajoutez les lignes et enregistrez en brouillon.
+            Sélectionnez un client, ajoutez les lignes et enregistrez en
+            brouillon.
           </p>
         </div>
 
@@ -75,7 +91,7 @@ export default function CreateOrderPage({
 
         {taxRatesQuery.data ? (
           <OrderForm
-            isSubmitting={createMutation.isPending}
+            isSubmitting={isBusy}
             submitLabel="Enregistrer le brouillon"
             taxRates={taxRatesQuery.data}
             lockQuotation={Boolean(defaultQuotationId)}

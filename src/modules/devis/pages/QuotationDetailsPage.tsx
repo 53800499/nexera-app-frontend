@@ -1,23 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ChevronLeftIcon } from "@/icons";
 import { DataTable, type DataTableColumn } from "@/shared/components/table";
+import { ChevronLeftIcon } from "@/icons";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
 } from "@/shared/components/feedback";
+import { QuotationPdfPreviewModal } from "../components/QuotationPdfPreviewModal";
 import { RequireQuotationAccess } from "../components/RequireQuotationAccess";
 import { QuotationStatusBadge } from "../components/QuotationStatusBadge";
 import { useQuotationAccess } from "../hooks/useQuotationAccess";
 import { useQuotation, useQuotations } from "../hooks/useQuotations";
-import { quotationsOfflineService } from "../offline/services/quotationsOffline.service";
-import { quotationsApi } from "../services/quotationsApi.service";
-import type { QuotationDetail, QuotationLine } from "../types/quotation.types";
+import { useQuotationPdf } from "../pdf/useQuotationPdf";
+import type { QuotationLine } from "../types/quotation.types";
 import { formatMoney } from "../utils/quotationCalculations";
-import { normalizeQuotationStatus, quotationStatusLabel } from "../utils/quotationLabels";
+import {
+  normalizeQuotationStatus,
+  quotationStatusLabel,
+} from "../utils/quotationLabels";
 import {
   canConvertQuotation,
   canDecideQuotation,
@@ -75,9 +77,10 @@ const lineColumns = (
 ];
 
 export default function QuotationDetailsPage({ id }: { id: string }) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
   const { canManageQuotations } = useQuotationAccess();
+  const { preview, openPreview, downloadPdf, closePreview } =
+    useQuotationPdf();
   const quotationQuery = useQuotation(id);
   const {
     removeMutation,
@@ -92,27 +95,23 @@ export default function QuotationDetailsPage({ id }: { id: string }) {
     : null;
   const discountPct = quotation?.discountPct ?? 0;
 
-  const openPdf = () => {
-    void quotationsOfflineService.openAuthenticatedAsset(quotationsApi.pdfUrl(id));
+  const handlePreview = () => {
+    if (!quotation) return;
+    void runAction({
+      loadingMessage: "Génération de l'aperçu...",
+      error: { title: "Aperçu impossible" },
+      action: () => openPreview(quotation),
+    });
   };
 
-  const openPreview = () => {
-    void quotationsOfflineService.openAuthenticatedAsset(quotationsApi.previewUrl(id));
-  };
-
-  const runAction = async (
-    label: string,
-    action: () => Promise<QuotationDetail | void>,
-  ) => {
-    try {
-      const updated = await action();
-      toast.success(label, updated?.number ?? quotation?.number);
-      await quotationQuery.refetch();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Réessayez ou contactez un administrateur.";
-      toast.error("Action impossible", message);
-    }
+  const handleDownloadPdf = () => {
+    if (!quotation) return;
+    void runAction({
+      loadingMessage: "Génération du PDF...",
+      success: { title: "PDF téléchargé" },
+      error: { title: "Génération PDF impossible" },
+      action: () => downloadPdf(quotation),
+    });
   };
 
   return (
@@ -167,16 +166,34 @@ export default function QuotationDetailsPage({ id }: { id: string }) {
                   {canSendQuotation(status) ? (
                     <button
                       type="button"
-                      disabled={sendMutation.isPending}
                       onClick={() =>
-                        runAction("Devis envoyé", async () => {
-                          const result = await sendMutation.mutateAsync({
-                            id: quotation.id,
-                          });
-                          return result.quotation;
+                        void runAction({
+                          confirm: {
+                            title: "Marquer le devis comme envoyé ?",
+                            message:
+                              "Le statut passera à « envoyé ». Cette action est irréversible.",
+                            confirmLabel: "Marquer envoyé",
+                          },
+                          loadingMessage: "Mise à jour du devis...",
+                          success: {
+                            title: "Devis envoyé",
+                            message: quotation.number,
+                          },
+                          error: {
+                            title: "Envoi impossible",
+                            message:
+                              "Vérifiez le statut du devis, l'e-mail du client et la configuration d'envoi dans Paramètres.",
+                          },
+                          action: async () => {
+                            const result = await sendMutation.mutateAsync({
+                              id: quotation.id,
+                            });
+                            await quotationQuery.refetch();
+                            return result.quotation;
+                          },
                         })
                       }
-                      className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
+                      className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
                     >
                       Marquer envoyé
                     </button>
@@ -184,14 +201,28 @@ export default function QuotationDetailsPage({ id }: { id: string }) {
                   {canMarkQuotationViewed(status) ? (
                     <button
                       type="button"
-                      disabled={changeStatusMutation.isPending}
                       onClick={() =>
-                        runAction("Devis marqué comme vu", () =>
-                          changeStatusMutation.mutateAsync({
-                            id: quotation.id,
-                            payload: { status: "viewed" },
-                          }),
-                        )
+                        void runAction({
+                          confirm: {
+                            title: "Marquer comme vu ?",
+                            message:
+                              "Le devis sera enregistré comme consulté par le client.",
+                            confirmLabel: "Confirmer",
+                          },
+                          loadingMessage: "Mise à jour du devis...",
+                          success: {
+                            title: "Devis marqué comme vu",
+                            message: quotation.number,
+                          },
+                          action: async () => {
+                            const updated = await changeStatusMutation.mutateAsync({
+                              id: quotation.id,
+                              payload: { status: "viewed" },
+                            });
+                            await quotationQuery.refetch();
+                            return updated;
+                          },
+                        })
                       }
                       className="rounded-lg border border-indigo-300 px-4 py-2 text-sm text-indigo-700 hover:bg-indigo-50"
                     >
@@ -202,14 +233,29 @@ export default function QuotationDetailsPage({ id }: { id: string }) {
                     <>
                       <button
                         type="button"
-                        disabled={changeStatusMutation.isPending}
                         onClick={() =>
-                          runAction("Devis accepté", () =>
-                            changeStatusMutation.mutateAsync({
-                              id: quotation.id,
-                              payload: { status: "accepted" },
-                            }),
-                          )
+                          void runAction({
+                            confirm: {
+                              title: "Accepter ce devis ?",
+                              message:
+                                "Le devis sera marqué comme accepté par le client.",
+                              confirmLabel: "Accepter",
+                            },
+                            loadingMessage: "Mise à jour du devis...",
+                            success: {
+                              title: "Devis accepté",
+                              message: quotation.number,
+                            },
+                            action: async () => {
+                              const updated =
+                                await changeStatusMutation.mutateAsync({
+                                  id: quotation.id,
+                                  payload: { status: "accepted" },
+                                });
+                              await quotationQuery.refetch();
+                              return updated;
+                            },
+                          })
                         }
                         className="rounded-lg border border-green-300 px-4 py-2 text-sm text-green-700 hover:bg-green-50"
                       >
@@ -217,14 +263,30 @@ export default function QuotationDetailsPage({ id }: { id: string }) {
                       </button>
                       <button
                         type="button"
-                        disabled={changeStatusMutation.isPending}
                         onClick={() =>
-                          runAction("Devis refusé", () =>
-                            changeStatusMutation.mutateAsync({
-                              id: quotation.id,
-                              payload: { status: "declined" },
-                            }),
-                          )
+                          void runAction({
+                            confirm: {
+                              title: "Refuser ce devis ?",
+                              message:
+                                "Le devis sera marqué comme refusé par le client.",
+                              confirmLabel: "Refuser",
+                              variant: "warning",
+                            },
+                            loadingMessage: "Mise à jour du devis...",
+                            success: {
+                              title: "Devis refusé",
+                              message: quotation.number,
+                            },
+                            action: async () => {
+                              const updated =
+                                await changeStatusMutation.mutateAsync({
+                                  id: quotation.id,
+                                  payload: { status: "declined" },
+                                });
+                              await quotationQuery.refetch();
+                              return updated;
+                            },
+                          })
                         }
                         className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                       >
@@ -236,46 +298,64 @@ export default function QuotationDetailsPage({ id }: { id: string }) {
                     <>
                       <button
                         type="button"
-                        disabled={convertMutation.isPending}
-                        onClick={async () => {
-                          try {
-                            const result = await convertMutation.mutateAsync({
-                              id: quotation.id,
-                              payload: { target: "order" },
-                            });
-                            toast.success("Bon de commande créé", quotation.number);
-                            router.push(`/commandes/${result.targetId}`);
-                          } catch (error) {
-                            const message =
-                              error instanceof Error
-                                ? error.message
-                                : "Réessayez ou contactez un administrateur.";
-                            toast.error("Conversion impossible", message);
-                          }
-                        }}
+                        onClick={() =>
+                          void runAction({
+                            confirm: {
+                              title: "Convertir en bon de commande ?",
+                              message:
+                                "Un bon de commande sera créé à partir de ce devis.",
+                              confirmLabel: "Convertir",
+                            },
+                            loadingMessage: "Conversion en cours...",
+                            success: {
+                              title: "Bon de commande créé",
+                              message: quotation.number,
+                            },
+                            redirectTo: (result) =>
+                              `/commandes/${result.targetId}`,
+                            redirectMessage: "Ouverture du bon de commande...",
+                            error: {
+                              title: "Conversion impossible",
+                            },
+                            action: () =>
+                              convertMutation.mutateAsync({
+                                id: quotation.id,
+                                payload: { target: "order" },
+                              }),
+                          })
+                        }
                         className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
                       >
                         Convertir en BC
                       </button>
                       <button
                         type="button"
-                        disabled={convertMutation.isPending}
-                        onClick={async () => {
-                          try {
-                            const result = await convertMutation.mutateAsync({
-                              id: quotation.id,
-                              payload: { target: "invoice" },
-                            });
-                            toast.success("Facture créée", quotation.number);
-                            router.push(`/factures/${result.targetId}`);
-                          } catch (error) {
-                            const message =
-                              error instanceof Error
-                                ? error.message
-                                : "Réessayez ou contactez un administrateur.";
-                            toast.error("Conversion impossible", message);
-                          }
-                        }}
+                        onClick={() =>
+                          void runAction({
+                            confirm: {
+                              title: "Convertir en facture ?",
+                              message:
+                                "Une facture sera créée à partir de ce devis.",
+                              confirmLabel: "Convertir",
+                            },
+                            loadingMessage: "Conversion en cours...",
+                            success: {
+                              title: "Facture créée",
+                              message: quotation.number,
+                            },
+                            redirectTo: (result) =>
+                              `/factures/${result.targetId}`,
+                            redirectMessage: "Ouverture de la facture...",
+                            error: {
+                              title: "Conversion impossible",
+                            },
+                            action: () =>
+                              convertMutation.mutateAsync({
+                                id: quotation.id,
+                                payload: { target: "invoice" },
+                              }),
+                          })
+                        }
                         className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
                       >
                         Convertir en facture
@@ -284,14 +364,14 @@ export default function QuotationDetailsPage({ id }: { id: string }) {
                   ) : null}
                   <button
                     type="button"
-                    onClick={openPreview}
+                    onClick={handlePreview}
                     className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
                   >
                     Aperçu
                   </button>
                   <button
                     type="button"
-                    onClick={openPdf}
+                    onClick={handleDownloadPdf}
                     className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
                   >
                     PDF
@@ -299,27 +379,26 @@ export default function QuotationDetailsPage({ id }: { id: string }) {
                   {canDeleteQuotation(status) ? (
                     <button
                       type="button"
-                      disabled={removeMutation.isPending}
-                      onClick={() => {
-                        if (
-                          !window.confirm("Supprimer ce brouillon de devis ?")
-                        ) {
-                          return;
-                        }
-                        removeMutation.mutate(quotation.id, {
-                          onSuccess: () => {
-                            toast.success("Devis supprimé");
-                            window.location.href = "/devis";
+                      onClick={() =>
+                        void runAction({
+                          confirm: {
+                            title: "Supprimer ce brouillon ?",
+                            message:
+                              "Ce devis sera définitivement supprimé.",
+                            confirmLabel: "Supprimer",
+                            variant: "danger",
                           },
-                          onError: (error) =>
-                            toast.error(
-                              "Suppression impossible",
-                              error instanceof Error
-                                ? error.message
-                                : undefined,
-                            ),
-                        });
-                      }}
+                          loadingMessage: "Suppression en cours...",
+                          success: { title: "Devis supprimé" },
+                          redirectTo: "/devis",
+                          redirectMessage: "Retour à la liste des devis...",
+                          error: {
+                            title: "Suppression impossible",
+                          },
+                          action: () =>
+                            removeMutation.mutateAsync(quotation.id),
+                        })
+                      }
                       className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
                       Supprimer
@@ -386,7 +465,9 @@ export default function QuotationDetailsPage({ id }: { id: string }) {
                 <dl className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <dt className="text-gray-500">Sous-total HT</dt>
-                    <dd>{formatMoney(quotation.subtotalHt, quotation.currency)}</dd>
+                    <dd>
+                      {formatMoney(quotation.subtotalHt, quotation.currency)}
+                    </dd>
                   </div>
                   {discountPct > 0 ? (
                     <div className="flex justify-between">
@@ -398,7 +479,9 @@ export default function QuotationDetailsPage({ id }: { id: string }) {
                   ) : null}
                   <div className="flex justify-between">
                     <dt className="text-gray-500">TVA</dt>
-                    <dd>{formatMoney(quotation.totalTax, quotation.currency)}</dd>
+                    <dd>
+                      {formatMoney(quotation.totalTax, quotation.currency)}
+                    </dd>
                   </div>
                   <div className="flex justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
                     <dt className="font-semibold">Total TTC</dt>
@@ -425,6 +508,11 @@ export default function QuotationDetailsPage({ id }: { id: string }) {
           </>
         ) : null}
       </div>
+      <QuotationPdfPreviewModal
+        preview={preview}
+        quotationNumber={quotation?.number}
+        onClose={closePreview}
+      />
     </RequireQuotationAccess>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import type { SelectHTMLAttributes } from "react";
-import { CURRENCY_OPTIONS } from "@/shared/constants/currencies";
+import { CURRENCY_OPTIONS, CURRENCY_CODES } from "@/shared/constants/currencies";
 
 type Props = SelectHTMLAttributes<HTMLSelectElement> & {
   error?: boolean;
@@ -27,7 +27,7 @@ export function CurrencySelect({
             : "border-gray-300 dark:border-gray-700"
         } ${className}`}
       >
-        {CURRENCY_OPTIONS.map((option) => (
+        {CURRENCY_OPTIONS.filter((option) => option.value === CURRENCY_CODES.XOF).map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>

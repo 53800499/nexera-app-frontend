@@ -10,6 +10,7 @@ import { UserStatusBadge } from "./UserStatusBadge";
 type Props = {
   users: UserSummary[];
   canManage?: boolean;
+  isBusy?: boolean;
   onToggleStatus: (user: UserSummary) => void;
   onRemove: (user: UserSummary) => void;
 };
@@ -17,6 +18,7 @@ type Props = {
 export function UsersTable({
   users,
   canManage = true,
+  isBusy = false,
   onToggleStatus,
   onRemove,
 }: Props) {
@@ -86,15 +88,17 @@ export function UsersTable({
               </Link>
               <button
                 type="button"
+                disabled={isBusy}
                 onClick={() => onToggleStatus(user)}
-                className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs font-medium hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:hover:bg-gray-800"
               >
                 {user.isActive ? "Désactiver" : "Activer"}
               </button>
               <button
                 type="button"
+                disabled={isBusy}
                 onClick={() => onRemove(user)}
-                className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:hover:bg-red-500/10"
+                className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-500/30 dark:hover:bg-red-500/10"
               >
                 Supprimer
               </button>

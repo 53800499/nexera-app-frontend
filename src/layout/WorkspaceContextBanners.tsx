@@ -50,14 +50,14 @@ export function WorkspaceContextBanners() {
       {isCabinetWorkspace ? (
         <div className="flex w-full flex-wrap items-center justify-between gap-2 bg-[var(--color-nexera-cabinet)] px-4 py-2 text-xs text-white/95">
           <span className="font-medium">
-            {WORKSPACE_LABELS.cabinet} — {displayName}
+            {WORKSPACE_LABELS.cabinet} - {displayName}
           </span>
           {isReadOnly ? <ReadOnlyBadge /> : null}
         </div>
       ) : (
         <div className="flex w-full items-center gap-2 bg-[var(--color-nexera-primary)] px-4 py-2 text-xs font-medium text-white/95">
           <span>
-            {WORKSPACE_LABELS.entreprise} — {displayName}
+            {WORKSPACE_LABELS.entreprise} - {displayName}
           </span>
         </div>
       )}

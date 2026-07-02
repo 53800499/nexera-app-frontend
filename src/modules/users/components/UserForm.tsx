@@ -1,12 +1,31 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useMemo } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useMemo, useState } from "react";
+import {
+  Controller,
+  useForm,
+  type SubmitErrorHandler,
+} from "react-hook-form";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
-import type { RoleSummary } from "../types/user.types";
+import { useActionFeedback } from "@/shared/components/feedback";
+import {
+  focusFirstFormError,
+  scrollToFormField,
+} from "@/shared/forms/formErrorFocus";
+import {
+  buildFormHydrationKey,
+  useHydrateFormDefaults,
+} from "@/shared/forms/useHydrateFormDefaults";
+import { applyFormApiErrors } from "@/shared/http/applyFormApiErrors";
+import { resolveFormErrorMessage } from "@/shared/http/resolveFormErrorMessage";
+import type {
+  CreateUserPayload,
+  RoleSummary,
+  UpdateUserPayload,
+} from "../types/user.types";
 import {
   createUserFormSchema,
   updateUserFormSchema,
@@ -18,6 +37,8 @@ type BaseProps = {
   roles: RoleSummary[];
   isSubmitting: boolean;
   onCancel?: () => void;
+  /** Identifiant stable de la source (ex. user.id) pour éviter un reset après erreur. */
+  formKey?: string;
 };
 
 type CreateProps = BaseProps & {
@@ -36,39 +57,89 @@ type UpdateProps = BaseProps & {
 
 type Props = CreateProps | UpdateProps;
 
+export function buildCreateUserPayload(
+  values: CreateUserFormValues,
+): CreateUserPayload {
+  return {
+    email: values.email,
+    firstName: values.firstName,
+    lastName: values.lastName,
+    password: values.password || undefined,
+    isActive: values.isActive,
+    requestPasswordReset: values.requestPasswordReset,
+    roleIds: values.roleIds ?? [],
+  };
+}
+
+export function buildUpdateUserPayload(
+  values: UpdateUserFormValues,
+): UpdateUserPayload {
+  return {
+    email: values.email,
+    firstName: values.firstName,
+    lastName: values.lastName,
+    password: values.password || undefined,
+    isActive: values.isActive,
+  };
+}
+
 export function UserForm(props: Props) {
-  const { roles, isSubmitting, onCancel, mode, submitLabel, onSubmit } = props;
+  const { roles, isSubmitting, onCancel, mode, submitLabel, onSubmit, formKey } =
+    props;
+  const { showResult } = useActionFeedback();
+  const [formError, setFormError] = useState<string | null>(null);
+  const defaultValues =
+    mode === "create"
+      ? (props as CreateProps).defaultValues
+      : (props as UpdateProps).defaultValues;
 
   const initialValues = useMemo(() => {
     if (mode === "create") {
-      const defaults = props.defaultValues;
+      const createDefaults = defaultValues as
+        | Partial<CreateUserFormValues>
+        | undefined;
       return {
-        email: defaults?.email ?? "",
-        firstName: defaults?.firstName ?? "",
-        lastName: defaults?.lastName ?? "",
-        password: defaults?.password ?? "",
-        isActive: defaults?.isActive ?? true,
-        requestPasswordReset: defaults?.requestPasswordReset ?? false,
-        roleIds: defaults?.roleIds ?? [],
+        email: createDefaults?.email ?? "",
+        firstName: createDefaults?.firstName ?? "",
+        lastName: createDefaults?.lastName ?? "",
+        password: createDefaults?.password ?? "",
+        isActive: createDefaults?.isActive ?? true,
+        requestPasswordReset: createDefaults?.requestPasswordReset ?? false,
+        roleIds: createDefaults?.roleIds ?? [],
       } satisfies CreateUserFormValues;
     }
 
-    const defaults = props.defaultValues;
     return {
-      email: defaults?.email ?? "",
-      firstName: defaults?.firstName ?? "",
-      lastName: defaults?.lastName ?? "",
-      password: defaults?.password ?? "",
-      isActive: defaults?.isActive ?? true,
-      roleIds: defaults?.roleIds ?? [],
+      email: defaultValues?.email ?? "",
+      firstName: defaultValues?.firstName ?? "",
+      lastName: defaultValues?.lastName ?? "",
+      password: defaultValues?.password ?? "",
+      isActive: defaultValues?.isActive ?? true,
+      roleIds: defaultValues?.roleIds ?? [],
     } satisfies UpdateUserFormValues;
-  }, [mode, props]);
+  }, [
+    mode,
+    defaultValues?.email,
+    defaultValues?.firstName,
+    defaultValues?.lastName,
+    defaultValues?.password,
+    defaultValues?.isActive,
+    defaultValues?.roleIds,
+    mode === "create"
+      ? (defaultValues as Partial<CreateUserFormValues> | undefined)
+          ?.requestPasswordReset
+      : undefined,
+  ]);
+
+  const hydrationKey =
+    formKey ?? buildFormHydrationKey({ mode, defaults: defaultValues ?? {} });
 
   const {
     register,
     handleSubmit,
     control,
     reset,
+    setError,
     formState: { errors },
   } = useForm<CreateUserFormValues | UpdateUserFormValues>({
     resolver: zodResolver(
@@ -77,23 +148,77 @@ export function UserForm(props: Props) {
     defaultValues: initialValues,
   });
 
-  useEffect(() => {
-    reset(initialValues);
-  }, [initialValues, reset]);
+  useHydrateFormDefaults(reset, initialValues, hydrationKey);
+
+  const handleFormSubmit = async (
+    values: CreateUserFormValues | UpdateUserFormValues,
+  ) => {
+    setFormError(null);
+    try {
+      if (mode === "create") {
+        await (onSubmit as CreateProps["onSubmit"])(
+          values as CreateUserFormValues,
+        );
+      } else {
+        await (onSubmit as UpdateProps["onSubmit"])(
+          values as UpdateUserFormValues,
+        );
+      }
+    } catch (error) {
+      const { message, firstField } = applyFormApiErrors(error, setError);
+      const displayMessage = message ?? resolveFormErrorMessage(error);
+      setFormError(displayMessage);
+      void showResult({
+        variant: "error",
+        title: "Enregistrement impossible",
+        message: firstField
+          ? `${displayMessage} Le champ concerné est mis en évidence ci-dessous.`
+          : displayMessage,
+      });
+      if (firstField) {
+        window.setTimeout(() => scrollToFormField(firstField), 0);
+      } else {
+        document
+          .getElementById("user-form-error")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  };
+
+  const handleInvalidSubmit: SubmitErrorHandler<
+    CreateUserFormValues | UpdateUserFormValues
+  > = (fieldErrors) => {
+    const firstError = focusFirstFormError(fieldErrors);
+    if (!firstError) return;
+    setFormError(firstError.message);
+    void showResult({
+      variant: "error",
+      title: "Formulaire incomplet",
+      message: `${firstError.message} Corrigez le champ indiqué puis réessayez.`,
+    });
+  };
 
   return (
     <form
-      onSubmit={handleSubmit((values) =>
-        onSubmit(values as CreateUserFormValues & UpdateUserFormValues),
-      )}
+      onSubmit={handleSubmit(handleFormSubmit, handleInvalidSubmit)}
       className="space-y-6"
+      noValidate
     >
+      {formError ? (
+        <p
+          id="user-form-error"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+        >
+          {formError}
+        </p>
+      ) : null}
+
       <section className="space-y-4">
         <h2 className="text-sm font-semibold text-gray-800 dark:text-white/90">
           Identité
         </h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
+          <div data-form-field="email">
             <Label>Email</Label>
             <Input
               {...register("email")}
@@ -102,7 +227,7 @@ export function UserForm(props: Props) {
               hint={errors.email?.message}
             />
           </div>
-          <div>
+          <div data-form-field="password">
             <Label>
               {mode === "create"
                 ? "Mot de passe (optionnel)"
@@ -120,7 +245,7 @@ export function UserForm(props: Props) {
               }
             />
           </div>
-          <div>
+          <div data-form-field="firstName">
             <Label>Prénom</Label>
             <Input
               {...register("firstName")}
@@ -128,7 +253,7 @@ export function UserForm(props: Props) {
               hint={errors.firstName?.message}
             />
           </div>
-          <div>
+          <div data-form-field="lastName">
             <Label>Nom</Label>
             <Input
               {...register("lastName")}
@@ -139,7 +264,7 @@ export function UserForm(props: Props) {
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-4" data-form-field="roleIds">
         <h2 className="text-sm font-semibold text-gray-800 dark:text-white/90">
           Rôles
         </h2>
@@ -192,6 +317,9 @@ export function UserForm(props: Props) {
             </div>
           )}
         />
+        {errors.roleIds ? (
+          <p className="text-xs text-red-600">{errors.roleIds.message}</p>
+        ) : null}
       </section>
 
       <section className="flex flex-wrap items-center gap-6">

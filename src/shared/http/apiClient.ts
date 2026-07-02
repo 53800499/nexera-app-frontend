@@ -3,18 +3,26 @@ import { env } from "@/shared/config/env";
 import { isBrowserOnline } from "@/shared/hooks/useNetworkStatus";
 import { fetchWithOfflineGuard } from "@/shared/http/fetchWithOfflineGuard";
 import { parseApiErrorBody } from "@/shared/http/parseApiError";
+import { refreshAccessToken } from "@/shared/http/refreshAccessToken";
 import { tokenStorage } from "@/modules/auth/services/tokenStorage.service";
 type RequestOptions = {
   method?: string;
   body?: unknown;
   auth?: boolean;
   refreshToken?: boolean;
+  _retryOnAuthFail?: boolean;
 };
 export async function apiClient<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = "GET", body, auth = false, refreshToken = false } = options;
+  const {
+    method = "GET",
+    body,
+    auth = false,
+    refreshToken = false,
+    _retryOnAuthFail = true,
+  } = options;
 
   if (!isBrowserOnline()) {
     throw new OfflineError();
@@ -39,6 +47,22 @@ export async function apiClient<T>(
     headers,
     body: body ? JSON.stringify(body) : undefined,
   });
+
+  if (
+    response.status === 401 &&
+    auth &&
+    !refreshToken &&
+    _retryOnAuthFail &&
+    path !== "/auth/refresh"
+  ) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      return apiClient<T>(path, {
+        ...options,
+        _retryOnAuthFail: false,
+      });
+    }
+  }
 
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => ({}))) as Parameters<

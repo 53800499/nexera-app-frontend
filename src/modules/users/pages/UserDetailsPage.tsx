@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ChevronLeftIcon } from "@/icons";
 import {
   EmptyState,
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { RequireUserAccess } from "../components/RequireUserAccess";
 import { UserDetailsCard } from "../components/UserDetailsCard";
@@ -17,8 +17,10 @@ import { useUser, useUserPermissions, useUsers } from "../hooks/useUsers";
 import { getUserFullName } from "../utils/userFormatters";
 
 export default function UserDetailsPage({ id }: { id: string }) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { canManageUsers } = useUserAccess();
   const userQuery = useUser(id);
   const permissionsQuery = useUserPermissions(id, canManageUsers);
@@ -32,7 +34,7 @@ export default function UserDetailsPage({ id }: { id: string }) {
     return (
       <ErrorState
         title="Utilisateur introuvable"
-        message="Impossible de charger les détails de cet utilisateur."
+        message="Impossible de charger les détails de cet utilisateur. Vérifiez l'identifiant ou réessayez."
         onRetry={() => userQuery.refetch()}
         action={
           <Link
@@ -64,6 +66,61 @@ export default function UserDetailsPage({ id }: { id: string }) {
   }
 
   const user = userQuery.data;
+  const fullName = getUserFullName(user);
+
+  const handleToggleStatus = () => {
+    void runAction({
+      confirm: {
+        title: user.isActive ? "Désactiver cet utilisateur ?" : "Activer cet utilisateur ?",
+        message: user.isActive
+          ? `${fullName} ne pourra plus se connecter tant que le compte est désactivé.`
+          : `${fullName} pourra à nouveau accéder à l'application.`,
+        confirmLabel: user.isActive ? "Désactiver" : "Activer",
+        variant: user.isActive ? "warning" : "default",
+      },
+      loadingMessage: "Mise à jour du statut...",
+      success: {
+        title: user.isActive ? "Utilisateur désactivé" : "Utilisateur activé",
+        message: fullName,
+      },
+      error: {
+        title: "Action impossible",
+        message:
+          "Le statut n'a pas pu être modifié. Vérifiez que vous ne modifiez pas votre propre compte de façon interdite.",
+      },
+      action: async () => {
+        await toggleStatusMutation.mutateAsync({
+          id: user.id,
+          isActive: !user.isActive,
+        });
+        await userQuery.refetch();
+      },
+    });
+  };
+
+  const handleRemove = () => {
+    void runAction({
+      confirm: {
+        title: "Supprimer ce compte ?",
+        message: `Le compte de ${fullName} sera désactivé définitivement.`,
+        confirmLabel: "Supprimer",
+        variant: "danger",
+      },
+      loadingMessage: "Suppression en cours...",
+      success: {
+        title: "Compte supprimé",
+        message: fullName,
+      },
+      redirectTo: "/utilisateurs",
+      redirectMessage: "Retour à la liste des utilisateurs...",
+      error: {
+        title: "Suppression impossible",
+        message:
+          "Ce compte ne peut pas être supprimé. Vérifiez qu'il ne s'agit pas de votre propre compte ou du dernier administrateur.",
+      },
+      action: () => removeMutation.mutateAsync(user.id),
+    });
+  };
 
   return (
     <RequireUserAccess>
@@ -79,7 +136,7 @@ export default function UserDetailsPage({ id }: { id: string }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-              {getUserFullName(user)}
+              {fullName}
             </h1>
             <p className="text-sm text-gray-500">Fiche utilisateur et permissions.</p>
           </div>
@@ -94,42 +151,17 @@ export default function UserDetailsPage({ id }: { id: string }) {
               </Link>
               <button
                 type="button"
-                onClick={() => {
-                  toggleStatusMutation.mutate(
-                    { id: user.id, isActive: !user.isActive },
-                    {
-                      onSuccess: () => {
-                        toast.success(
-                          user.isActive ? "Utilisateur désactivé" : "Utilisateur activé",
-                        );
-                      },
-                      onError: () => toast.error("Action impossible"),
-                    },
-                  );
-                }}
-                className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                disabled={isBusy}
+                onClick={handleToggleStatus}
+                className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:hover:bg-gray-800"
               >
                 {user.isActive ? "Désactiver" : "Activer"}
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      `Désactiver définitivement le compte de ${getUserFullName(user)} ?`,
-                    )
-                  ) {
-                    return;
-                  }
-                  removeMutation.mutate(user.id, {
-                    onSuccess: () => {
-                      toast.success("Compte désactivé");
-                      router.push("/utilisateurs");
-                    },
-                    onError: () => toast.error("Suppression impossible"),
-                  });
-                }}
-                className="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:hover:bg-red-500/10"
+                disabled={isBusy}
+                onClick={handleRemove}
+                className="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-500/30 dark:hover:bg-red-500/10"
               >
                 Supprimer
               </button>
@@ -141,6 +173,14 @@ export default function UserDetailsPage({ id }: { id: string }) {
 
         {permissionsQuery.isPending ? (
           <LoadingBlock label="Chargement des permissions..." />
+        ) : null}
+
+        {permissionsQuery.isError ? (
+          <ErrorState
+            title="Permissions indisponibles"
+            message="Impossible de charger les permissions de cet utilisateur."
+            onRetry={() => permissionsQuery.refetch()}
+          />
         ) : null}
 
         {permissionsQuery.data ? (

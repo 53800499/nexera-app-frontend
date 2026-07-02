@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ChevronLeftIcon } from "@/icons";
 import { useTaxRates } from "@/modules/catalogue/hooks/useCatalogue";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import {
   buildUpdateInvoicePayload,
@@ -20,23 +20,44 @@ import { invoiceToFormValues } from "../utils/invoiceFormMapping";
 import { canEditInvoice } from "../utils/invoiceStatusRules";
 
 export default function EditInvoicePage({ id }: { id: string }) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const invoiceQuery = useInvoice(id);
   const { updateMutation } = useInvoices();
   const taxRatesQuery = useTaxRates();
 
-  const submit = async (values: InvoiceFormValues) => {
-    const invoice = await updateMutation.mutateAsync({
-      id,
-      payload: buildUpdateInvoicePayload(values),
-    });
-    toast.success("Facture mise à jour", invoice.number);
-    router.push(`/factures/${invoice.id}`);
-  };
-
   const invoice = invoiceQuery.data;
   const canEdit = invoice ? canEditInvoice(invoice.status) : false;
+  const isPageLoading =
+    (invoiceQuery.isPending && !invoiceQuery.data) ||
+    (canEdit && taxRatesQuery.isLoading && !taxRatesQuery.data);
+
+  const submit = async (values: InvoiceFormValues) => {
+    const number = invoice?.number ?? "facture";
+    await runAction({
+      confirm: {
+        title: "Enregistrer les modifications ?",
+        message: `Mettre à jour la facture ${number}.`,
+        confirmLabel: "Enregistrer",
+      },
+      loadingMessage: "Enregistrement de la facture...",
+      success: {
+        title: "Facture mise à jour",
+        message: number,
+      },
+      redirectTo: `/factures/${id}`,
+      redirectMessage: "Retour au détail de la facture...",
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () =>
+        updateMutation.mutateAsync({
+          id,
+          payload: buildUpdateInvoicePayload(values),
+        }),
+    });
+  };
 
   return (
     <RequireInvoiceAccess requireManage>
@@ -49,8 +70,8 @@ export default function EditInvoicePage({ id }: { id: string }) {
           Retour à la facture
         </Link>
 
-        {invoiceQuery.isPending && !invoiceQuery.data && (
-          <LoadingBlock label="Chargement de la facture..." />
+        {isPageLoading && (
+          <LoadingBlock label="Chargement du formulaire de facture..." />
         )}
 
         {invoiceQuery.isError && (
@@ -76,6 +97,14 @@ export default function EditInvoicePage({ id }: { id: string }) {
           />
         ) : null}
 
+        {taxRatesQuery.isError && canEdit ? (
+          <ErrorState
+            title="Configuration TVA indisponible"
+            message="Impossible de charger les taux de TVA."
+            onRetry={() => taxRatesQuery.refetch()}
+          />
+        ) : null}
+
         {invoice && canEdit && taxRatesQuery.data ? (
           <>
             <div>
@@ -84,7 +113,7 @@ export default function EditInvoicePage({ id }: { id: string }) {
               </h1>
             </div>
             <InvoiceForm
-              isSubmitting={updateMutation.isPending}
+              isSubmitting={isBusy}
               submitLabel="Enregistrer"
               taxRates={taxRatesQuery.data}
               lockClient
@@ -96,8 +125,6 @@ export default function EditInvoicePage({ id }: { id: string }) {
               onSubmit={submit}
             />
           </>
-        ) : invoice && canEdit && taxRatesQuery.isLoading ? (
-          <LoadingBlock label="Chargement des taux de TVA..." />
         ) : null}
       </div>
     </RequireInvoiceAccess>

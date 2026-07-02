@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
-import { useToast } from "@/shared/components/feedback";
+import { useActionFeedback } from "@/shared/components/feedback";
 import type { Contact } from "../types/client.types";
 import {
   contactFormSchema,
@@ -27,7 +27,7 @@ function ContactRow({
   canManage,
   canDelete,
 }: ContactRowProps) {
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
   const [isEditing, setIsEditing] = useState(false);
   const { updateContactMutation, removeContactMutation } = useClients();
 
@@ -50,24 +50,28 @@ function ContactRow({
   const handleDelete = () => {
     const label = `${contact.firstName} ${contact.lastName}`;
     const message = contact.isPrimary
-      ? `Supprimer le contact principal « ${label} » ? Un autre contact restera sur la fiche.`
-      : `Supprimer le contact « ${label} » ?`;
+      ? `Le contact principal « ${label} » sera supprimé. Un autre contact restera sur la fiche.`
+      : `Le contact « ${label} » sera définitivement supprimé.`;
 
-    if (!window.confirm(message)) return;
-
-    removeContactMutation.mutate(
-      { contactId: contact.id, clientId },
-      {
-        onSuccess: () => toast.success("Contact supprimé", label),
-        onError: (error) => {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Le dernier contact ne peut pas être supprimé (RM-C02).";
-          toast.error("Suppression impossible", message);
-        },
+    void runAction({
+      confirm: {
+        title: "Supprimer ce contact ?",
+        message,
+        confirmLabel: "Supprimer",
+        variant: "danger",
       },
-    );
+      loadingMessage: "Suppression du contact...",
+      success: {
+        title: "Contact supprimé",
+        message: label,
+      },
+      error: {
+        title: "Suppression impossible",
+        message: "Le dernier contact ne peut pas être supprimé (RM-C02).",
+      },
+      action: () =>
+        removeContactMutation.mutateAsync({ contactId: contact.id, clientId }),
+    });
   };
 
   if (isEditing && canManage) {
@@ -75,22 +79,37 @@ function ContactRow({
       <form
         className="space-y-3 rounded-lg border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-500/30 dark:bg-brand-500/5"
         onSubmit={handleSubmit(async (values) => {
-          try {
-            await updateContactMutation.mutateAsync({
-              contactId: contact.id,
-              clientId,
-              payload: {
-                firstName: values.firstName,
-                lastName: values.lastName,
-                jobTitle: values.jobTitle || undefined,
-                email: values.email || undefined,
-                phone: values.phone || undefined,
-              },
-            });
-            toast.success("Contact mis à jour");
+          const label = `${values.firstName} ${values.lastName}`;
+          const result = await runAction({
+            confirm: {
+              title: "Enregistrer les modifications ?",
+              message: `Mettre à jour le contact ${label}.`,
+              confirmLabel: "Enregistrer",
+            },
+            loadingMessage: "Mise à jour du contact...",
+            success: {
+              title: "Contact mis à jour",
+              message: label,
+            },
+            error: {
+              title: "Impossible de modifier le contact",
+            },
+            action: () =>
+              updateContactMutation.mutateAsync({
+                contactId: contact.id,
+                clientId,
+                payload: {
+                  firstName: values.firstName,
+                  lastName: values.lastName,
+                  jobTitle: values.jobTitle || undefined,
+                  email: values.email || undefined,
+                  phone: values.phone || undefined,
+                },
+              }),
+          });
+
+          if (result) {
             setIsEditing(false);
-          } catch {
-            toast.error("Impossible de modifier le contact");
           }
         })}
       >
@@ -125,9 +144,7 @@ function ContactRow({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" disabled={updateContactMutation.isPending}>
-            {updateContactMutation.isPending ? "Enregistrement..." : "Enregistrer"}
-          </Button>
+          <Button size="sm">Enregistrer</Button>
           <button
             type="button"
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
@@ -172,7 +189,6 @@ function ContactRow({
             <button
               type="button"
               className="rounded border border-error-300 px-2 py-1 text-xs text-error-600 hover:bg-error-50 dark:border-error-500/40 dark:text-error-400"
-              disabled={removeContactMutation.isPending}
               onClick={handleDelete}
             >
               Supprimer
@@ -202,7 +218,7 @@ export function ClientContactsSection({
   contacts,
   canManage,
 }: Props) {
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
   const [showForm, setShowForm] = useState(false);
   const { addContactMutation } = useClients();
   const canDeleteAny = contacts.length > 1;
@@ -259,22 +275,37 @@ export function ClientContactsSection({
         <form
           className="mt-4 space-y-3 border-t border-gray-200 pt-4 dark:border-gray-800"
           onSubmit={handleSubmit(async (values) => {
-            try {
-              await addContactMutation.mutateAsync({
-                clientId,
-                payload: {
-                  firstName: values.firstName,
-                  lastName: values.lastName,
-                  jobTitle: values.jobTitle || undefined,
-                  email: values.email || undefined,
-                  phone: values.phone || undefined,
-                },
-              });
-              toast.success("Contact ajouté");
+            const label = `${values.firstName} ${values.lastName}`;
+            const result = await runAction({
+              confirm: {
+                title: "Ajouter ce contact ?",
+                message: `Le contact ${label} sera ajouté à la fiche client.`,
+                confirmLabel: "Ajouter",
+              },
+              loadingMessage: "Ajout du contact...",
+              success: {
+                title: "Contact ajouté",
+                message: label,
+              },
+              error: {
+                title: "Impossible d'ajouter le contact",
+              },
+              action: () =>
+                addContactMutation.mutateAsync({
+                  clientId,
+                  payload: {
+                    firstName: values.firstName,
+                    lastName: values.lastName,
+                    jobTitle: values.jobTitle || undefined,
+                    email: values.email || undefined,
+                    phone: values.phone || undefined,
+                  },
+                }),
+            });
+
+            if (result) {
               reset();
               setShowForm(false);
-            } catch {
-              toast.error("Impossible d'ajouter le contact");
             }
           })}
         >
@@ -311,9 +342,7 @@ export function ClientContactsSection({
               <Input {...register("phone")} />
             </div>
           </div>
-          <Button size="sm" disabled={addContactMutation.isPending}>
-            Enregistrer le contact
-          </Button>
+          <Button size="sm">Enregistrer le contact</Button>
         </form>
       ) : null}
     </div>

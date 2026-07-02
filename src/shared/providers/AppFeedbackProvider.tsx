@@ -1,6 +1,6 @@
 "use client";
 
-import { ToastProvider } from "@/shared/components/feedback";
+import { ActionFeedbackProvider, ToastProvider } from "@/shared/components/feedback";
 
 export function AppFeedbackProvider({
   children,
@@ -11,6 +11,7 @@ export function AppFeedbackProvider({
     <>
       {children}
       <ToastProvider />
+      <ActionFeedbackProvider />
     </>
   );
 }

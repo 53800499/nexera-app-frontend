@@ -4,17 +4,44 @@ import Link from "next/link";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { RequirePermission } from "../components/RequirePermission";
 import { RolesTable } from "../components/RolesTable";
 import { useAccessControl } from "../hooks/useAccessControl";
 import { useRoles } from "../hooks/useRoles";
+import type { Role } from "../types/role.types";
 
 export default function RolesListPage() {
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { canManageRoles } = useAccessControl();
   const { rolesQuery, deleteMutation } = useRoles();
+
+  const handleDelete = (role: Role) => {
+    void runAction({
+      confirm: {
+        title: "Supprimer ce rôle ?",
+        message: `Le rôle « ${role.name} » sera supprimé définitivement. Cette action est irréversible.`,
+        confirmLabel: "Supprimer",
+        variant: "danger",
+      },
+      loadingMessage: "Suppression du rôle...",
+      success: {
+        title: "Rôle supprimé",
+        message: role.name,
+      },
+      error: {
+        title: "Suppression impossible",
+        message:
+          "Ce rôle ne peut pas être supprimé s'il est encore assigné à des utilisateurs.",
+      },
+      action: () => deleteMutation.mutateAsync(role.id),
+    });
+  };
 
   return (
     <RequirePermission permission="manage:roles">
@@ -62,28 +89,8 @@ export default function RolesListPage() {
           <RolesTable
             roles={rolesQuery.data}
             canManage={canManageRoles}
-            isDeleting={deleteMutation.isPending}
-            onDelete={(role) => {
-              if (
-                !window.confirm(
-                  `Supprimer le rôle « ${role.name} » ? Cette action est irréversible.`,
-                )
-              ) {
-                return;
-              }
-
-              deleteMutation.mutate(role.id, {
-                onSuccess: () => {
-                  toast.success("Rôle supprimé", role.name);
-                },
-                onError: () => {
-                  toast.error(
-                    "Suppression impossible",
-                    "Ce rôle est peut-être encore assigné à des utilisateurs.",
-                  );
-                },
-              });
-            }}
+            isDeleting={deleteMutation.isPending || isBusy}
+            onDelete={handleDelete}
           />
         ) : null}
       </div>

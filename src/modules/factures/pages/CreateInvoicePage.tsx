@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ChevronLeftIcon } from "@/icons";
 import { useTaxRates } from "@/modules/catalogue/hooks/useCatalogue";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import {
   buildCreateInvoicePayload,
@@ -32,17 +32,32 @@ export default function CreateInvoicePage({
   orderLabel,
   quotationLabel,
 }: Props) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { createMutation } = useInvoices();
   const taxRatesQuery = useTaxRates();
 
   const submit = async (values: InvoiceFormValues) => {
-    const invoice = await createMutation.mutateAsync(
-      buildCreateInvoicePayload(values),
-    );
-    toast.success("Facture créée", invoice.number);
-    router.push(`/factures/${invoice.id}`);
+    await runAction({
+      confirm: {
+        title: "Enregistrer cette facture ?",
+        message: "La facture sera créée en brouillon.",
+        confirmLabel: "Enregistrer",
+      },
+      loadingMessage: "Enregistrement de la facture...",
+      success: {
+        title: "Facture créée",
+        message: "Brouillon enregistré avec succès.",
+      },
+      redirectTo: (invoice) => `/factures/${invoice.id}`,
+      redirectMessage: "Ouverture de la facture...",
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () =>
+        createMutation.mutateAsync(buildCreateInvoicePayload(values)),
+    });
   };
 
   return (
@@ -79,7 +94,7 @@ export default function CreateInvoicePage({
 
         {taxRatesQuery.data ? (
           <InvoiceForm
-            isSubmitting={createMutation.isPending}
+            isSubmitting={isBusy}
             submitLabel="Enregistrer le brouillon"
             taxRates={taxRatesQuery.data}
             lockOrder={Boolean(defaultOrderId)}

@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ChevronLeftIcon } from "@/icons";
 import { useTaxRates } from "@/modules/catalogue/hooks/useCatalogue";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import {
   buildUpdateQuotationPayload,
@@ -20,23 +20,44 @@ import { quotationToFormValues } from "../utils/quotationFormMapping";
 import { canEditQuotation } from "../utils/quotationStatusRules";
 
 export default function EditQuotationPage({ id }: { id: string }) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const quotationQuery = useQuotation(id);
   const { updateMutation } = useQuotations();
   const taxRatesQuery = useTaxRates();
 
-  const submit = async (values: QuotationFormValues) => {
-    const quotation = await updateMutation.mutateAsync({
-      id,
-      payload: buildUpdateQuotationPayload(values),
-    });
-    toast.success("Devis mis à jour", quotation.number);
-    router.push(`/devis/${quotation.id}`);
-  };
-
   const quotation = quotationQuery.data;
   const canEdit = quotation ? canEditQuotation(quotation.status) : false;
+  const isPageLoading =
+    (quotationQuery.isPending && !quotationQuery.data) ||
+    (canEdit && taxRatesQuery.isLoading && !taxRatesQuery.data);
+
+  const submit = async (values: QuotationFormValues) => {
+    const number = quotation?.number ?? "devis";
+    await runAction({
+      confirm: {
+        title: "Enregistrer les modifications ?",
+        message: `Mettre à jour le devis ${number}.`,
+        confirmLabel: "Enregistrer",
+      },
+      loadingMessage: "Enregistrement du devis...",
+      success: {
+        title: "Devis mis à jour",
+        message: number,
+      },
+      redirectTo: `/devis/${id}`,
+      redirectMessage: "Retour au détail du devis...",
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () =>
+        updateMutation.mutateAsync({
+          id,
+          payload: buildUpdateQuotationPayload(values),
+        }),
+    });
+  };
 
   return (
     <RequireQuotationAccess requireManage>
@@ -49,8 +70,8 @@ export default function EditQuotationPage({ id }: { id: string }) {
           Retour au devis
         </Link>
 
-        {quotationQuery.isPending && !quotationQuery.data && (
-          <LoadingBlock label="Chargement du devis..." />
+        {isPageLoading && (
+          <LoadingBlock label="Chargement du formulaire de devis..." />
         )}
 
         {quotationQuery.isError && (
@@ -76,6 +97,14 @@ export default function EditQuotationPage({ id }: { id: string }) {
           />
         ) : null}
 
+        {taxRatesQuery.isError && canEdit ? (
+          <ErrorState
+            title="Configuration TVA indisponible"
+            message="Impossible de charger les taux de TVA."
+            onRetry={() => taxRatesQuery.refetch()}
+          />
+        ) : null}
+
         {quotation && canEdit && taxRatesQuery.data ? (
           <>
             <div>
@@ -84,7 +113,7 @@ export default function EditQuotationPage({ id }: { id: string }) {
               </h1>
             </div>
             <QuotationForm
-              isSubmitting={updateMutation.isPending}
+              isSubmitting={isBusy}
               submitLabel="Enregistrer"
               taxRates={taxRatesQuery.data}
               lockClient
@@ -92,8 +121,6 @@ export default function EditQuotationPage({ id }: { id: string }) {
               onSubmit={submit}
             />
           </>
-        ) : quotation && canEdit && taxRatesQuery.isLoading ? (
-          <LoadingBlock label="Chargement des taux de TVA..." />
         ) : null}
       </div>
     </RequireQuotationAccess>

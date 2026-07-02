@@ -5,7 +5,7 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { useClients } from "@/modules/crm/hooks/useClients";
 import type { ClientSummary } from "@/modules/crm/types/client.types";
-import { LoadingBlock } from "@/shared/components/feedback";
+import { LoadingBlock, ErrorState } from "@/shared/components/feedback";
 import { useClientPaymentBehavior } from "../hooks/useReminders";
 
 export function PaymentBehaviorPanel() {
@@ -68,6 +68,14 @@ export function PaymentBehaviorPanel() {
 
       {behaviorQuery.isFetching && clientId ? (
         <LoadingBlock label="Analyse en cours..." />
+      ) : null}
+
+      {behaviorQuery.isError && clientId ? (
+        <ErrorState
+          title="Analyse impossible"
+          message="Impossible d'analyser le comportement de paiement de ce client. Réessayez ou choisissez un autre client."
+          onRetry={() => behaviorQuery.refetch()}
+        />
       ) : null}
 
       {behaviorQuery.data ? (

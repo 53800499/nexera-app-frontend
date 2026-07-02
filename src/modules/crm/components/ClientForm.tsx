@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
+import { CountryFlagsSelect } from "@/shared/components/form/CountryFlagsSelect";
 import { CurrencySelect } from "@/shared/components/form/CurrencySelect";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
@@ -56,7 +57,7 @@ export function ClientForm({
         street: defaultValues?.billingAddress?.street ?? "",
         city: defaultValues?.billingAddress?.city ?? "",
         postalCode: defaultValues?.billingAddress?.postalCode ?? "",
-        country: defaultValues?.billingAddress?.country ?? "France",
+        country: defaultValues?.billingAddress?.country ?? "CI",
       },
       shippingAddress: defaultValues?.shippingAddress,
       useShippingAddress: defaultValues?.useShippingAddress ?? false,
@@ -82,6 +83,8 @@ export function ClientForm({
   });
 
   const useShippingAddress = watch("useShippingAddress");
+  const clientType = watch("clientType");
+  const isPostalCodeRequired = clientType !== "individual";
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -184,7 +187,10 @@ export function ClientForm({
             />
           </div>
           <div>
-            <Label>Code postal <span className="text-red-600">*</span></Label>
+            <Label>
+              Code postal{" "}
+              {isPostalCodeRequired ? <span className="text-red-600">*</span> : null}
+            </Label>
             <Input
               {...register("billingAddress.postalCode")}
               error={Boolean(errors.billingAddress?.postalCode)}
@@ -193,10 +199,17 @@ export function ClientForm({
           </div>
           <div>
             <Label>Pays <span className="text-red-600">*</span></Label>
-            <Input
-              {...register("billingAddress.country")}
-              error={Boolean(errors.billingAddress?.country)}
-              hint={errors.billingAddress?.country?.message}
+            <Controller
+              name="billingAddress.country"
+              control={control}
+              render={({ field }) => (
+                <CountryFlagsSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={Boolean(errors.billingAddress?.country)}
+                  hint={errors.billingAddress?.country?.message}
+                />
+              )}
             />
           </div>
         </div>
@@ -228,8 +241,19 @@ export function ClientForm({
               <Input {...register("shippingAddress.postalCode")} />
             </div>
             <div>
-              <Label>Pays</Label>
-              <Input {...register("shippingAddress.country")} />
+              <Label>Pays <span className="text-red-600">*</span></Label>
+              <Controller
+                name="shippingAddress.country"
+                control={control}
+                render={({ field }) => (
+                  <CountryFlagsSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={Boolean(errors.shippingAddress?.country)}
+                    hint={errors.shippingAddress?.country?.message}
+                  />
+                )}
+              />
             </div>
           </div>
         ) : null}

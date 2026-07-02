@@ -1,14 +1,20 @@
 "use client";
 
 import type { Address, ClientDetail } from "../types/client.types";
+import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
 import { ClientStatusBadge } from "./ClientStatusBadge";
 
 function formatAddress(address?: Address | null) {
   if (!address) return "—";
+  const country =
+    address.country && /^[A-Z]{2}$/.test(address.country)
+      ? new Intl.DisplayNames(["fr"], { type: "region" }).of(address.country) ??
+        address.country
+      : address.country;
   const parts = [
     address.street,
     [address.postalCode, address.city].filter(Boolean).join(" "),
-    address.country,
+    country,
   ].filter(Boolean);
   return parts.join(", ") || "—";
 }
@@ -77,14 +83,14 @@ export function ClientDetailsCard({ client }: Props) {
         <div>
           <p className="text-xs uppercase text-gray-500">Devise / Remise</p>
           <p className="mt-1 text-sm">
-            {client.defaultCurrency ?? "EUR"} · {client.defaultDiscountPct ?? 0}%
+            {client.defaultCurrency ?? DEFAULT_CURRENCY} · {client.defaultDiscountPct ?? 0}%
           </p>
         </div>
         <div>
           <p className="text-xs uppercase text-gray-500">Encours max</p>
           <p className="mt-1 text-sm">
             {client.creditLimit != null
-              ? `${client.creditLimit} ${client.defaultCurrency ?? "EUR"}`
+              ? `${client.creditLimit} ${client.defaultCurrency ?? DEFAULT_CURRENCY}`
               : "—"}
           </p>
         </div>

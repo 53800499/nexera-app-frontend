@@ -1,13 +1,18 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import ComponentCard from "@/components/common/ComponentCard";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { useToast } from "@/shared/components/feedback";
+import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
+import {
+  buildFormHydrationKey,
+  useHydrateFormDefaults,
+} from "@/shared/forms/useHydrateFormDefaults";
 import {
   tenantSettingsSchema,
   type TenantSettingsFormValues,
@@ -23,7 +28,7 @@ type Props = {
 
 function toFormValues(settings: TenantSettings): TenantSettingsFormValues {
   return {
-    primaryCurrency: settings.primaryCurrency ?? "EUR",
+    primaryCurrency: settings.primaryCurrency ?? DEFAULT_CURRENCY,
     exchangeRateSource: settings.exchangeRateSource ?? "manual",
     latePaymentPenaltyRate:
       settings.latePaymentPenaltyRate != null
@@ -55,6 +60,9 @@ export function TenantSettingsForm({
   onSubmit,
 }: Props) {
   const toast = useToast();
+  const initialValues = useMemo(() => toFormValues(settings), [settings]);
+  const hydrationKey = buildFormHydrationKey(initialValues);
+
   const {
     register,
     handleSubmit,
@@ -62,12 +70,10 @@ export function TenantSettingsForm({
     formState: { errors, isDirty },
   } = useForm<TenantSettingsFormValues>({
     resolver: zodResolver(tenantSettingsSchema),
-    defaultValues: toFormValues(settings),
+    defaultValues: initialValues,
   });
 
-  useEffect(() => {
-    reset(toFormValues(settings));
-  }, [settings, reset]);
+  useHydrateFormDefaults(reset, initialValues, hydrationKey);
 
   const submit = handleSubmit(async (values) => {
     try {

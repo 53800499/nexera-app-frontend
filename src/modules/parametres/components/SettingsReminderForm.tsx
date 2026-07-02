@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import Button from "@/components/ui/button/Button";
 import { useToast } from "@/shared/components/feedback";
+import {
+  buildFormHydrationKey,
+  useHydrateFormDefaults,
+} from "@/shared/forms/useHydrateFormDefaults";
 import {
   reminderSettingsSchema,
   type ReminderSettingsFormValues,
@@ -27,6 +31,34 @@ export function SettingsReminderForm({
   onSubmit,
 }: Props) {
   const toast = useToast();
+
+  const initialValues = useMemo(
+    () => ({
+      isEnabled: settings.isEnabled,
+      level1DaysAfterDue: settings.level1DaysAfterDue,
+      level2DaysAfterDue: settings.level2DaysAfterDue,
+      level3DaysAfterDue: settings.level3DaysAfterDue,
+      level2CopyCommercial: settings.level2CopyCommercial,
+      level3AlertDirector: settings.level3AlertDirector,
+      level3BlockNewOrders: settings.level3BlockNewOrders,
+      commercialEmail: settings.commercialEmail ?? "",
+      directorEmail: settings.directorEmail ?? "",
+    }),
+    [
+      settings.isEnabled,
+      settings.level1DaysAfterDue,
+      settings.level2DaysAfterDue,
+      settings.level3DaysAfterDue,
+      settings.level2CopyCommercial,
+      settings.level3AlertDirector,
+      settings.level3BlockNewOrders,
+      settings.commercialEmail,
+      settings.directorEmail,
+    ],
+  );
+
+  const hydrationKey = buildFormHydrationKey(initialValues);
+
   const {
     register,
     handleSubmit,
@@ -34,32 +66,10 @@ export function SettingsReminderForm({
     formState: { errors },
   } = useForm<ReminderSettingsFormValues>({
     resolver: zodResolver(reminderSettingsSchema),
-    defaultValues: {
-      isEnabled: settings.isEnabled,
-      level1DaysAfterDue: settings.level1DaysAfterDue,
-      level2DaysAfterDue: settings.level2DaysAfterDue,
-      level3DaysAfterDue: settings.level3DaysAfterDue,
-      level2CopyCommercial: settings.level2CopyCommercial,
-      level3AlertDirector: settings.level3AlertDirector,
-      level3BlockNewOrders: settings.level3BlockNewOrders,
-      commercialEmail: settings.commercialEmail ?? "",
-      directorEmail: settings.directorEmail ?? "",
-    },
+    defaultValues: initialValues,
   });
 
-  useEffect(() => {
-    reset({
-      isEnabled: settings.isEnabled,
-      level1DaysAfterDue: settings.level1DaysAfterDue,
-      level2DaysAfterDue: settings.level2DaysAfterDue,
-      level3DaysAfterDue: settings.level3DaysAfterDue,
-      level2CopyCommercial: settings.level2CopyCommercial,
-      level3AlertDirector: settings.level3AlertDirector,
-      level3BlockNewOrders: settings.level3BlockNewOrders,
-      commercialEmail: settings.commercialEmail ?? "",
-      directorEmail: settings.directorEmail ?? "",
-    });
-  }, [settings, reset]);
+  useHydrateFormDefaults(reset, initialValues, hydrationKey);
 
   const submit = handleSubmit(async (values) => {
     try {

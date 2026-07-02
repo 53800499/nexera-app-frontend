@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ChevronLeftIcon } from "@/icons";
 import { useTaxRates } from "@/modules/catalogue/hooks/useCatalogue";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import {
   buildCreateQuotationPayload,
@@ -22,17 +22,32 @@ type Props = {
 };
 
 export default function CreateQuotationPage({ defaultClientId }: Props) {
-  const router = useRouter();
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { createMutation } = useQuotations();
   const taxRatesQuery = useTaxRates();
 
   const submit = async (values: QuotationFormValues) => {
-    const quotation = await createMutation.mutateAsync(
-      buildCreateQuotationPayload(values),
-    );
-    toast.success("Devis créé", quotation.number);
-    router.push(`/devis/${quotation.id}`);
+    await runAction({
+      confirm: {
+        title: "Enregistrer ce devis ?",
+        message: "Le devis sera créé en brouillon.",
+        confirmLabel: "Enregistrer",
+      },
+      loadingMessage: "Enregistrement du devis...",
+      success: {
+        title: "Devis créé",
+        message: "Brouillon enregistré avec succès.",
+      },
+      redirectTo: (quotation) => `/devis/${quotation.id}`,
+      redirectMessage: "Ouverture du devis...",
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () =>
+        createMutation.mutateAsync(buildCreateQuotationPayload(values)),
+    });
   };
 
   return (
@@ -51,7 +66,8 @@ export default function CreateQuotationPage({ defaultClientId }: Props) {
             Nouveau devis
           </h1>
           <p className="text-sm text-gray-500">
-            Sélectionnez un client, ajoutez les lignes et enregistrez en brouillon.
+            Sélectionnez un client, ajoutez les lignes et enregistrez en
+            brouillon.
           </p>
         </div>
 
@@ -69,7 +85,7 @@ export default function CreateQuotationPage({ defaultClientId }: Props) {
 
         {taxRatesQuery.data ? (
           <QuotationForm
-            isSubmitting={createMutation.isPending}
+            isSubmitting={isBusy}
             submitLabel="Enregistrer le brouillon"
             taxRates={taxRatesQuery.data}
             defaultValues={

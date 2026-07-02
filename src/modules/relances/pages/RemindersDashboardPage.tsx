@@ -4,7 +4,8 @@ import Link from "next/link";
 import {
   ErrorState,
   LoadingBlock,
-  useToast,
+  useActionFeedback,
+  useActionFeedbackStore,
 } from "@/shared/components/feedback";
 import { RequireReminderAccess } from "../components/RequireReminderAccess";
 import { ReminderSettingsForm } from "../components/ReminderSettingsForm";
@@ -15,42 +16,79 @@ import { useReminderSettings, useReminders } from "../hooks/useReminders";
 import type { ReminderSettingsFormValues } from "../schemas/reminderForm.schema";
 
 export default function RemindersDashboardPage() {
-  const toast = useToast();
+  const { runAction, showResult } = useActionFeedback();
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { canManageReminders } = useReminderAccess();
   const { settingsQuery, updateSettingsMutation } = useReminderSettings();
-  const { remindersQuery, processMutation } = useReminders({ page: 1, limit: 10 });
+  const { remindersQuery, processMutation } = useReminders({
+    page: 1,
+    limit: 10,
+  });
 
   const handleSettingsSubmit = async (values: ReminderSettingsFormValues) => {
-    await updateSettingsMutation.mutateAsync({
-      isEnabled: values.isEnabled,
-      level1DaysAfterDue: values.level1DaysAfterDue,
-      level2DaysAfterDue: values.level2DaysAfterDue,
-      level3DaysAfterDue: values.level3DaysAfterDue,
-      level2CopyCommercial: values.level2CopyCommercial,
-      level3AlertDirector: values.level3AlertDirector,
-      level3BlockNewOrders: values.level3BlockNewOrders,
-      ...(values.commercialEmail?.trim()
-        ? { commercialEmail: values.commercialEmail.trim() }
-        : {}),
-      ...(values.directorEmail?.trim()
-        ? { directorEmail: values.directorEmail.trim() }
-        : {}),
+    await runAction({
+      confirm: {
+        title: "Enregistrer les paramètres ?",
+        message: "Les délais et options de relance seront mis à jour.",
+        confirmLabel: "Enregistrer",
+      },
+      loadingMessage: "Enregistrement des paramètres...",
+      success: {
+        title: "Paramètres enregistrés",
+        message: "La configuration des relances a été mise à jour.",
+      },
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: () =>
+        updateSettingsMutation.mutateAsync({
+          isEnabled: values.isEnabled,
+          level1DaysAfterDue: values.level1DaysAfterDue,
+          level2DaysAfterDue: values.level2DaysAfterDue,
+          level3DaysAfterDue: values.level3DaysAfterDue,
+          level2CopyCommercial: values.level2CopyCommercial,
+          level3AlertDirector: values.level3AlertDirector,
+          level3BlockNewOrders: values.level3BlockNewOrders,
+          ...(values.commercialEmail?.trim()
+            ? { commercialEmail: values.commercialEmail.trim() }
+            : {}),
+          ...(values.directorEmail?.trim()
+            ? { directorEmail: values.directorEmail.trim() }
+            : {}),
+        }),
     });
   };
 
   const runAutomatic = async () => {
-    try {
-      const result = await processMutation.mutateAsync();
-      toast.success(
-        "Relances traitées",
-        `${result.sent} envoyée(s), ${result.skipped} ignorée(s), ${result.blocked} bloquée(s)`,
-      );
-      await remindersQuery.refetch();
-    } catch (error) {
-      toast.error(
-        "Traitement impossible",
-        error instanceof Error ? error.message : undefined,
-      );
+    const result = await runAction({
+      confirm: {
+        title: "Déclencher les relances automatiques ?",
+        message:
+          "Les factures éligibles seront analysées et les relances seront envoyées selon la configuration.",
+        confirmLabel: "Déclencher",
+        variant: "warning",
+      },
+      loadingMessage: "Traitement des relances en cours...",
+      showResultOnSuccess: false,
+      error: {
+        title: "Traitement impossible",
+        message:
+          "Vérifiez que les relances sont activées, que les e-mails sont configurés et que des factures sont éligibles.",
+      },
+      action: async () => {
+        const processResult = await processMutation.mutateAsync();
+        await remindersQuery.refetch();
+        return processResult;
+      },
+    });
+
+    if (result) {
+      await showResult({
+        variant: "success",
+        title: "Relances traitées",
+        message: `${result.sent} envoyée(s), ${result.skipped} ignorée(s), ${result.blocked} bloquée(s).`,
+      });
     }
   };
 
@@ -81,7 +119,7 @@ export default function RemindersDashboardPage() {
         {settingsQuery.isError && (
           <ErrorState
             title="Paramètres indisponibles"
-            message="Impossible de charger la configuration des relances."
+            message="Impossible de charger la configuration des relances. Vérifiez votre connexion puis réessayez."
             onRetry={() => settingsQuery.refetch()}
           />
         )}
@@ -93,11 +131,11 @@ export default function RemindersDashboardPage() {
               {canManageReminders ? (
                 <button
                   type="button"
-                  disabled={processMutation.isPending}
+                  disabled={processMutation.isPending || isBusy}
                   onClick={() => void runAutomatic()}
                   className="rounded-lg border border-brand-300 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50 disabled:opacity-60 dark:border-brand-500/40 dark:text-brand-400"
                 >
-                  {processMutation.isPending
+                  {processMutation.isPending || isBusy
                     ? "Traitement..."
                     : "Déclencher les relances auto"}
                 </button>
@@ -106,7 +144,7 @@ export default function RemindersDashboardPage() {
             {canManageReminders ? (
               <ReminderSettingsForm
                 settings={settingsQuery.data}
-                isSubmitting={updateSettingsMutation.isPending}
+                isSubmitting={updateSettingsMutation.isPending || isBusy}
                 onSubmit={handleSettingsSubmit}
               />
             ) : (
@@ -142,7 +180,7 @@ export default function RemindersDashboardPage() {
           {remindersQuery.isError && (
             <ErrorState
               title="Échec du chargement"
-              message="Impossible de charger les relances récentes."
+              message="Impossible de charger les relances récentes. Réessayez dans quelques instants."
               onRetry={() => remindersQuery.refetch()}
             />
           )}

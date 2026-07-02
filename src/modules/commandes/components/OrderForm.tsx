@@ -20,9 +20,11 @@ import {
   computeQuotationTotals,
   formatMoney,
 } from "@/modules/devis/utils/quotationCalculations";
-import { useToast } from "@/shared/components/feedback";
+import { useActionFeedback } from "@/shared/components/feedback";
 import { CurrencySelect } from "@/shared/components/form/CurrencySelect";
+import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
 import { applyFormApiErrors } from "@/shared/http/applyFormApiErrors";
+import { resolveFormErrorMessage } from "@/shared/http/resolveFormErrorMessage";
 import {
   focusFirstFormError,
   scrollToFormField,
@@ -158,7 +160,7 @@ function ItemPicker({ onSelect }: { onSelect: (item: CatalogItem) => void }) {
                   {item.reference} — {item.name}
                 </div>
                 <div className="text-xs text-gray-500">
-                  {formatMoney(item.priceHt, "EUR")} HT
+                  {formatMoney(item.priceHt, DEFAULT_CURRENCY)} HT
                 </div>
               </button>
             </li>
@@ -179,7 +181,7 @@ export function OrderForm({
   quotationLabel,
   onSubmit,
 }: Props) {
-  const toast = useToast();
+  const { showResult } = useActionFeedback();
   const [formError, setFormError] = useState<string | null>(null);
   const activeTaxRates = taxRates.filter((rate) => rate.isActive);
   const defaultTaxId =
@@ -193,7 +195,7 @@ export function OrderForm({
       quotationId: defaultValues?.quotationId ?? "",
       issueDate:
         defaultValues?.issueDate ?? new Date().toISOString().slice(0, 10),
-      currency: defaultValues?.currency ?? "EUR",
+      currency: defaultValues?.currency ?? DEFAULT_CURRENCY,
       globalDiscountPct: defaultValues?.globalDiscountPct ?? 0,
       lines:
         defaultValues?.lines && defaultValues.lines.length > 0
@@ -238,12 +240,21 @@ export function OrderForm({
       await onSubmit(values);
     } catch (error) {
       const { message, firstField } = applyFormApiErrors(error, setError);
-      if (message) {
-        setFormError(message);
-        toast.error("Enregistrement impossible", message);
-      }
+      const displayMessage = message ?? resolveFormErrorMessage(error);
+      setFormError(displayMessage);
+      void showResult({
+        variant: "error",
+        title: "Enregistrement impossible",
+        message: firstField
+          ? `${displayMessage} Le champ concerné est mis en évidence ci-dessous.`
+          : displayMessage,
+      });
       if (firstField) {
         window.setTimeout(() => scrollToFormField(firstField), 0);
+      } else {
+        document
+          .getElementById("order-form-error")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }
   };
@@ -253,8 +264,13 @@ export function OrderForm({
   ) => {
     const firstError = focusFirstFormError(fieldErrors);
     if (!firstError) return;
+
     setFormError(firstError.message);
-    toast.error("Formulaire incomplet", firstError.message);
+    void showResult({
+      variant: "error",
+      title: "Formulaire incomplet",
+      message: `${firstError.message} Corrigez le champ indiqué puis réessayez.`,
+    });
   };
 
   return (
@@ -264,7 +280,10 @@ export function OrderForm({
       noValidate
     >
       {formError ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+        <p
+          id="order-form-error"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+        >
           {formError}
         </p>
       ) : null}
@@ -285,7 +304,7 @@ export function OrderForm({
             ) : null}
           </div>
           {quotationId ? (
-            <div className="md:col-span-2">
+            <div className="md:col-span-2" data-form-field="quotationId">
               <Label>Devis source</Label>
               {lockQuotation && quotationLabel ? (
                 <Link
@@ -297,6 +316,11 @@ export function OrderForm({
               ) : (
                 <Input {...register("quotationId")} disabled={lockQuotation} />
               )}
+              {errors.quotationId ? (
+                <p className="mt-1 text-xs text-red-600">
+                  {errors.quotationId.message}
+                </p>
+              ) : null}
             </div>
           ) : null}
           <div data-form-field="issueDate">
@@ -321,6 +345,11 @@ export function OrderForm({
               step="0.01"
               {...register("globalDiscountPct", { valueAsNumber: true })}
             />
+            {errors.globalDiscountPct ? (
+              <p className="mt-1 text-xs text-red-600">
+                {errors.globalDiscountPct.message}
+              </p>
+            ) : null}
           </div>
         </div>
       </section>
@@ -331,11 +360,17 @@ export function OrderForm({
           <p className="text-xs text-red-600">{errors.lines.message}</p>
         ) : null}
         <div className="space-y-3">
-          {fields.map((field, index) => (
+          {fields.map((field, index) => {
+            const lineErrors = errors.lines?.[index];
+            return (
             <div
               key={field.id}
               data-form-field={`lines.${index}`}
-              className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-800 md:grid-cols-12"
+              className={`grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-12 ${
+                lineErrors
+                  ? "border-red-300 dark:border-red-500/40"
+                  : "border-gray-200 dark:border-gray-800"
+              }`}
             >
               <div className="md:col-span-3">
                 <ItemPicker
@@ -350,42 +385,87 @@ export function OrderForm({
                   }}
                 />
               </div>
-              <div className="md:col-span-3">
+              <div
+                className="md:col-span-3"
+                data-form-field={`lines.${index}.description`}
+              >
                 <Label>Description</Label>
-                <Input {...register(`lines.${index}.description`)} />
+                <Input
+                  {...register(`lines.${index}.description`)}
+                  error={Boolean(lineErrors?.description)}
+                />
+                {lineErrors?.description ? (
+                  <p className="mt-1 text-xs text-red-600">
+                    {lineErrors.description.message}
+                  </p>
+                ) : null}
               </div>
-              <div className="md:col-span-1">
+              <div
+                className="md:col-span-1"
+                data-form-field={`lines.${index}.quantity`}
+              >
                 <Label>Qté</Label>
                 <Input
                   type="number"
                   min={0.01}
                   step="0.01"
+                  error={Boolean(lineErrors?.quantity)}
                   {...register(`lines.${index}.quantity`, { valueAsNumber: true })}
                 />
+                {lineErrors?.quantity ? (
+                  <p className="mt-1 text-xs text-red-600">
+                    {lineErrors.quantity.message}
+                  </p>
+                ) : null}
               </div>
-              <div className="md:col-span-2">
+              <div
+                className="md:col-span-2"
+                data-form-field={`lines.${index}.unitPriceHt`}
+              >
                 <Label>Prix unit. HT</Label>
                 <Input
                   type="number"
                   min={0}
                   step="0.01"
+                  error={Boolean(lineErrors?.unitPriceHt)}
                   {...register(`lines.${index}.unitPriceHt`, { valueAsNumber: true })}
                 />
+                {lineErrors?.unitPriceHt ? (
+                  <p className="mt-1 text-xs text-red-600">
+                    {lineErrors.unitPriceHt.message}
+                  </p>
+                ) : null}
               </div>
-              <div className="md:col-span-1">
+              <div
+                className="md:col-span-1"
+                data-form-field={`lines.${index}.discountPct`}
+              >
                 <Label>Rem. %</Label>
                 <Input
                   type="number"
                   min={0}
                   max={100}
                   step="0.01"
+                  error={Boolean(lineErrors?.discountPct)}
                   {...register(`lines.${index}.discountPct`, { valueAsNumber: true })}
                 />
+                {lineErrors?.discountPct ? (
+                  <p className="mt-1 text-xs text-red-600">
+                    {lineErrors.discountPct.message}
+                  </p>
+                ) : null}
               </div>
-              <div className="md:col-span-1">
+              <div
+                className="md:col-span-1"
+                data-form-field={`lines.${index}.taxRateId`}
+              >
                 <Label>TVA</Label>
                 <select
-                  className="h-11 w-full rounded-lg border border-gray-300 px-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                  className={`h-11 w-full rounded-lg border px-2 text-sm dark:bg-gray-900 ${
+                    lineErrors?.taxRateId
+                      ? "border-red-500 dark:border-red-500"
+                      : "border-gray-300 dark:border-gray-700"
+                  }`}
                   {...register(`lines.${index}.taxRateId`)}
                 >
                   {activeTaxRates.map((rate) => (
@@ -394,6 +474,11 @@ export function OrderForm({
                     </option>
                   ))}
                 </select>
+                {lineErrors?.taxRateId ? (
+                  <p className="mt-1 text-xs text-red-600">
+                    {lineErrors.taxRateId.message}
+                  </p>
+                ) : null}
               </div>
               <div className="flex items-end md:col-span-1">
                 <button
@@ -406,7 +491,8 @@ export function OrderForm({
                 </button>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
         <button
           type="button"

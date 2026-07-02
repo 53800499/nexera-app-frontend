@@ -1,4 +1,5 @@
 import type { TaxRate } from "@/modules/catalogue/types/catalogue.types";
+import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
 
 export type LineInput = {
   quantity: number;
@@ -87,7 +88,7 @@ export function computeQuotationTotals(
 
 export function formatMoney(
   value: number,
-  currency = "EUR",
+  currency: string = DEFAULT_CURRENCY,
   locale = "fr-FR",
 ) {
   return new Intl.NumberFormat(locale, {

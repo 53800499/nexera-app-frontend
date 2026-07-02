@@ -100,13 +100,22 @@ async function processQueueItem(
     case "archiveClient": {
       const clientId = await resolveClientId(item.entityId);
       await clientsApi.archive(clientId);
-      const client = await crmOfflineRepository.getClient(clientId);
+      const client = await crmOfflineRepository.getClientIncludingArchived(clientId);
       if (client) {
         await crmOfflineRepository.upsertClient(
           { ...client, isArchived: true },
           "synced",
         );
       }
+      return;
+    }
+    case "unarchiveClient": {
+      const clientId = await resolveClientId(item.entityId);
+      const client = await clientsApi.unarchive(clientId);
+      await crmOfflineRepository.upsertClient(
+        { ...client, isArchived: false },
+        "synced",
+      );
       return;
     }
     case "addContact": {

@@ -141,11 +141,23 @@ export function useQuotations(params: ListParams = {}) {
       id: string;
       payload: ConvertQuotationPayload;
     }) => quotationsOfflineService.convert(id, payload),
-    onSuccess: (_, variables) => {
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: QUOTATIONS_QUERY_KEY });
       queryClient.invalidateQueries({
         queryKey: ["quotations", variables.id],
       });
+
+      if (result.target === "order") {
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+        queryClient.invalidateQueries({
+          queryKey: ["orders", result.targetId],
+        });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["invoices"] });
+        queryClient.invalidateQueries({
+          queryKey: ["invoices", result.targetId],
+        });
+      }
     },
   });
 

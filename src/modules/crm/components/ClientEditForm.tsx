@@ -7,6 +7,7 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import Checkbox from "@/components/form/input/Checkbox";
+import { CountryFlagsSelect } from "@/shared/components/form/CountryFlagsSelect";
 import { CurrencySelect } from "@/shared/components/form/CurrencySelect";
 import {
   clientEditSchema,
@@ -50,6 +51,8 @@ export function ClientEditForm({
   });
 
   const useShippingAddress = watch("useShippingAddress");
+  const clientType = watch("clientType");
+  const isPostalCodeRequired = clientType !== "individual";
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -128,7 +131,10 @@ export function ClientEditForm({
           </div>
           <div>
             <Label>
-              Code postal <span className="text-error-500">*</span>
+              Code postal{" "}
+              {isPostalCodeRequired ? (
+                <span className="text-error-500">*</span>
+              ) : null}
             </Label>
             <Input
               {...register("billingAddress.postalCode")}
@@ -140,10 +146,17 @@ export function ClientEditForm({
             <Label>
               Pays <span className="text-error-500">*</span>
             </Label>
-            <Input
-              {...register("billingAddress.country")}
-              error={Boolean(errors.billingAddress?.country)}
-              hint={errors.billingAddress?.country?.message}
+            <Controller
+              name="billingAddress.country"
+              control={control}
+              render={({ field }) => (
+                <CountryFlagsSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={Boolean(errors.billingAddress?.country)}
+                  hint={errors.billingAddress?.country?.message}
+                />
+              )}
             />
           </div>
         </div>
@@ -175,8 +188,19 @@ export function ClientEditForm({
               <Input {...register("shippingAddress.postalCode")} />
             </div>
             <div>
-              <Label>Pays</Label>
-              <Input {...register("shippingAddress.country")} />
+              <Label>Pays <span className="text-error-500">*</span></Label>
+              <Controller
+                name="shippingAddress.country"
+                control={control}
+                render={({ field }) => (
+                  <CountryFlagsSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={Boolean(errors.shippingAddress?.country)}
+                    hint={errors.shippingAddress?.country?.message}
+                  />
+                )}
+              />
             </div>
           </div>
         ) : null}

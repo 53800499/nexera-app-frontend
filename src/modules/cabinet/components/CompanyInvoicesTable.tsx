@@ -6,6 +6,7 @@ import {
   normalizeInvoiceStatus,
   invoiceTypeLabel,
 } from "@/modules/factures/utils/invoiceLabels";
+import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
 import type { CabinetInvoice } from "../types/cabinet.types";
 
 type Props = {
@@ -24,7 +25,7 @@ function formatDate(value: string | null) {
 function formatAmount(value: number, currency: string) {
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
-    currency: currency || "EUR",
+    currency: currency || DEFAULT_CURRENCY,
   }).format(value);
 }
 

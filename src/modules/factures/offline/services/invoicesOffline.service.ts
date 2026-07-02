@@ -1,4 +1,5 @@
 import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
+import { isOfflineError } from "@/shared/core/OfflineError";
 import { isBrowserOnline } from "@/shared/hooks/useNetworkStatus";
 import { withTimeout } from "@/shared/lib/withTimeout";
 import { crmOfflineRepository } from "@/modules/crm/offline/services/crmOfflineRepository";
@@ -187,11 +188,12 @@ async function readWithOfflineFallback<T>(
       clearInvoicesOfflineIfOnline();
     }
     return data;
-  } catch {
-    if (!isBrowserOnline()) {
+  } catch (error) {
+    if (!isBrowserOnline() || isOfflineError(error)) {
       setInvoicesOffline(true);
+      return offlineData;
     }
-    return offlineData;
+    throw error;
   }
 }
 
@@ -234,18 +236,30 @@ export const invoicesOfflineService = {
   },
 
   async byId(id: string): Promise<InvoiceDetail> {
-    return readWithOfflineFallback(
-      async () => {
-        const invoice = await invoicesApi.byId(id);
-        await invoicesOfflineRepository.upsertInvoice(invoice, "synced");
-        return invoice;
-      },
-      async () => {
-        const cached = await invoicesOfflineRepository.getInvoice(id);
-        if (!cached) throw new Error("Facture introuvable hors-ligne");
-        return cached;
-      },
-    );
+    const readCached = async () => {
+      const cached = await invoicesOfflineRepository.getInvoice(id);
+      if (!cached) throw new Error("Facture introuvable hors-ligne");
+      return cached;
+    };
+
+    if (isOfflineMode()) {
+      return readCached();
+    }
+
+    try {
+      const invoice = await withTimeout(invoicesApi.byId(id), API_READ_TIMEOUT_MS);
+      await invoicesOfflineRepository.upsertInvoice(invoice, "synced");
+      if (isBrowserOnline()) {
+        clearInvoicesOfflineIfOnline();
+      }
+      return invoice;
+    } catch (error) {
+      if (!isBrowserOnline() || isOfflineError(error)) {
+        setInvoicesOffline(true);
+        return readCached();
+      }
+      throw error;
+    }
   },
 
   async create(payload: CreateInvoicePayload): Promise<InvoiceDetail> {
