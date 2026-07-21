@@ -84,7 +84,8 @@ export function ClientForm({
 
   const useShippingAddress = watch("useShippingAddress");
   const clientType = watch("clientType");
-  const isPostalCodeRequired = clientType !== "individual";
+  const isCompany = clientType === "company";
+  const isPostalCodeRequired = isCompany;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -102,29 +103,36 @@ export function ClientForm({
             </select>
           </div>
           <div>
-            <Label>Raison sociale / Nom <span className="text-red-600">*</span></Label>
+            <Label>
+              {isCompany ? "Raison sociale" : "Nom"}{" "}
+              <span className="text-red-600">*</span>
+            </Label>
             <Input
               {...register("companyName")}
               error={Boolean(errors.companyName)}
               hint={errors.companyName?.message}
             />
           </div>
-          <div>
-            <Label>Nom commercial</Label>
-            <Input {...register("tradeName")} />
-          </div>
-          <div>
-            <Label>SIRET / RCCM</Label>
-            <Input {...register("siret")} />
-          </div>
-          <div>
-            <Label>IFU</Label>
-            <Input {...register("taxId")} />
-          </div>
-          <div>
-            <Label>Secteur</Label>
-            <Input {...register("sector")} />
-          </div>
+          {isCompany ? (
+            <>
+              <div>
+                <Label>Nom commercial</Label>
+                <Input {...register("tradeName")} />
+              </div>
+              <div>
+                <Label>SIRET / RCCM</Label>
+                <Input {...register("siret")} />
+              </div>
+              <div>
+                <Label>IFU</Label>
+                <Input {...register("taxId")} />
+              </div>
+              <div>
+                <Label>Secteur</Label>
+                <Input {...register("sector")} />
+              </div>
+            </>
+          ) : null}
         </div>
       </section>
 
@@ -308,8 +316,8 @@ export function ClientForm({
       </section>
 
       <ClientDuplicateChecker
-        siret={watch("siret")}
-        taxId={watch("taxId")}
+        siret={isCompany ? watch("siret") : ""}
+        taxId={isCompany ? watch("taxId") : ""}
         email={watch("primaryContact.email")}
         companyName={watch("companyName")}
       />
@@ -325,13 +333,15 @@ export function buildCreateClientPayload(
   values: ClientFormValues,
   confirmDuplicate = false,
 ) {
+  const isCompany = values.clientType === "company";
+
   return {
     clientType: values.clientType,
     companyName: values.companyName,
-    tradeName: values.tradeName || undefined,
-    siret: values.siret || undefined,
-    taxId: values.taxId || undefined,
-    sector: values.sector || undefined,
+    tradeName: isCompany ? values.tradeName || undefined : undefined,
+    siret: isCompany ? values.siret || undefined : undefined,
+    taxId: isCompany ? values.taxId || undefined : undefined,
+    sector: isCompany ? values.sector || undefined : undefined,
     primaryContact: {
       firstName: values.primaryContact.firstName,
       lastName: values.primaryContact.lastName,

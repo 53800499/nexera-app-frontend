@@ -7,12 +7,12 @@ import ComponentCard from "@/components/common/ComponentCard";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
-import { useToast } from "@/shared/components/feedback";
 import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
 import {
   buildFormHydrationKey,
   useHydrateFormDefaults,
 } from "@/shared/forms/useHydrateFormDefaults";
+import { useSettingsFormFeedback } from "../hooks/useSettingsFormFeedback";
 import {
   tenantSettingsSchema,
   type TenantSettingsFormValues,
@@ -59,7 +59,6 @@ export function TenantSettingsForm({
   readOnly = false,
   onSubmit,
 }: Props) {
-  const toast = useToast();
   const initialValues = useMemo(() => toFormValues(settings), [settings]);
   const hydrationKey = buildFormHydrationKey(initialValues);
 
@@ -67,35 +66,48 @@ export function TenantSettingsForm({
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors, isDirty },
   } = useForm<TenantSettingsFormValues>({
     resolver: zodResolver(tenantSettingsSchema),
     defaultValues: initialValues,
   });
 
+  const { formError, clearFormError, handleApiError, handleInvalidSubmit } =
+    useSettingsFormFeedback(setError, {
+      formErrorId: "tenant-settings-form-error",
+      apiErrorTitle: "Enregistrement impossible",
+    });
+
   useHydrateFormDefaults(reset, initialValues, hydrationKey);
 
   const submit = handleSubmit(async (values) => {
+    clearFormError();
     try {
       await onSubmit(values);
-      toast.success("Paramètres enregistrés");
     } catch (error) {
-      toast.error(
-        "Enregistrement impossible",
-        error instanceof Error ? error.message : undefined,
-      );
+      await handleApiError(error);
     }
-  });
+  }, handleInvalidSubmit);
 
   return (
-    <form onSubmit={submit} className="space-y-6">
+    <form onSubmit={submit} className="space-y-6" noValidate>
+      {formError ? (
+        <p
+          id="tenant-settings-form-error"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+        >
+          {formError}
+        </p>
+      ) : null}
+
       <ComponentCard
         title="Finance"
         desc="Devise, taux de change et pénalités de retard."
         className="!bg-transparent !shadow-none"
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
+          <div data-form-field="primaryCurrency">
             <Label>Devise principale</Label>
             <Input
               {...register("primaryCurrency")}
@@ -142,7 +154,7 @@ export function TenantSettingsForm({
         className="!bg-transparent !shadow-none"
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
+          <div data-form-field="legalName">
             <Label>Raison sociale</Label>
             <Input {...register("legalName")} disabled={readOnly} />
           </div>
@@ -150,11 +162,11 @@ export function TenantSettingsForm({
             <Label>Nom commercial</Label>
             <Input {...register("tradeName")} disabled={readOnly} />
           </div>
-          <div>
+          <div data-form-field="siret">
             <Label>SIRET</Label>
             <Input {...register("siret")} disabled={readOnly} />
           </div>
-          <div>
+          <div data-form-field="vatNumber">
             <Label>N° TVA</Label>
             <Input {...register("vatNumber")} disabled={readOnly} />
           </div>
@@ -175,7 +187,7 @@ export function TenantSettingsForm({
         className="!bg-transparent !shadow-none"
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="md:col-span-2">
+          <div className="md:col-span-2" data-form-field="street">
             <Label>Adresse</Label>
             <Input {...register("street")} disabled={readOnly} />
           </div>
@@ -195,7 +207,7 @@ export function TenantSettingsForm({
             <Label>Téléphone</Label>
             <Input {...register("companyPhone")} disabled={readOnly} />
           </div>
-          <div>
+          <div data-form-field="companyEmail">
             <Label>Email</Label>
             <Input
               {...register("companyEmail")}

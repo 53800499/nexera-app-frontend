@@ -1,6 +1,10 @@
 "use client";
 
-import { ErrorState, LoadingBlock } from "@/shared/components/feedback";
+import {
+  ErrorState,
+  LoadingBlock,
+  useActionFeedbackStore,
+} from "@/shared/components/feedback";
 import { CurrenciesManager } from "../components/CurrenciesManager";
 import { SettingsContentCard } from "../components/SettingsContentCard";
 import { SettingsPageHeader } from "../components/SettingsPageHeader";
@@ -9,6 +13,9 @@ import { useSettingsAccess } from "../hooks/useSettingsAccess";
 import type { CurrencyFormValues } from "../schemas/settingsForm.schema";
 
 export default function CurrenciesPage() {
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { canManageSettings } = useSettingsAccess();
   const { currenciesQuery, createMutation, updateMutation, deleteMutation } =
     useCurrencies();
@@ -16,7 +23,8 @@ export default function CurrenciesPage() {
   const isSubmitting =
     createMutation.isPending ||
     updateMutation.isPending ||
-    deleteMutation.isPending;
+    deleteMutation.isPending ||
+    isBusy;
 
   const toCreatePayload = (values: CurrencyFormValues) => ({
     code: values.code.toUpperCase(),
@@ -63,18 +71,16 @@ export default function CurrenciesPage() {
             currencies={currenciesQuery.data}
             canManage={canManageSettings}
             isSubmitting={isSubmitting}
-            onCreate={async (values) => {
-              await createMutation.mutateAsync(toCreatePayload(values));
-            }}
-            onUpdate={async (id, values) => {
-              await updateMutation.mutateAsync({
+            onCreate={(values) =>
+              createMutation.mutateAsync(toCreatePayload(values))
+            }
+            onUpdate={(id, values) =>
+              updateMutation.mutateAsync({
                 id,
                 payload: toUpdatePayload(values),
-              });
-            }}
-            onDelete={async (id) => {
-              await deleteMutation.mutateAsync(id);
-            }}
+              })
+            }
+            onDelete={(id) => deleteMutation.mutateAsync(id)}
           />
         </SettingsContentCard>
       ) : null}

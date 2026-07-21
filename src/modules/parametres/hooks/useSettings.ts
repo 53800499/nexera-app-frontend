@@ -238,6 +238,7 @@ export function useEmailTemplates() {
     queryKey: EMAIL_TEMPLATES_KEY,
     queryFn: settingsApi.listEmailTemplates,
     enabled: queryEnabled,
+    retry: 1,
   });
 }
 
@@ -249,6 +250,7 @@ export function useEmailTemplate(type: EmailTemplateType) {
     queryKey: [...EMAIL_TEMPLATES_KEY, type],
     queryFn: () => settingsApi.getEmailTemplate(type),
     enabled: queryEnabled,
+    retry: 1,
   });
 
   const updateMutation = useMutation({

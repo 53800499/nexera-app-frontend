@@ -6,11 +6,11 @@ import { useForm } from "react-hook-form";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import Button from "@/components/ui/button/Button";
-import { useToast } from "@/shared/components/feedback";
 import {
   buildFormHydrationKey,
   useHydrateFormDefaults,
 } from "@/shared/forms/useHydrateFormDefaults";
+import { useSettingsFormFeedback } from "../hooks/useSettingsFormFeedback";
 import {
   reminderSettingsSchema,
   type ReminderSettingsFormValues,
@@ -30,8 +30,6 @@ export function SettingsReminderForm({
   isSubmitting,
   onSubmit,
 }: Props) {
-  const toast = useToast();
-
   const initialValues = useMemo(
     () => ({
       isEnabled: settings.isEnabled,
@@ -63,35 +61,48 @@ export function SettingsReminderForm({
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = useForm<ReminderSettingsFormValues>({
     resolver: zodResolver(reminderSettingsSchema),
     defaultValues: initialValues,
   });
 
+  const { formError, clearFormError, handleApiError, handleInvalidSubmit } =
+    useSettingsFormFeedback(setError, {
+      formErrorId: "reminder-settings-form-error",
+      apiErrorTitle: "Enregistrement impossible",
+    });
+
   useHydrateFormDefaults(reset, initialValues, hydrationKey);
 
   const submit = handleSubmit(async (values) => {
+    clearFormError();
     try {
       await onSubmit(values);
-      toast.success("Paramètres enregistrés");
     } catch (error) {
-      toast.error(
-        "Enregistrement impossible",
-        error instanceof Error ? error.message : undefined,
-      );
+      await handleApiError(error);
     }
-  });
+  }, handleInvalidSubmit);
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} className="space-y-4" noValidate>
+      {formError ? (
+        <p
+          id="reminder-settings-form-error"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+        >
+          {formError}
+        </p>
+      ) : null}
+
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" {...register("isEnabled")} disabled={readOnly} />
         Relances automatiques activées
       </label>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div>
+        <div data-form-field="level1DaysAfterDue">
           <Label>Niveau 1 (J+)</Label>
           <Input
             type="number"
@@ -99,7 +110,7 @@ export function SettingsReminderForm({
             disabled={readOnly}
           />
         </div>
-        <div>
+        <div data-form-field="level2DaysAfterDue">
           <Label>Niveau 2 (J+)</Label>
           <Input
             type="number"
@@ -107,7 +118,7 @@ export function SettingsReminderForm({
             disabled={readOnly}
           />
         </div>
-        <div>
+        <div data-form-field="level3DaysAfterDue">
           <Label>Niveau 3 (J+)</Label>
           <Input
             type="number"
@@ -119,21 +130,33 @@ export function SettingsReminderForm({
 
       <div className="space-y-2 text-sm">
         <label className="flex items-center gap-2">
-          <input type="checkbox" {...register("level2CopyCommercial")} disabled={readOnly} />
+          <input
+            type="checkbox"
+            {...register("level2CopyCommercial")}
+            disabled={readOnly}
+          />
           Copie commercial (niveau 2)
         </label>
         <label className="flex items-center gap-2">
-          <input type="checkbox" {...register("level3AlertDirector")} disabled={readOnly} />
+          <input
+            type="checkbox"
+            {...register("level3AlertDirector")}
+            disabled={readOnly}
+          />
           Alerte dirigeant (niveau 3)
         </label>
         <label className="flex items-center gap-2">
-          <input type="checkbox" {...register("level3BlockNewOrders")} disabled={readOnly} />
+          <input
+            type="checkbox"
+            {...register("level3BlockNewOrders")}
+            disabled={readOnly}
+          />
           Bloquer nouveaux devis/commandes (niveau 3)
         </label>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div>
+        <div data-form-field="commercialEmail">
           <Label>Email commercial</Label>
           <Input
             {...register("commercialEmail")}
@@ -142,7 +165,7 @@ export function SettingsReminderForm({
             hint={errors.commercialEmail?.message}
           />
         </div>
-        <div>
+        <div data-form-field="directorEmail">
           <Label>Email dirigeant</Label>
           <Input
             {...register("directorEmail")}

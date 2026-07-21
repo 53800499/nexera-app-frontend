@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import Button from "@/components/ui/button/Button";
-import { useToast } from "@/shared/components/feedback";
+import { useSettingsFormFeedback } from "../hooks/useSettingsFormFeedback";
 import {
   emailTemplateSchema,
   type EmailTemplateFormValues,
@@ -26,11 +26,11 @@ export function EmailTemplateForm({
   isSubmitting,
   onSubmit,
 }: Props) {
-  const toast = useToast();
   const {
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = useForm<EmailTemplateFormValues>({
     resolver: zodResolver(emailTemplateSchema),
@@ -41,6 +41,12 @@ export function EmailTemplateForm({
     },
   });
 
+  const { formError, clearFormError, handleApiError, handleInvalidSubmit } =
+    useSettingsFormFeedback(setError, {
+      formErrorId: "email-template-form-error",
+      apiErrorTitle: "Enregistrement impossible",
+    });
+
   useEffect(() => {
     reset({
       subject: template.subject,
@@ -50,20 +56,26 @@ export function EmailTemplateForm({
   }, [template, reset]);
 
   const submit = handleSubmit(async (values) => {
+    clearFormError();
     try {
       await onSubmit(values);
-      toast.success("Modèle enregistré");
     } catch (error) {
-      toast.error(
-        "Enregistrement impossible",
-        error instanceof Error ? error.message : undefined,
-      );
+      await handleApiError(error);
     }
-  });
+  }, handleInvalidSubmit);
 
   return (
-    <form onSubmit={submit} className="space-y-4">
-      <div>
+    <form onSubmit={submit} className="space-y-4" noValidate>
+      {formError ? (
+        <p
+          id="email-template-form-error"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+        >
+          {formError}
+        </p>
+      ) : null}
+
+      <div data-form-field="subject">
         <Label>Sujet</Label>
         <Input
           {...register("subject")}
@@ -72,7 +84,7 @@ export function EmailTemplateForm({
           hint={errors.subject?.message}
         />
       </div>
-      <div>
+      <div data-form-field="body">
         <Label>Corps du message</Label>
         <textarea
           {...register("body")}

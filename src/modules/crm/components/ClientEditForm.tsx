@@ -52,7 +52,8 @@ export function ClientEditForm({
 
   const useShippingAddress = watch("useShippingAddress");
   const clientType = watch("clientType");
-  const isPostalCodeRequired = clientType !== "individual";
+  const isCompany = clientType === "company";
+  const isPostalCodeRequired = isCompany;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -79,7 +80,8 @@ export function ClientEditForm({
           </div>
           <div>
             <Label>
-              Raison sociale / Nom <span className="text-error-500">*</span>
+              {isCompany ? "Raison sociale" : "Nom"}{" "}
+              <span className="text-error-500">*</span>
             </Label>
             <Input
               {...register("companyName")}
@@ -87,22 +89,26 @@ export function ClientEditForm({
               hint={errors.companyName?.message}
             />
           </div>
-          <div>
-            <Label>Nom commercial</Label>
-            <Input {...register("tradeName")} />
-          </div>
-          <div>
-            <Label>SIRET / RCCM</Label>
-            <Input {...register("siret")} />
-          </div>
-          <div>
-            <Label>IFU</Label>
-            <Input {...register("taxId")} />
-          </div>
-          <div>
-            <Label>Secteur</Label>
-            <Input {...register("sector")} />
-          </div>
+          {isCompany ? (
+            <>
+              <div>
+                <Label>Nom commercial</Label>
+                <Input {...register("tradeName")} />
+              </div>
+              <div>
+                <Label>SIRET / RCCM</Label>
+                <Input {...register("siret")} />
+              </div>
+              <div>
+                <Label>IFU</Label>
+                <Input {...register("taxId")} />
+              </div>
+              <div>
+                <Label>Secteur</Label>
+                <Input {...register("sector")} />
+              </div>
+            </>
+          ) : null}
         </div>
       </section>
 

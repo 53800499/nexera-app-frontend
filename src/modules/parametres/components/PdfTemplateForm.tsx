@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import Button from "@/components/ui/button/Button";
-import { useToast } from "@/shared/components/feedback";
+import { useSettingsFormFeedback } from "../hooks/useSettingsFormFeedback";
 import {
   pdfTemplateSchema,
   type PdfTemplateFormValues,
@@ -41,49 +41,61 @@ export function PdfTemplateForm({
   isSubmitting,
   onSubmit,
 }: Props) {
-  const toast = useToast();
   const {
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = useForm<PdfTemplateFormValues>({
     resolver: zodResolver(pdfTemplateSchema),
     defaultValues: toFormValues(template),
   });
 
+  const { formError, clearFormError, handleApiError, handleInvalidSubmit } =
+    useSettingsFormFeedback(setError, {
+      formErrorId: "pdf-template-form-error",
+      apiErrorTitle: "Enregistrement impossible",
+    });
+
   useEffect(() => {
     reset(toFormValues(template));
   }, [template, reset]);
 
   const submit = handleSubmit(async (values) => {
+    clearFormError();
     try {
       await onSubmit(values);
-      toast.success("Modèle PDF enregistré");
     } catch (error) {
-      toast.error(
-        "Enregistrement impossible",
-        error instanceof Error ? error.message : undefined,
-      );
+      await handleApiError(error);
     }
-  });
+  }, handleInvalidSubmit);
 
   return (
-    <form onSubmit={submit} className="space-y-6">
+    <form onSubmit={submit} className="space-y-6" noValidate>
+      {formError ? (
+        <p
+          id="pdf-template-form-error"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+        >
+          {formError}
+        </p>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="md:col-span-2">
+        <div className="md:col-span-2" data-form-field="logoUrl">
           <Label>URL du logo</Label>
           <Input {...register("logoUrl")} disabled={readOnly} />
         </div>
-        <div>
+        <div data-form-field="primaryColor">
           <Label>Couleur principale</Label>
           <Input type="color" {...register("primaryColor")} disabled={readOnly} />
         </div>
-        <div>
+        <div data-form-field="secondaryColor">
           <Label>Couleur secondaire</Label>
           <Input type="color" {...register("secondaryColor")} disabled={readOnly} />
         </div>
-        <div>
+        <div data-form-field="layoutType">
           <Label>Mise en page</Label>
           <select
             {...register("layoutType")}

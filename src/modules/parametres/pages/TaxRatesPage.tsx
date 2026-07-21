@@ -1,6 +1,10 @@
 "use client";
 
-import { ErrorState, LoadingBlock } from "@/shared/components/feedback";
+import {
+  ErrorState,
+  LoadingBlock,
+  useActionFeedbackStore,
+} from "@/shared/components/feedback";
 import { SettingsContentCard } from "../components/SettingsContentCard";
 import { SettingsPageHeader } from "../components/SettingsPageHeader";
 import { TaxRatesManager } from "../components/TaxRatesManager";
@@ -8,6 +12,9 @@ import { useSettingsAccess } from "../hooks/useSettingsAccess";
 import { useTaxRatesManagement } from "../hooks/useSettings";
 
 export default function TaxRatesPage() {
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { canManageSettings } = useSettingsAccess();
   const { taxRatesQuery, createMutation, updateMutation, deleteMutation } =
     useTaxRatesManagement();
@@ -15,7 +22,8 @@ export default function TaxRatesPage() {
   const isSubmitting =
     createMutation.isPending ||
     updateMutation.isPending ||
-    deleteMutation.isPending;
+    deleteMutation.isPending ||
+    isBusy;
 
   return (
     <div className="space-y-6">
@@ -42,15 +50,11 @@ export default function TaxRatesPage() {
             taxRates={taxRatesQuery.data}
             canManage={canManageSettings}
             isSubmitting={isSubmitting}
-            onCreate={async (values) => {
-              await createMutation.mutateAsync(values);
-            }}
-            onUpdate={async (id, values) => {
-              await updateMutation.mutateAsync({ id, payload: values });
-            }}
-            onDelete={async (id) => {
-              await deleteMutation.mutateAsync(id);
-            }}
+            onCreate={(values) => createMutation.mutateAsync(values)}
+            onUpdate={(id, values) =>
+              updateMutation.mutateAsync({ id, payload: values })
+            }
+            onDelete={(id) => deleteMutation.mutateAsync(id)}
           />
         </SettingsContentCard>
       ) : null}

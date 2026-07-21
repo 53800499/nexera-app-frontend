@@ -26,6 +26,7 @@ type Props = {
 export function ClientDetailsCard({ client }: Props) {
   const primary =
     client.contacts.find((c) => c.isPrimary) ?? client.contacts[0];
+  const isCompany = client.clientType === "company";
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
@@ -37,7 +38,7 @@ export function ClientDetailsCard({ client }: Props) {
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90">
             {client.companyName}
           </h2>
-          {client.tradeName ? (
+          {isCompany && client.tradeName ? (
             <p className="text-sm text-gray-500">{client.tradeName}</p>
           ) : null}
         </div>
@@ -51,16 +52,20 @@ export function ClientDetailsCard({ client }: Props) {
             {client.clientType === "company" ? "Entreprise" : "Particulier"}
           </p>
         </div>
-        <div>
-          <p className="text-xs uppercase text-gray-500">SIRET / IFU</p>
-          <p className="mt-1 text-sm">
-            {client.siret || "—"} / {client.taxId || "—"}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs uppercase text-gray-500">Secteur</p>
-          <p className="mt-1 text-sm">{client.sector || "—"}</p>
-        </div>
+        {isCompany ? (
+          <>
+            <div>
+              <p className="text-xs uppercase text-gray-500">SIRET / IFU</p>
+              <p className="mt-1 text-sm">
+                {client.siret || "—"} / {client.taxId || "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-500">Secteur</p>
+              <p className="mt-1 text-sm">{client.sector || "—"}</p>
+            </div>
+          </>
+        ) : null}
         <div>
           <p className="text-xs uppercase text-gray-500">Contact principal</p>
           <p className="mt-1 text-sm">

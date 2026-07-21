@@ -1,6 +1,10 @@
 "use client";
 
-import { ErrorState, LoadingBlock } from "@/shared/components/feedback";
+import {
+  ErrorState,
+  LoadingBlock,
+  useActionFeedbackStore,
+} from "@/shared/components/feedback";
 import { NumberingRulesEditor } from "../components/NumberingRulesEditor";
 import { SettingsContentCard } from "../components/SettingsContentCard";
 import { SettingsPageHeader } from "../components/SettingsPageHeader";
@@ -8,6 +12,9 @@ import { useNumberingRules } from "../hooks/useSettings";
 import { useSettingsAccess } from "../hooks/useSettingsAccess";
 
 export default function NumberingPage() {
+  const isBusy = useActionFeedbackStore(
+    (state) => state.loadingCount > 0 || state.isRedirecting,
+  );
   const { canManageSettings } = useSettingsAccess();
   const { numberingQuery, updateMutation } = useNumberingRules();
 
@@ -35,10 +42,10 @@ export default function NumberingPage() {
           <NumberingRulesEditor
             rules={numberingQuery.data}
             canManage={canManageSettings}
-            isSubmitting={updateMutation.isPending}
-            onUpdate={async (documentType, values) => {
-              await updateMutation.mutateAsync({ documentType, payload: values });
-            }}
+            isSubmitting={updateMutation.isPending || isBusy}
+            onUpdate={(documentType, values) =>
+              updateMutation.mutateAsync({ documentType, payload: values })
+            }
           />
         </SettingsContentCard>
       ) : null}

@@ -59,7 +59,7 @@ const AppHeader: React.FC = () => {
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <button
               type="button"
-              className="z-99999 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 lg:flex lg:h-11 lg:w-11 dark:border-gray-800 dark:text-gray-400"
+              className="z-9 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 lg:flex lg:h-11 lg:w-11 dark:border-gray-800 dark:text-gray-400"
               onClick={handleToggle}
               aria-label="Basculer le menu"
             >

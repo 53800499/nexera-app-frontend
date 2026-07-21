@@ -466,7 +466,7 @@ export function InvoiceForm({
                   : "border-gray-200 dark:border-gray-800"
               }`}
             >
-              <div className="md:col-span-3">
+              <div className="md:col-span-3 mt-0 md:mt-6">
                 <ItemPicker
                   onSelect={(item) => {
                     setValue(`lines.${index}.itemId`, item.id);

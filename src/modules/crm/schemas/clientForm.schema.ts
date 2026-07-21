@@ -107,13 +107,15 @@ export function parseAddress(value: unknown): z.infer<typeof addressSchema> {
 }
 
 export function buildUpdateClientPayload(values: ClientEditFormValues) {
+  const isCompany = values.clientType === "company";
+
   return {
     clientType: values.clientType,
     companyName: values.companyName,
-    tradeName: values.tradeName || undefined,
-    siret: values.siret || undefined,
-    taxId: values.taxId || undefined,
-    sector: values.sector || undefined,
+    tradeName: isCompany ? values.tradeName || undefined : undefined,
+    siret: isCompany ? values.siret || undefined : undefined,
+    taxId: isCompany ? values.taxId || undefined : undefined,
+    sector: isCompany ? values.sector || undefined : undefined,
     billingAddress: addressToJson(values.billingAddress),
     shippingAddress:
       values.useShippingAddress && values.shippingAddress

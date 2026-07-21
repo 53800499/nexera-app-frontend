@@ -6,7 +6,8 @@ import { useForm } from "react-hook-form";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
-import { useToast } from "@/shared/components/feedback";
+import { useActionFeedback } from "@/shared/components/feedback";
+import { useSettingsFormFeedback } from "../hooks/useSettingsFormFeedback";
 import {
   currencySchema,
   type CurrencyFormValues,
@@ -17,9 +18,9 @@ type Props = {
   currencies: TenantCurrency[];
   canManage: boolean;
   isSubmitting: boolean;
-  onCreate: (values: CurrencyFormValues) => Promise<void>;
-  onUpdate: (id: string, values: CurrencyFormValues) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onCreate: (values: CurrencyFormValues) => Promise<unknown>;
+  onUpdate: (id: string, values: CurrencyFormValues) => Promise<unknown>;
+  onDelete: (id: string) => Promise<unknown>;
 };
 
 const emptyValues: CurrencyFormValues = {
@@ -38,53 +39,120 @@ export function CurrenciesManager({
   onUpdate,
   onDelete,
 }: Props) {
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = useForm<CurrencyFormValues>({
     resolver: zodResolver(currencySchema),
     defaultValues: emptyValues,
   });
 
+  const { formError, clearFormError, handleApiError, handleInvalidSubmit } =
+    useSettingsFormFeedback(setError, {
+      formErrorId: "currency-form-error",
+      apiErrorTitle: "Action impossible",
+    });
+
   const startEdit = (currency: TenantCurrency) => {
     setEditingId(currency.id);
+    clearFormError();
     reset({
       code: currency.code,
       name: currency.name,
       symbol: currency.symbol ?? "",
       manualRate:
-      currency.manualRate != null ? String(currency.manualRate) : "",
+        currency.manualRate != null ? String(currency.manualRate) : "",
       isActive: currency.isActive,
     });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
+    clearFormError();
     reset(emptyValues);
   };
 
+  const handleDelete = (currency: TenantCurrency) => {
+    void runAction({
+      confirm: {
+        title: "Supprimer cette devise ?",
+        message: `La devise ${currency.code} (${currency.name}) sera retirée de votre catalogue.`,
+        confirmLabel: "Supprimer",
+        variant: "danger",
+      },
+      loadingMessage: "Suppression de la devise...",
+      success: {
+        title: "Devise supprimée",
+        message: currency.code,
+      },
+      error: {
+        title: "Suppression impossible",
+        message:
+          "La devise principale ou une devise encore utilisée ne peut pas être supprimée.",
+      },
+      action: () => onDelete(currency.id),
+    });
+  };
+
   const submit = handleSubmit(async (values) => {
+    clearFormError();
     try {
+      let result: unknown;
       if (editingId) {
-        await onUpdate(editingId, values);
-        toast.success("Devise mise à jour");
+        result = await runAction({
+          confirm: {
+            title: "Mettre à jour cette devise ?",
+            message: `Les informations de ${values.code.toUpperCase()} seront mises à jour.`,
+            confirmLabel: "Mettre à jour",
+          },
+          loadingMessage: "Mise à jour de la devise...",
+          success: {
+            title: "Devise mise à jour",
+            message: values.code.toUpperCase(),
+          },
+          error: {
+            title: "Mise à jour impossible",
+            message: "Vérifiez le nom, le symbole et le taux manuel.",
+          },
+          showResultOnError: false,
+          rethrowOnError: true,
+          action: () => onUpdate(editingId, values),
+        });
       } else {
-        await onCreate(values);
-        toast.success("Devise créée");
+        result = await runAction({
+          confirm: {
+            title: "Ajouter cette devise ?",
+            message: `La devise ${values.code.toUpperCase()} (${values.name}) sera ajoutée.`,
+            confirmLabel: "Créer",
+          },
+          loadingMessage: "Création de la devise...",
+          success: {
+            title: "Devise créée",
+            message: values.code.toUpperCase(),
+          },
+          error: {
+            title: "Création impossible",
+            message:
+              "Vérifiez le code ISO (3 lettres), le nom et le taux manuel.",
+          },
+          showResultOnError: false,
+          rethrowOnError: true,
+          action: () => onCreate(values),
+        });
       }
-      cancelEdit();
+      if (result !== undefined) {
+        cancelEdit();
+      }
     } catch (error) {
-      toast.error(
-        "Action impossible",
-        error instanceof Error ? error.message : undefined,
-      );
+      await handleApiError(error);
     }
-  });
+  }, handleInvalidSubmit);
 
   return (
     <div className="space-y-6">
@@ -103,7 +171,10 @@ export function CurrenciesManager({
           </thead>
           <tbody>
             {currencies.map((currency) => (
-              <tr key={currency.id} className="border-t border-gray-100 dark:border-gray-800">
+              <tr
+                key={currency.id}
+                className="border-t border-gray-100 dark:border-gray-800"
+              >
                 <td className="px-4 py-3 font-medium">{currency.code}</td>
                 <td className="px-4 py-3">{currency.name}</td>
                 <td className="px-4 py-3">{currency.symbol ?? "—"}</td>
@@ -124,15 +195,7 @@ export function CurrenciesManager({
                         <button
                           type="button"
                           className="text-red-500 hover:underline"
-                          onClick={async () => {
-                            if (!window.confirm(`Supprimer ${currency.code} ?`)) return;
-                            try {
-                              await onDelete(currency.id);
-                              toast.success("Devise supprimée");
-                            } catch {
-                              toast.error("Suppression impossible");
-                            }
-                          }}
+                          onClick={() => handleDelete(currency)}
                         >
                           Supprimer
                         </button>
@@ -151,9 +214,17 @@ export function CurrenciesManager({
           <h2 className="mb-4 font-medium">
             {editingId ? "Modifier la devise" : "Nouvelle devise"}
           </h2>
-          <form onSubmit={submit} className="space-y-4">
+          {formError ? (
+            <p
+              id="currency-form-error"
+              className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+            >
+              {formError}
+            </p>
+          ) : null}
+          <form onSubmit={submit} className="space-y-4" noValidate>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
+              <div data-form-field="code">
                 <Label>Code ISO</Label>
                 <Input
                   {...register("code")}
@@ -162,7 +233,7 @@ export function CurrenciesManager({
                   hint={errors.code?.message}
                 />
               </div>
-              <div>
+              <div data-form-field="name">
                 <Label>Nom</Label>
                 <Input
                   {...register("name")}
@@ -170,11 +241,11 @@ export function CurrenciesManager({
                   hint={errors.name?.message}
                 />
               </div>
-              <div>
+              <div data-form-field="symbol">
                 <Label>Symbole</Label>
                 <Input {...register("symbol")} />
               </div>
-              <div>
+              <div data-form-field="manualRate">
                 <Label>Taux manuel</Label>
                 <Input type="number" step="0.0001" {...register("manualRate")} />
               </div>

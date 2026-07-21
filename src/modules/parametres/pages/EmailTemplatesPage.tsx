@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { ArrowRightIcon } from "@/icons";
 import { ErrorState, LoadingBlock } from "@/shared/components/feedback";
+import { useQueryPageState } from "@/shared/hooks/useQueryPageState";
 import { SettingsPageHeader } from "../components/SettingsPageHeader";
 import { useEmailTemplates } from "../hooks/useSettings";
 import { EMAIL_TEMPLATE_LABELS } from "../utils/settingsLabels";
 
 export default function EmailTemplatesPage() {
   const templatesQuery = useEmailTemplates();
+  const { showLoading, showError } = useQueryPageState(templatesQuery);
 
   return (
     <div className="space-y-6">
@@ -17,17 +19,17 @@ export default function EmailTemplatesPage() {
         description="Personnalisez les emails envoyés automatiquement à vos clients."
       />
 
-      {templatesQuery.isPending && !templatesQuery.data && (
+      {showLoading ? (
         <LoadingBlock label="Chargement des modèles..." />
-      )}
+      ) : null}
 
-      {templatesQuery.isError && (
+      {showError ? (
         <ErrorState
           title="Échec du chargement"
           message="Impossible de charger les modèles email."
           onRetry={() => templatesQuery.refetch()}
         />
-      )}
+      ) : null}
 
       {templatesQuery.data ? (
         <div className="space-y-3">

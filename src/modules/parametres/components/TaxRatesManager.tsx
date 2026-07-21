@@ -6,7 +6,8 @@ import { useForm } from "react-hook-form";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
-import { useToast } from "@/shared/components/feedback";
+import { useActionFeedback } from "@/shared/components/feedback";
+import { useSettingsFormFeedback } from "../hooks/useSettingsFormFeedback";
 import {
   taxRateSchema,
   type TaxRateFormValues,
@@ -17,9 +18,9 @@ type Props = {
   taxRates: TaxRate[];
   canManage: boolean;
   isSubmitting: boolean;
-  onCreate: (values: TaxRateFormValues) => Promise<void>;
-  onUpdate: (id: string, values: TaxRateFormValues) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onCreate: (values: TaxRateFormValues) => Promise<unknown>;
+  onUpdate: (id: string, values: TaxRateFormValues) => Promise<unknown>;
+  onDelete: (id: string) => Promise<unknown>;
 };
 
 const emptyValues: TaxRateFormValues = {
@@ -37,21 +38,29 @@ export function TaxRatesManager({
   onUpdate,
   onDelete,
 }: Props) {
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = useForm<TaxRateFormValues>({
     resolver: zodResolver(taxRateSchema),
     defaultValues: emptyValues,
   });
 
+  const { formError, clearFormError, handleApiError, handleInvalidSubmit } =
+    useSettingsFormFeedback(setError, {
+      formErrorId: "tax-rate-form-error",
+      apiErrorTitle: "Action impossible",
+    });
+
   const startEdit = (taxRate: TaxRate) => {
     setEditingId(taxRate.id);
+    clearFormError();
     reset({
       name: taxRate.name,
       rate: taxRate.rate,
@@ -62,26 +71,85 @@ export function TaxRatesManager({
 
   const cancelEdit = () => {
     setEditingId(null);
+    clearFormError();
     reset(emptyValues);
   };
 
+  const handleDelete = (taxRate: TaxRate) => {
+    void runAction({
+      confirm: {
+        title: "Supprimer ce taux de TVA ?",
+        message: `Le taux « ${taxRate.name} » (${taxRate.rate} %) sera supprimé définitivement.`,
+        confirmLabel: "Supprimer",
+        variant: "danger",
+      },
+      loadingMessage: "Suppression du taux...",
+      success: {
+        title: "Taux supprimé",
+        message: taxRate.name,
+      },
+      error: {
+        title: "Suppression impossible",
+        message:
+          "Ce taux est peut-être utilisé sur des documents ou défini par défaut.",
+      },
+      action: () => onDelete(taxRate.id),
+    });
+  };
+
   const submit = handleSubmit(async (values) => {
+    clearFormError();
     try {
+      let result: unknown;
       if (editingId) {
-        await onUpdate(editingId, values);
-        toast.success("Taux mis à jour");
+        result = await runAction({
+          confirm: {
+            title: "Mettre à jour ce taux de TVA ?",
+            message: `Les modifications sur « ${values.name} » (${values.rate} %) seront appliquées.`,
+            confirmLabel: "Mettre à jour",
+          },
+          loadingMessage: "Mise à jour du taux...",
+          success: {
+            title: "Taux mis à jour",
+            message: values.name,
+          },
+          error: {
+            title: "Mise à jour impossible",
+            message:
+              "Vérifiez le nom, le taux et l'option « taux par défaut ».",
+          },
+          showResultOnError: false,
+          rethrowOnError: true,
+          action: () => onUpdate(editingId, values),
+        });
       } else {
-        await onCreate(values);
-        toast.success("Taux créé");
+        result = await runAction({
+          confirm: {
+            title: "Créer ce taux de TVA ?",
+            message: `Le taux « ${values.name} » (${values.rate} %) sera ajouté à votre catalogue.`,
+            confirmLabel: "Créer",
+          },
+          loadingMessage: "Création du taux...",
+          success: {
+            title: "Taux créé",
+            message: values.name,
+          },
+          error: {
+            title: "Création impossible",
+            message: "Vérifiez le nom et le taux saisis.",
+          },
+          showResultOnError: false,
+          rethrowOnError: true,
+          action: () => onCreate(values),
+        });
       }
-      cancelEdit();
+      if (result !== undefined) {
+        cancelEdit();
+      }
     } catch (error) {
-      toast.error(
-        "Action impossible",
-        error instanceof Error ? error.message : undefined,
-      );
+      await handleApiError(error);
     }
-  });
+  }, handleInvalidSubmit);
 
   return (
     <div className="space-y-6">
@@ -98,7 +166,10 @@ export function TaxRatesManager({
           </thead>
           <tbody>
             {taxRates.map((taxRate) => (
-              <tr key={taxRate.id} className="border-t border-gray-100 dark:border-gray-800">
+              <tr
+                key={taxRate.id}
+                className="border-t border-gray-100 dark:border-gray-800"
+              >
                 <td className="px-4 py-3">{taxRate.name}</td>
                 <td className="px-4 py-3">{taxRate.rate} %</td>
                 <td className="px-4 py-3">{taxRate.isDefault ? "Oui" : "—"}</td>
@@ -116,15 +187,7 @@ export function TaxRatesManager({
                       <button
                         type="button"
                         className="text-red-500 hover:underline"
-                        onClick={async () => {
-                          if (!window.confirm(`Supprimer « ${taxRate.name} » ?`)) return;
-                          try {
-                            await onDelete(taxRate.id);
-                            toast.success("Taux supprimé");
-                          } catch {
-                            toast.error("Suppression impossible");
-                          }
-                        }}
+                        onClick={() => handleDelete(taxRate)}
                       >
                         Supprimer
                       </button>
@@ -142,9 +205,17 @@ export function TaxRatesManager({
           <h2 className="mb-4 text-sm font-semibold text-gray-800 dark:text-white/90">
             {editingId ? "Modifier le taux" : "Nouveau taux de TVA"}
           </h2>
-          <form onSubmit={submit} className="space-y-4">
+          {formError ? (
+            <p
+              id="tax-rate-form-error"
+              className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+            >
+              {formError}
+            </p>
+          ) : null}
+          <form onSubmit={submit} className="space-y-4" noValidate>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
+              <div data-form-field="name">
                 <Label>Nom</Label>
                 <Input
                   {...register("name")}
@@ -152,7 +223,7 @@ export function TaxRatesManager({
                   hint={errors.name?.message}
                 />
               </div>
-              <div>
+              <div data-form-field="rate">
                 <Label>Taux (%)</Label>
                 <Input
                   type="number"

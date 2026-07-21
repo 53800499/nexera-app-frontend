@@ -6,7 +6,8 @@ import { useForm } from "react-hook-form";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
-import { useToast } from "@/shared/components/feedback";
+import { useActionFeedback } from "@/shared/components/feedback";
+import { useSettingsFormFeedback } from "../hooks/useSettingsFormFeedback";
 import {
   numberingRuleSchema,
   type NumberingRuleFormValues,
@@ -21,7 +22,7 @@ type Props = {
   onUpdate: (
     documentType: DocumentType,
     values: NumberingRuleFormValues,
-  ) => Promise<void>;
+  ) => Promise<unknown>;
 };
 
 function toFormValues(rule: NumberingRule): NumberingRuleFormValues {
@@ -42,7 +43,7 @@ export function NumberingRulesEditor({
   isSubmitting,
   onUpdate,
 }: Props) {
-  const toast = useToast();
+  const { runAction } = useActionFeedback();
   const [selectedType, setSelectedType] = useState<DocumentType>(
     rules[0]?.documentType ?? "quotation",
   );
@@ -52,6 +53,7 @@ export function NumberingRulesEditor({
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = useForm<NumberingRuleFormValues>({
     resolver: zodResolver(numberingRuleSchema),
@@ -67,6 +69,12 @@ export function NumberingRulesEditor({
     ),
   });
 
+  const { formError, clearFormError, handleApiError, handleInvalidSubmit } =
+    useSettingsFormFeedback(setError, {
+      formErrorId: "numbering-form-error",
+      apiErrorTitle: "Enregistrement impossible",
+    });
+
   useEffect(() => {
     if (!rules.length) return;
     if (!rules.some((rule) => rule.documentType === selectedType)) {
@@ -77,21 +85,39 @@ export function NumberingRulesEditor({
   useEffect(() => {
     const rule = rules.find((item) => item.documentType === selectedType);
     if (rule) {
+      clearFormError();
       reset(toFormValues(rule));
     }
-  }, [rules, selectedType, reset]);
+  }, [rules, selectedType, reset, clearFormError]);
 
   const submit = handleSubmit(async (values) => {
+    const docLabel = DOCUMENT_TYPE_LABELS[selectedType];
+    clearFormError();
     try {
-      await onUpdate(selectedType, values);
-      toast.success("Règle enregistrée");
+      await runAction({
+        confirm: {
+          title: "Enregistrer cette règle de numérotation ?",
+          message: `La numérotation des ${docLabel.toLowerCase()} sera mise à jour (préfixe « ${values.prefix} »).`,
+          confirmLabel: "Enregistrer",
+        },
+        loadingMessage: "Enregistrement de la règle...",
+        success: {
+          title: "Règle enregistrée",
+          message: docLabel,
+        },
+        error: {
+          title: "Enregistrement impossible",
+          message:
+            "Vérifiez le préfixe, le séparateur et la longueur du compteur.",
+        },
+        showResultOnError: false,
+        rethrowOnError: true,
+        action: () => onUpdate(selectedType, values),
+      });
     } catch (error) {
-      toast.error(
-        "Enregistrement impossible",
-        error instanceof Error ? error.message : undefined,
-      );
+      await handleApiError(error);
     }
-  });
+  }, handleInvalidSubmit);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_1fr]">
@@ -125,9 +151,18 @@ export function NumberingRulesEditor({
             ) : null}
           </div>
 
-          <form onSubmit={submit} className="space-y-4">
+          {formError ? (
+            <p
+              id="numbering-form-error"
+              className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+            >
+              {formError}
+            </p>
+          ) : null}
+
+          <form onSubmit={submit} className="space-y-4" noValidate>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
+              <div data-form-field="prefix">
                 <Label>Préfixe</Label>
                 <Input
                   {...register("prefix")}
@@ -136,19 +171,19 @@ export function NumberingRulesEditor({
                   hint={errors.prefix?.message}
                 />
               </div>
-              <div>
+              <div data-form-field="suffix">
                 <Label>Suffixe</Label>
                 <Input {...register("suffix")} disabled={!canManage} />
               </div>
-              <div>
+              <div data-form-field="separator">
                 <Label>Séparateur</Label>
                 <Input {...register("separator")} disabled={!canManage} />
               </div>
-              <div>
+              <div data-form-field="draftMarker">
                 <Label>Marqueur brouillon</Label>
                 <Input {...register("draftMarker")} disabled={!canManage} />
               </div>
-              <div>
+              <div data-form-field="counterLength">
                 <Label>Longueur compteur</Label>
                 <Input
                   type="number"

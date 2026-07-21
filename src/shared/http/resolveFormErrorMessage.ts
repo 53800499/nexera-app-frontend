@@ -190,6 +190,52 @@ const BUSINESS_MESSAGE_PATTERNS: { pattern: RegExp; message: string }[] = [
     pattern: /lastName.*(short|long|length|characters)|last name/i,
     message: "Le nom doit contenir au moins 2 caractères.",
   },
+  {
+    pattern:
+      /tax.?rate.*(in use|used|referenced)|taux.*tva.*(utilisé|supprim)|cannot delete.*tax/i,
+    message:
+      "Ce taux de TVA est utilisé sur des documents et ne peut pas être supprimé.",
+  },
+  {
+    pattern: /default tax|taux.*défaut|only one default.*tax/i,
+    message:
+      "Un seul taux de TVA peut être défini par défaut. Désactivez l'autre taux par défaut d'abord.",
+  },
+  {
+    pattern:
+      /primary currency|devise principale|cannot delete.*currency|currency.*in use/i,
+    message:
+      "Cette devise ne peut pas être supprimée (devise principale ou encore utilisée).",
+  },
+  {
+    pattern:
+      /payment.?term.*(in use|used|referenced)|condition.*paiement.*(utilisée|supprim)/i,
+    message:
+      "Cette condition de paiement est utilisée sur des documents et ne peut pas être supprimée.",
+  },
+  {
+    pattern: /default payment|condition.*défaut/i,
+    message:
+      "Une seule condition de paiement peut être définie par défaut.",
+  },
+  {
+    pattern: /numbering|numérotation|counter.*length|invalid.*prefix/i,
+    message:
+      "Format de numérotation invalide. Vérifiez le préfixe, le séparateur et la longueur du compteur.",
+  },
+  {
+    pattern: /settings.*(not found|forbidden)|paramètres.*(introuvable|interdit)/i,
+    message:
+      "Paramètres introuvables ou accès refusé. Actualisez la page ou contactez un administrateur.",
+  },
+  {
+    pattern: /invalid.*(color|hex)|couleur.*invalide/i,
+    message: "La couleur choisie n'est pas valide.",
+  },
+  {
+    pattern: /logo.*(url|invalid)|url.*logo/i,
+    message: "L'URL du logo n'est pas valide ou inaccessible.",
+  },
 ];
 
 const VAGUE_ERROR_PATTERNS = [
