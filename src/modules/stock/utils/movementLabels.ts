@@ -30,3 +30,12 @@ export const STOCK_MOVEMENT_STATUS_LABELS: Record<string, string> = {
   validated: "Validé",
   cancelled: "Annulé",
 };
+
+export const STOCK_TRANSFER_STATUS_LABELS: Record<string, string> = {
+  draft: "Brouillon",
+  pending: "En attente départ",
+  in_transit: "En transit",
+  received: "Reçu",
+  completed: "Complété",
+  cancelled: "Annulé",
+};

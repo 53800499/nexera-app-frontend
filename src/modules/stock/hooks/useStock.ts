@@ -12,12 +12,15 @@ import type {
   UpdateWarehousePayload,
   CreateStockEntryPayload,
   CreateStockExitPayload,
+  CreateStockTransferPayload,
+  ReceiveStockTransferPayload,
 } from "../types/stock.types";
 
 export const STOCK_ARTICLES_KEY = ["stock", "articles"] as const;
 export const STOCK_WAREHOUSES_KEY = ["stock", "warehouses"] as const;
 export const STOCK_ENTRIES_KEY = ["stock", "entries"] as const;
 export const STOCK_EXITS_KEY = ["stock", "exits"] as const;
+export const STOCK_TRANSFERS_KEY = ["stock", "transfers"] as const;
 
 export function useStockArticles(q?: string) {
   const queryEnabled = useQueryEnabled();
@@ -208,6 +211,84 @@ export function useStockExits() {
   });
 
   return { exitsQuery, createExitMutation };
+}
+
+export function useStockTransfers() {
+  const queryClient = useQueryClient();
+  const queryEnabled = useQueryEnabled();
+
+  const transfersQuery = useQuery({
+    queryKey: STOCK_TRANSFERS_KEY,
+    queryFn: () => stockApi.listTransfers(),
+    enabled: queryEnabled,
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: STOCK_TRANSFERS_KEY });
+    queryClient.invalidateQueries({ queryKey: STOCK_ARTICLES_KEY });
+  };
+
+  const createTransferMutation = useMutation({
+    mutationFn: (payload: CreateStockTransferPayload) =>
+      stockApi.createTransfer(payload),
+    onSuccess: () => invalidate(),
+  });
+
+  const submitTransferMutation = useMutation({
+    mutationFn: (id: string) => stockApi.submitTransfer(id),
+    onSuccess: (_, id) => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["stock", "transfers", id] });
+    },
+  });
+
+  const shipTransferMutation = useMutation({
+    mutationFn: (id: string) => stockApi.shipTransfer(id),
+    onSuccess: (_, id) => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["stock", "transfers", id] });
+    },
+  });
+
+  const receiveTransferMutation = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: ReceiveStockTransferPayload;
+    }) => stockApi.receiveTransfer(id, payload),
+    onSuccess: (_, { id }) => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["stock", "transfers", id] });
+    },
+  });
+
+  const cancelTransferMutation = useMutation({
+    mutationFn: (id: string) => stockApi.cancelTransfer(id),
+    onSuccess: (_, id) => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["stock", "transfers", id] });
+    },
+  });
+
+  return {
+    transfersQuery,
+    createTransferMutation,
+    submitTransferMutation,
+    shipTransferMutation,
+    receiveTransferMutation,
+    cancelTransferMutation,
+  };
+}
+
+export function useStockTransfer(id: string) {
+  const queryEnabled = useQueryEnabled(Boolean(id));
+  return useQuery({
+    queryKey: ["stock", "transfers", id],
+    queryFn: () => stockApi.getTransfer(id),
+    enabled: queryEnabled,
+  });
 }
 
 export function useStockMovement(id: string) {

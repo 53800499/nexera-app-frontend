@@ -12,6 +12,8 @@ type SidebarContextType = {
   setIsHovered: (isHovered: boolean) => void;
   setActiveItem: (item: string | null) => void;
   toggleSubmenu: (item: string) => void;
+  openSubmenuFor: (item: string) => void;
+  closeSubmenu: () => void;
 };
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
@@ -63,6 +65,14 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
     setOpenSubmenu((prev) => (prev === item ? null : item));
   };
 
+  const openSubmenuFor = (item: string) => {
+    setOpenSubmenu(item);
+  };
+
+  const closeSubmenu = () => {
+    setOpenSubmenu(null);
+  };
+
   return (
     <SidebarContext.Provider
       value={{
@@ -76,6 +86,8 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
         setIsHovered,
         setActiveItem,
         toggleSubmenu,
+        openSubmenuFor,
+        closeSubmenu,
       }}
     >
       {children}

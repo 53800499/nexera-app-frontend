@@ -5,3 +5,6 @@ export { default as StockMovementsListPage } from "./pages/StockMovementsListPag
 export { default as CreateStockEntryPage } from "./pages/CreateStockEntryPage";
 export { default as CreateStockExitPage } from "./pages/CreateStockExitPage";
 export { default as StockMovementDetailsPage } from "./pages/StockMovementDetailsPage";
+export { default as StockTransfersListPage } from "./pages/StockTransfersListPage";
+export { default as CreateStockTransferPage } from "./pages/CreateStockTransferPage";
+export { default as StockTransferDetailsPage } from "./pages/StockTransferDetailsPage";

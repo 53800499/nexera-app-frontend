@@ -10,6 +10,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   articles: "Articles",
   entrepots: "Entrepôts",
   mouvements: "Mouvements",
+  transferts: "Transferts",
   "nouvelle-entree": "Nouvelle entrée",
   "nouvelle-sortie": "Nouvelle sortie",
   categories: "Catégories",

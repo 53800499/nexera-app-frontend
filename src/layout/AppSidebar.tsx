@@ -1,30 +1,55 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NexeraLogo } from "@/components/brand/NexeraLogo";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuthStore } from "@/modules/auth/store/authStore";
 import { useAppNavigation } from "./navigation/useAppNavigation";
-import { HorizontaLDots } from "../icons/index";
+import { ChevronDownIcon, HorizontaLDots } from "../icons/index";
+import type { ResolvedNavItem } from "./navigation/types";
 
 const AppSidebar: React.FC = () => {
-  const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const {
+    isExpanded,
+    isMobileOpen,
+    isHovered,
+    setIsHovered,
+    openSubmenu,
+    toggleSubmenu,
+    openSubmenuFor,
+    closeSubmenu,
+  } = useSidebar();
   const pathname = usePathname();
   const isSessionReady = useAuthStore((state) => state.isSessionReady);
-  const user = useAuthStore((state) => state.user);
   const { mainItems, isCabinetWorkspace } = useAppNavigation();
   const navItems = isSessionReady ? mainItems : [];
   const homeHref = isCabinetWorkspace ? "/cabinet" : "/";
 
-  const isActive = (path: string) => {
-    if (path === "/cabinet") {
-      return pathname === "/cabinet";
-    }
+  const isPathActive = (path: string) => {
+    if (path === "/cabinet") return pathname === "/cabinet";
     if (path === "/") return pathname === "/";
     return pathname === path || pathname.startsWith(`${path}/`);
   };
+
+  const isItemActive = (nav: ResolvedNavItem) => {
+    if (nav.subItems?.length) {
+      return nav.subItems.some((sub) => isPathActive(sub.path));
+    }
+    return isPathActive(nav.path);
+  };
+
+  useEffect(() => {
+    const match = navItems.find((nav) =>
+      nav.subItems?.some((sub) => isPathActive(sub.path)),
+    );
+    if (match) openSubmenuFor(match.name);
+    else closeSubmenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, navItems.length]);
+
+  const showLabels = isExpanded || isHovered || isMobileOpen;
 
   return (
     <aside
@@ -33,8 +58,8 @@ const AppSidebar: React.FC = () => {
           isExpanded || isMobileOpen
             ? "w-[290px]"
             : isHovered
-            ? "w-[290px]"
-            : "w-[90px]"
+              ? "w-[290px]"
+              : "w-[90px]"
         }
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0`}
@@ -47,7 +72,7 @@ const AppSidebar: React.FC = () => {
         }`}
       >
         <Link href={homeHref} className="block">
-          {isExpanded || isHovered || isMobileOpen ? (
+          {showLabels ? (
             <NexeraLogo showContext={isSessionReady} />
           ) : (
             <NexeraLogo variant="compact" showContext={false} />
@@ -65,38 +90,102 @@ const AppSidebar: React.FC = () => {
                     : "justify-start"
                 }`}
               >
-                {isExpanded || isHovered || isMobileOpen ? (
-                  "Menu"
-                ) : (
-                  <HorizontaLDots />
-                )}
+                {showLabels ? "Menu" : <HorizontaLDots />}
               </h2>
-              <ul className="flex flex-col gap-4">
-                {navItems.map((nav) => (
-                  <li key={nav.name}>
-                    <Link
-                      href={nav.path}
-                      className={`menu-item group ${
-                        isActive(nav.path)
-                          ? "menu-item-active"
-                          : "menu-item-inactive"
-                      }`}
-                    >
-                      <span
-                        className={`${
-                          isActive(nav.path)
-                            ? "menu-item-icon-active"
-                            : "menu-item-icon-inactive"
+              <ul className="flex flex-col gap-1">
+                {navItems.map((nav) => {
+                  const active = isItemActive(nav);
+                  const hasSub = Boolean(nav.subItems?.length);
+                  const isOpen = openSubmenu === nav.name;
+
+                  if (hasSub) {
+                    return (
+                      <li key={nav.name}>
+                        <button
+                          type="button"
+                          onClick={() => toggleSubmenu(nav.name)}
+                          className={`menu-item group w-full ${
+                            active
+                              ? "menu-item-active"
+                              : "menu-item-inactive"
+                          }`}
+                        >
+                          <span
+                            className={
+                              active
+                                ? "menu-item-icon-active"
+                                : "menu-item-icon-inactive"
+                            }
+                          >
+                            {nav.icon}
+                          </span>
+                          {showLabels ? (
+                            <>
+                              <span className="menu-item-text flex-1 text-left">
+                                {nav.name}
+                              </span>
+                              <ChevronDownIcon
+                                className={`ml-auto size-5 transition-transform duration-200 ${
+                                  isOpen
+                                    ? "menu-item-arrow-active"
+                                    : "menu-item-arrow-inactive"
+                                }`}
+                              />
+                            </>
+                          ) : null}
+                        </button>
+                        {showLabels && isOpen ? (
+                          <ul className="mt-1 space-y-1 pl-9">
+                            {nav.subItems!.map((sub) => {
+                              const subActive = isPathActive(sub.path);
+                              return (
+                                <li key={sub.path}>
+                                  <Link
+                                    href={sub.path}
+                                    className={`menu-dropdown-item ${
+                                      subActive
+                                        ? "menu-dropdown-item-active"
+                                        : "menu-dropdown-item-inactive"
+                                    }`}
+                                  >
+                                    {sub.name}
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : null}
+                      </li>
+                    );
+                  }
+
+                  return (
+                    <li key={nav.name}>
+                      <Link
+                        href={nav.path}
+                        onClick={closeSubmenu}
+                        className={`menu-item group ${
+                          active
+                            ? "menu-item-active"
+                            : "menu-item-inactive"
                         }`}
                       >
-                        {nav.icon}
-                      </span>
-                      {(isExpanded || isHovered || isMobileOpen) && (
-                        <span className="menu-item-text">{nav.name}</span>
-                      )}
-                    </Link>
-                  </li>
-                ))}
+                        <span
+                          className={
+                            active
+                              ? "menu-item-icon-active"
+                              : "menu-item-icon-inactive"
+                          }
+                        >
+                          {nav.icon}
+                        </span>
+                        {showLabels ? (
+                          <span className="menu-item-text">{nav.name}</span>
+                        ) : null}
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </div>

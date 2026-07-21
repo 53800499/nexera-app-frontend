@@ -249,3 +249,84 @@ export type StockMovement = {
     location?: { id: string; code: string } | null;
   }>;
 };
+
+export type StockTransferStatus =
+  | "draft"
+  | "pending"
+  | "in_transit"
+  | "received"
+  | "completed"
+  | "cancelled";
+
+export type StockTransferLine = {
+  id: string;
+  stockItemId: string;
+  lotId: string | null;
+  lotNumber: string | null;
+  serialNumbers: string[];
+  sourceLocationId: string | null;
+  destLocationId: string | null;
+  qtyPlanned: number;
+  qtyShipped: number;
+  qtyReceived: number | null;
+  unitCost: number;
+  varianceReason: string | null;
+  stockItem?: {
+    id: string;
+    commercialItem?: { reference: string; name: string; unit?: string };
+    trackLots?: boolean;
+    trackSerials?: boolean;
+  };
+  lot?: { id: string; lotNumber: string } | null;
+  sourceLocation?: { id: string; code: string } | null;
+  destLocation?: { id: string; code: string } | null;
+};
+
+export type StockTransfer = {
+  id: string;
+  number: string;
+  status: StockTransferStatus;
+  sourceWarehouseId: string;
+  destWarehouseId: string;
+  plannedDate: string | null;
+  shippedAt: string | null;
+  receivedAt: string | null;
+  movementOutId: string | null;
+  movementInId: string | null;
+  varianceReason: string | null;
+  notes: string | null;
+  createdAt: string;
+  sourceWarehouse?: { id: string; code: string; name: string };
+  destWarehouse?: { id: string; code: string; name: string };
+  lines?: StockTransferLine[];
+};
+
+export type CreateStockTransferLinePayload = {
+  stockItemId: string;
+  qty: number;
+  lotId?: string;
+  sourceLocationId?: string;
+  destLocationId?: string;
+  serialNumbers?: string[];
+};
+
+export type CreateStockTransferPayload = {
+  sourceWarehouseId: string;
+  destWarehouseId: string;
+  plannedDate?: string;
+  notes?: string;
+  lines: CreateStockTransferLinePayload[];
+};
+
+export type ReceiveTransferLinePayload = {
+  lineId: string;
+  qtyReceived: number;
+  varianceReason?: string;
+  destLocationId?: string;
+};
+
+export type ReceiveStockTransferPayload = {
+  lines: ReceiveTransferLinePayload[];
+  varianceReason?: string;
+  notes?: string;
+};

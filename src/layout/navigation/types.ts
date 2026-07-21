@@ -20,6 +20,11 @@ export type NavItemConfig<T = NavPermissions> = {
   iconKey: NavIconKey;
   path: string;
   canAccess: (permissions: T) => boolean;
+  subItems?: Array<{
+    name: string;
+    path: string;
+    canAccess?: (permissions: T) => boolean;
+  }>;
 };
 
 export type NavPermissions = {
@@ -53,6 +58,7 @@ export type ResolvedNavItem = {
   name: string;
   icon: ReactNode;
   path: string;
+  subItems?: Array<{ name: string; path: string }>;
 };
 
 export type BreadcrumbItem = {

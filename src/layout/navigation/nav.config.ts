@@ -30,6 +30,12 @@ export const MAIN_NAV_CONFIG: NavItemConfig[] = [
     iconKey: "box",
     path: "/stock/mouvements",
     canAccess: (p) => p.stock,
+    subItems: [
+      { name: "Articles", path: "/stock/articles" },
+      { name: "Entrepôts", path: "/stock/entrepots" },
+      { name: "Mouvements", path: "/stock/mouvements" },
+      { name: "Transferts", path: "/stock/transferts" },
+    ],
   },
   {
     id: "devis",

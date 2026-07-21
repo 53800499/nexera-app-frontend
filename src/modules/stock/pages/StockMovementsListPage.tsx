@@ -128,6 +128,12 @@ export default function StockMovementsListPage() {
                 >
                   Nouvelle sortie
                 </Link>
+                <Link
+                  href="/stock/transferts"
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                >
+                  Transferts
+                </Link>
               </>
             ) : null}
           </div>

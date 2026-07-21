@@ -32,6 +32,11 @@ export function useAppNavigation() {
           name: nav.name,
           icon: NAV_ICONS[nav.iconKey],
           path: nav.path,
+          subItems: nav.subItems
+            ?.filter((sub) =>
+              sub.canAccess ? sub.canAccess(cabinetPermissions) : true,
+            )
+            .map((sub) => ({ name: sub.name, path: sub.path })),
         });
       }
       return items;
@@ -43,6 +48,11 @@ export function useAppNavigation() {
         name: nav.name,
         icon: NAV_ICONS[nav.iconKey],
         path: nav.path,
+        subItems: nav.subItems
+          ?.filter((sub) =>
+            sub.canAccess ? sub.canAccess(permissions) : true,
+          )
+          .map((sub) => ({ name: sub.name, path: sub.path })),
       });
     }
 

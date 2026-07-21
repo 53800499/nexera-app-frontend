@@ -15,6 +15,9 @@ import type {
   CreateStockExitPayload,
   AvailableLotsResponse,
   StockMovement,
+  StockTransfer,
+  CreateStockTransferPayload,
+  ReceiveStockTransferPayload,
 } from "../types/stock.types";
 
 export const stockApi = {
@@ -127,4 +130,37 @@ export const stockApi = {
     authorizedFetch<AvailableLotsResponse>(
       `/stock/items/${stockItemId}/available-lots?warehouseId=${encodeURIComponent(warehouseId)}`,
     ),
+
+  listTransfers: () =>
+    authorizedFetch<StockTransfer[]>("/stock/transfers"),
+
+  getTransfer: (id: string) =>
+    authorizedFetch<StockTransfer>(`/stock/transfers/${id}`),
+
+  createTransfer: (payload: CreateStockTransferPayload) =>
+    authorizedFetch<StockTransfer>("/stock/transfers", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  submitTransfer: (id: string) =>
+    authorizedFetch<StockTransfer>(`/stock/transfers/${id}/submit`, {
+      method: "POST",
+    }),
+
+  shipTransfer: (id: string) =>
+    authorizedFetch<StockTransfer>(`/stock/transfers/${id}/ship`, {
+      method: "POST",
+    }),
+
+  receiveTransfer: (id: string, payload: ReceiveStockTransferPayload) =>
+    authorizedFetch<StockTransfer>(`/stock/transfers/${id}/receive`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  cancelTransfer: (id: string) =>
+    authorizedFetch<StockTransfer>(`/stock/transfers/${id}/cancel`, {
+      method: "POST",
+    }),
 };
