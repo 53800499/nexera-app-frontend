@@ -25,6 +25,13 @@ export const MAIN_NAV_CONFIG: NavItemConfig[] = [
     canAccess: (p) => p.catalogue,
   },
   {
+    id: "stock",
+    name: "Stocks",
+    iconKey: "box",
+    path: "/stock/articles",
+    canAccess: (p) => p.stock,
+  },
+  {
     id: "devis",
     name: "Devis",
     iconKey: "docs",

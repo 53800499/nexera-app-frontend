@@ -25,6 +25,8 @@ export const PERMISSION_CODES = {
   MANAGE_SETTINGS: "manage:settings",
   CATALOGUE_READ: "catalogue.read",
   MANAGE_CATALOGUE: "manage:catalogue",
+  STOCK_READ: "stock.read",
+  MANAGE_STOCK: "manage:stock",
   MANAGE_USERS: "manage:users",
   ROLES_READ: "roles.read",
   MANAGE_ROLES: "manage:roles",
@@ -160,6 +162,17 @@ export function canReadCatalogue(user: Pick<AuthUser, "permissions"> | null) {
 
 export function canManageCatalogue(user: Pick<AuthUser, "permissions"> | null) {
   return hasPermissionCode(user, PERMISSION_CODES.MANAGE_CATALOGUE);
+}
+
+export function canReadStock(user: Pick<AuthUser, "permissions"> | null) {
+  return hasAnyPermissionCode(user, [
+    PERMISSION_CODES.STOCK_READ,
+    PERMISSION_CODES.MANAGE_STOCK,
+  ]);
+}
+
+export function canManageStock(user: Pick<AuthUser, "permissions"> | null) {
+  return hasPermissionCode(user, PERMISSION_CODES.MANAGE_STOCK);
 }
 
 export function canReadCabinet(user: Pick<AuthUser, "permissions"> | null) {

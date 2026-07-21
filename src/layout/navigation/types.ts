@@ -26,6 +26,7 @@ export type NavPermissions = {
   dashboard: boolean;
   clients: boolean;
   catalogue: boolean;
+  stock: boolean;
   quotations: boolean;
   orders: boolean;
   invoices: boolean;
@@ -37,6 +38,7 @@ export type NavPermissions = {
   roles: boolean;
   canManageClients: boolean;
   canManageCatalogue: boolean;
+  canManageStock: boolean;
   canManageQuotations: boolean;
   canManageOrders: boolean;
   canManageInvoices: boolean;

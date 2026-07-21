@@ -6,6 +6,9 @@ import type { NavPermissions } from "./types";
 const SEGMENT_LABELS: Record<string, string> = {
   clients: "Clients",
   catalogue: "Catalogue",
+  stock: "Stocks",
+  articles: "Articles",
+  entrepots: "Entrepôts",
   categories: "Catégories",
   devis: "Devis",
   commandes: "Commandes",
@@ -42,6 +45,11 @@ const MODULE_ROOTS: Record<
     label: "Catalogue",
     href: "/catalogue",
     manageKey: "canManageCatalogue",
+  },
+  stock: {
+    label: "Stocks",
+    href: "/stock/articles",
+    manageKey: "canManageStock",
   },
   devis: { label: "Devis", href: "/devis", manageKey: "canManageQuotations" },
   commandes: {
@@ -110,6 +118,7 @@ function buildQuickAction(
   const createPaths: Record<string, { label: string; href: string }> = {
     clients: { label: "Nouveau client", href: "/clients/nouveau" },
     catalogue: { label: "Nouvel article", href: "/catalogue/nouveau" },
+    stock: { label: "Nouvel entrepôt", href: "/stock/entrepots" },
     devis: { label: "Nouveau devis", href: "/devis/nouveau" },
     commandes: { label: "Nouvelle commande", href: "/commandes/nouveau" },
     factures: { label: "Nouvelle facture", href: "/factures/nouvelle" },
