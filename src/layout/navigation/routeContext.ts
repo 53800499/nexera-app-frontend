@@ -9,6 +9,9 @@ const SEGMENT_LABELS: Record<string, string> = {
   stock: "Stocks",
   articles: "Articles",
   entrepots: "Entrepôts",
+  mouvements: "Mouvements",
+  "nouvelle-entree": "Nouvelle entrée",
+  "nouvelle-sortie": "Nouvelle sortie",
   categories: "Catégories",
   devis: "Devis",
   commandes: "Commandes",
@@ -48,7 +51,7 @@ const MODULE_ROOTS: Record<
   },
   stock: {
     label: "Stocks",
-    href: "/stock/articles",
+    href: "/stock/mouvements",
     manageKey: "canManageStock",
   },
   devis: { label: "Devis", href: "/devis", manageKey: "canManageQuotations" },
@@ -118,7 +121,7 @@ function buildQuickAction(
   const createPaths: Record<string, { label: string; href: string }> = {
     clients: { label: "Nouveau client", href: "/clients/nouveau" },
     catalogue: { label: "Nouvel article", href: "/catalogue/nouveau" },
-    stock: { label: "Nouvel entrepôt", href: "/stock/entrepots" },
+    stock: { label: "Nouvelle entrée", href: "/stock/mouvements/nouvelle-entree" },
     devis: { label: "Nouveau devis", href: "/devis/nouveau" },
     commandes: { label: "Nouvelle commande", href: "/commandes/nouveau" },
     factures: { label: "Nouvelle facture", href: "/factures/nouvelle" },

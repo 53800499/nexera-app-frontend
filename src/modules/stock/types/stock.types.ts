@@ -135,3 +135,117 @@ export type UpdateWarehouseLocationPayload = {
   capacity?: number;
   isActive?: boolean;
 };
+
+export type StockEntryType =
+  | "IN_SUPPLIER"
+  | "IN_RETURN"
+  | "IN_PRODUCTION"
+  | "IN_ADJUSTMENT"
+  | "IN_INITIAL";
+
+export type StockQualityStatus = "accepted" | "partial" | "rejected";
+
+export type StockMovementStatus = "draft" | "validated" | "cancelled";
+
+export type StockEntryLinePayload = {
+  stockItemId: string;
+  qtyPlanned: number;
+  qtyActual?: number;
+  unitCost: number;
+  locationId?: string;
+  lotNumber?: string;
+  manufactureDate?: string;
+  expiryDate?: string;
+  serialNumbers?: string[];
+};
+
+export type CreateStockEntryPayload = {
+  movementType: StockEntryType;
+  warehouseId: string;
+  movementDate?: string;
+  reference?: string;
+  supplierId?: string;
+  qualityStatus?: StockQualityStatus;
+  reason?: string;
+  notes?: string;
+  validate?: boolean;
+  lines: StockEntryLinePayload[];
+};
+
+export type StockExitType =
+  | "OUT_SALE"
+  | "OUT_CONSUMPTION"
+  | "OUT_LOSS"
+  | "OUT_RETURN_SUPPLIER"
+  | "OUT_ADJUSTMENT";
+
+export type StockExitLinePayload = {
+  stockItemId: string;
+  qty: number;
+  lotId?: string;
+  locationId?: string;
+  serialNumbers?: string[];
+};
+
+export type CreateStockExitPayload = {
+  movementType: StockExitType;
+  warehouseId: string;
+  movementDate?: string;
+  reference?: string;
+  costCenter?: string;
+  reason?: string;
+  notes?: string;
+  validate?: boolean;
+  lines: StockExitLinePayload[];
+};
+
+export type AvailableLotsResponse = {
+  stockItemId: string;
+  valuationMethod: string;
+  trackLots: boolean;
+  trackSerials: boolean;
+  levels: Array<{
+    levelId: string;
+    lotId: string | null;
+    lotNumber: string | null;
+    receivedDate: string | null;
+    locationId: string | null;
+    locationCode: string | null;
+    qtyAvailable: number;
+    unitValue: number;
+  }>;
+};
+
+export type StockMovement = {
+  id: string;
+  number: string;
+  movementType: string;
+  status: StockMovementStatus;
+  warehouseId: string;
+  movementDate: string;
+  reference: string | null;
+  supplierId: string | null;
+  qualityStatus: StockQualityStatus | null;
+  reason: string | null;
+  notes: string | null;
+  createdAt: string;
+  warehouse?: { id: string; code: string; name: string };
+  lines?: Array<{
+    id: string;
+    qtyPlanned: number;
+    qtyActual: number;
+    unitCost: number;
+    totalCost?: number;
+    cmupBefore?: number | null;
+    cmupAfter?: number | null;
+    lotNumber?: string | null;
+    stockItem?: {
+      id: string;
+      commercialItem?: { reference: string; name: string };
+      trackLots?: boolean;
+      trackSerials?: boolean;
+      trackExpiry?: boolean;
+    };
+    location?: { id: string; code: string } | null;
+  }>;
+};

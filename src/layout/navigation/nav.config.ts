@@ -28,7 +28,7 @@ export const MAIN_NAV_CONFIG: NavItemConfig[] = [
     id: "stock",
     name: "Stocks",
     iconKey: "box",
-    path: "/stock/articles",
+    path: "/stock/mouvements",
     canAccess: (p) => p.stock,
   },
   {

@@ -10,10 +10,14 @@ import type {
   UpdateStockItemPayload,
   UpdateWarehouseLocationPayload,
   UpdateWarehousePayload,
+  CreateStockEntryPayload,
+  CreateStockExitPayload,
 } from "../types/stock.types";
 
 export const STOCK_ARTICLES_KEY = ["stock", "articles"] as const;
 export const STOCK_WAREHOUSES_KEY = ["stock", "warehouses"] as const;
+export const STOCK_ENTRIES_KEY = ["stock", "entries"] as const;
+export const STOCK_EXITS_KEY = ["stock", "exits"] as const;
 
 export function useStockArticles(q?: string) {
   const queryEnabled = useQueryEnabled();
@@ -150,4 +154,78 @@ export function useWarehouses(includeArchived = true) {
     createLocationMutation,
     updateLocationMutation,
   };
+}
+
+export function useStockEntries() {
+  const queryClient = useQueryClient();
+  const queryEnabled = useQueryEnabled();
+
+  const entriesQuery = useQuery({
+    queryKey: STOCK_ENTRIES_KEY,
+    queryFn: () => stockApi.listEntries(),
+    enabled: queryEnabled,
+  });
+
+  const createEntryMutation = useMutation({
+    mutationFn: (payload: CreateStockEntryPayload) =>
+      stockApi.createEntry(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: STOCK_ENTRIES_KEY });
+      queryClient.invalidateQueries({ queryKey: STOCK_ARTICLES_KEY });
+    },
+  });
+
+  const validateEntryMutation = useMutation({
+    mutationFn: (id: string) => stockApi.validateEntry(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: STOCK_ENTRIES_KEY });
+      queryClient.invalidateQueries({ queryKey: STOCK_EXITS_KEY });
+      queryClient.invalidateQueries({ queryKey: ["stock", "movements", id] });
+      queryClient.invalidateQueries({ queryKey: STOCK_ARTICLES_KEY });
+    },
+  });
+
+  return { entriesQuery, createEntryMutation, validateEntryMutation };
+}
+
+export function useStockExits() {
+  const queryClient = useQueryClient();
+  const queryEnabled = useQueryEnabled();
+
+  const exitsQuery = useQuery({
+    queryKey: STOCK_EXITS_KEY,
+    queryFn: () => stockApi.listExits(),
+    enabled: queryEnabled,
+  });
+
+  const createExitMutation = useMutation({
+    mutationFn: (payload: CreateStockExitPayload) =>
+      stockApi.createExit(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: STOCK_EXITS_KEY });
+      queryClient.invalidateQueries({ queryKey: STOCK_ARTICLES_KEY });
+    },
+  });
+
+  return { exitsQuery, createExitMutation };
+}
+
+export function useStockMovement(id: string) {
+  const queryEnabled = useQueryEnabled(Boolean(id));
+  return useQuery({
+    queryKey: ["stock", "movements", id],
+    queryFn: () => stockApi.getMovement(id),
+    enabled: queryEnabled,
+  });
+}
+
+export function useAvailableLots(stockItemId: string, warehouseId: string) {
+  const queryEnabled = useQueryEnabled(
+    Boolean(stockItemId) && Boolean(warehouseId),
+  );
+  return useQuery({
+    queryKey: ["stock", "available-lots", stockItemId, warehouseId],
+    queryFn: () => stockApi.listAvailableLots(stockItemId, warehouseId),
+    enabled: queryEnabled,
+  });
 }

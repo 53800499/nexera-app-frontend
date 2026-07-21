@@ -30,12 +30,20 @@ export default function StockArticlesListPage() {
               Configuration stock des articles catalogue (UC-S01).
             </p>
           </div>
-          <Link
-            href="/stock/entrepots"
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-          >
-            Entrepôts
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/stock/mouvements"
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+            >
+              Mouvements
+            </Link>
+            <Link
+              href="/stock/entrepots"
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+            >
+              Entrepôts
+            </Link>
+          </div>
         </div>
 
         <form

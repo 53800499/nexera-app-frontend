@@ -1,3 +1,7 @@
 export { default as StockArticlesListPage } from "./pages/StockArticlesListPage";
 export { default as StockArticleConfigPage } from "./pages/StockArticleConfigPage";
 export { default as WarehousesPage } from "./pages/WarehousesPage";
+export { default as StockMovementsListPage } from "./pages/StockMovementsListPage";
+export { default as CreateStockEntryPage } from "./pages/CreateStockEntryPage";
+export { default as CreateStockExitPage } from "./pages/CreateStockExitPage";
+export { default as StockMovementDetailsPage } from "./pages/StockMovementDetailsPage";

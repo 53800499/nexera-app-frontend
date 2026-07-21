@@ -11,6 +11,10 @@ import type {
   UpdateWarehousePayload,
   Warehouse,
   WarehouseLocation,
+  CreateStockEntryPayload,
+  CreateStockExitPayload,
+  AvailableLotsResponse,
+  StockMovement,
 } from "../types/stock.types";
 
 export const stockApi = {
@@ -91,5 +95,36 @@ export const stockApi = {
         method: "PATCH",
         body: JSON.stringify(payload),
       },
+    ),
+
+  listEntries: () =>
+    authorizedFetch<StockMovement[]>("/stock/movements/entries"),
+
+  listExits: () =>
+    authorizedFetch<StockMovement[]>("/stock/movements/exits"),
+
+  getMovement: (id: string) =>
+    authorizedFetch<StockMovement>(`/stock/movements/${id}`),
+
+  createEntry: (payload: CreateStockEntryPayload) =>
+    authorizedFetch<StockMovement>("/stock/movements/entries", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  createExit: (payload: CreateStockExitPayload) =>
+    authorizedFetch<StockMovement>("/stock/movements/exits", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  validateEntry: (id: string) =>
+    authorizedFetch<StockMovement>(`/stock/movements/${id}/validate`, {
+      method: "POST",
+    }),
+
+  listAvailableLots: (stockItemId: string, warehouseId: string) =>
+    authorizedFetch<AvailableLotsResponse>(
+      `/stock/items/${stockItemId}/available-lots?warehouseId=${encodeURIComponent(warehouseId)}`,
     ),
 };
