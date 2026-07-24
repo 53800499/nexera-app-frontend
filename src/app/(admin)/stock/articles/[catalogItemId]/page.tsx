@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { StockArticleConfigPage } from "@/modules/stock";
+import { StockArticleConfigPage } from "@/modules/stock/articles";
 
 export const metadata: Metadata = {
   title: "Configuration stock | NEXERA ERP",

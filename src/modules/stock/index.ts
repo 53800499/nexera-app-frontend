@@ -1,10 +1,23 @@
-export { default as StockArticlesListPage } from "./pages/StockArticlesListPage";
-export { default as StockArticleConfigPage } from "./pages/StockArticleConfigPage";
-export { default as WarehousesPage } from "./pages/WarehousesPage";
-export { default as StockMovementsListPage } from "./pages/StockMovementsListPage";
-export { default as CreateStockEntryPage } from "./pages/CreateStockEntryPage";
-export { default as CreateStockExitPage } from "./pages/CreateStockExitPage";
-export { default as StockMovementDetailsPage } from "./pages/StockMovementDetailsPage";
-export { default as StockTransfersListPage } from "./pages/StockTransfersListPage";
-export { default as CreateStockTransferPage } from "./pages/CreateStockTransferPage";
-export { default as StockTransferDetailsPage } from "./pages/StockTransferDetailsPage";
+export {
+  StockArticlesListPage,
+  StockArticleConfigPage,
+} from "./articles";
+export { WarehousesPage } from "./entrepots";
+export {
+  StockMovementsListPage,
+  CreateStockEntryPage,
+  CreateStockExitPage,
+  StockMovementDetailsPage,
+} from "./mouvements";
+export {
+  StockTransfersListPage,
+  CreateStockTransferPage,
+  StockTransferDetailsPage,
+} from "./transferts";
+export {
+  InventoryListPage,
+  CreateInventoryPage,
+  InventoryDetailsPage,
+} from "./inventory";
+export { StockAlertsPage } from "./alerts";
+export { StockValuationPage } from "./valuation";

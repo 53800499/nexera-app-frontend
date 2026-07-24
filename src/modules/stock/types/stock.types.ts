@@ -35,6 +35,7 @@ export type StockItem = {
   trackLots: boolean;
   trackSerials: boolean;
   trackExpiry: boolean;
+  expiryAlertDays: number;
   valuationMethod: StockValuationMethod;
   storageUnit: string;
   conversionFactor: number;
@@ -90,6 +91,7 @@ export type CreateStockItemPayload = {
   trackLots?: boolean;
   trackSerials?: boolean;
   trackExpiry?: boolean;
+  expiryAlertDays?: number | null;
   valuationMethod?: StockValuationMethod;
   storageUnit: string;
   conversionFactor?: number;

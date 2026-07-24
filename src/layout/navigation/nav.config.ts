@@ -35,6 +35,9 @@ export const MAIN_NAV_CONFIG: NavItemConfig[] = [
       { name: "Entrepôts", path: "/stock/entrepots" },
       { name: "Mouvements", path: "/stock/mouvements" },
       { name: "Transferts", path: "/stock/transferts" },
+      { name: "Inventaires", path: "/stock/inventaires" },
+      { name: "Alertes", path: "/stock/alertes" },
+      { name: "Valorisation", path: "/stock/valorisation" },
     ],
   },
   {
