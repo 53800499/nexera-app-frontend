@@ -10,6 +10,7 @@ import { CrmOfflineProvider } from "@/modules/crm/offline/components/CrmOfflineP
 import { QuotationsOfflineProvider } from "@/modules/devis/offline/components/QuotationsOfflineProvider";
 import { OrdersOfflineProvider } from "@/modules/commandes/offline/components/OrdersOfflineProvider";
 import { InvoicesOfflineProvider } from "@/modules/factures/offline/components/InvoicesOfflineProvider";
+import { StockOfflineProvider } from "@/modules/stock/offline/components/StockOfflineProvider";
 import React from "react";
 
 export default function AdminLayout({
@@ -39,7 +40,9 @@ export default function AdminLayout({
               <QuotationsOfflineProvider>
                 <OrdersOfflineProvider>
                   <InvoicesOfflineProvider>
-                    <ErrorBoundary>{children}</ErrorBoundary>
+                    <StockOfflineProvider>
+                      <ErrorBoundary>{children}</ErrorBoundary>
+                    </StockOfflineProvider>
                   </InvoicesOfflineProvider>
                 </OrdersOfflineProvider>
               </QuotationsOfflineProvider>

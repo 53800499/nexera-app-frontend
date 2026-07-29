@@ -15,6 +15,7 @@ import {
 import { RequireStockAccess } from "../../components/RequireStockAccess";
 import { useStockAccess } from "../../hooks/useStockAccess";
 import { useWarehouses } from "../../hooks/useStock";
+import { StockSyncStatusBadge } from "../../offline";
 import { buildLocationCodePreview } from "../utils/locationCode";
 import type { Warehouse } from "../../types/stock.types";
 
@@ -183,9 +184,12 @@ export default function WarehousesPage() {
         </Link>
 
         <div>
-          <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-            Entrepôts & emplacements
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
+              Entrepôts & emplacements
+            </h1>
+            <StockSyncStatusBadge />
+          </div>
           <p className="text-sm text-gray-500">
             Structure physique : entrepôt → zone → allée → rayon → case (UC-S02).
           </p>

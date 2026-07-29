@@ -8,6 +8,7 @@ import {
 import { RequireStockAccess } from "../../components/RequireStockAccess";
 import { useStockAccess } from "../../hooks/useStockAccess";
 import { useInventories } from "../hooks/useInventory";
+import { StockSyncStatusBadge } from "../../offline";
 import {
   INVENTORY_STATUS_LABELS,
   INVENTORY_TYPE_LABELS,
@@ -109,9 +110,12 @@ export default function InventoryListPage() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-              Inventaires physiques
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
+                Inventaires physiques
+              </h1>
+              <StockSyncStatusBadge />
+            </div>
             <p className="text-sm text-gray-500">
               Comptage total ou tournant, écarts et ajustements (UC-S06).
             </p>

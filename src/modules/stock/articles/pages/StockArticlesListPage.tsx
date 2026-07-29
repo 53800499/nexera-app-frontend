@@ -9,6 +9,7 @@ import {
 } from "@/shared/components/feedback";
 import { RequireStockAccess } from "../../components/RequireStockAccess";
 import { StockArticlesTable } from "../components/StockArticlesTable";
+import { StockSyncStatusBadge } from "../../offline";
 import { useStockAccess } from "../../hooks/useStockAccess";
 import { useStockArticles } from "../../hooks/useStock";
 
@@ -23,9 +24,12 @@ export default function StockArticlesListPage() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-              Articles stock
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
+                Articles stock
+              </h1>
+              <StockSyncStatusBadge />
+            </div>
             <p className="text-sm text-gray-500">
               Configuration stock des articles catalogue (UC-S01).
             </p>

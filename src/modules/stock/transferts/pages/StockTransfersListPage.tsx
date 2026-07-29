@@ -8,6 +8,7 @@ import {
 import { RequireStockAccess } from "../../components/RequireStockAccess";
 import { useStockAccess } from "../../hooks/useStockAccess";
 import { useStockTransfers } from "../../hooks/useStock";
+import { StockSyncStatusBadge } from "../../offline";
 import { STOCK_TRANSFER_STATUS_LABELS } from "../../mouvements/utils/movementLabels";
 import type { StockTransfer, StockTransferStatus } from "../../types/stock.types";
 
@@ -109,9 +110,12 @@ export default function StockTransfersListPage() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-              Transferts inter-entrepôts
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
+                Transferts inter-entrepôts
+              </h1>
+              <StockSyncStatusBadge />
+            </div>
             <p className="text-sm text-gray-500">
               Mouvement en deux temps : sortie source puis entrée destination
               (UC-S05).

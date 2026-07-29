@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import { ResultIcon } from "./ActionFeedbackIcons";
@@ -7,6 +8,7 @@ import { useActionFeedbackStore } from "./actionFeedbackStore";
 import type { ActionResultVariant } from "./types";
 
 const resultButtonStyles: Record<ActionResultVariant, string> = {
+  brand: "bg-brand-500 hover:bg-brand-600 text-white",
   success: "bg-success-500 hover:bg-success-600 text-white",
   error: "bg-error-500 hover:bg-error-600 text-white",
 };
@@ -14,6 +16,16 @@ const resultButtonStyles: Record<ActionResultVariant, string> = {
 export function ActionResultDialog() {
   const resultDialog = useActionFeedbackStore((state) => state.resultDialog);
   const closeResult = useActionFeedbackStore((state) => state.closeResult);
+
+  useEffect(() => {
+    if (!resultDialog?.isOpen || !resultDialog.autoCloseMs) return;
+
+    const timer = setTimeout(() => {
+      closeResult();
+    }, resultDialog.autoCloseMs);
+
+    return () => clearTimeout(timer);
+  }, [resultDialog?.isOpen, resultDialog?.autoCloseMs, closeResult]);
 
   if (!resultDialog?.isOpen) return null;
 

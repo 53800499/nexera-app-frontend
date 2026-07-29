@@ -11,6 +11,7 @@ import {
 import { RequireStockAccess } from "../../components/RequireStockAccess";
 import { useStockAccess } from "../../hooks/useStockAccess";
 import { useReplenishments, useStockAlerts } from "../hooks/useAlerts";
+import { StockSyncStatusBadge } from "../../offline";
 import type { StockAlert, StockAlertType } from "../types/alerts.types";
 import {
   ALERT_STATUS_LABELS,
@@ -71,9 +72,12 @@ export default function StockAlertsPage() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-              Alertes & réapprovisionnement
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
+                Alertes & réapprovisionnement
+              </h1>
+              <StockSyncStatusBadge />
+            </div>
             <p className="text-sm text-gray-500">
               Seuils, péremption, dormants et demandes d&apos;achat internes
               (UC-S07).

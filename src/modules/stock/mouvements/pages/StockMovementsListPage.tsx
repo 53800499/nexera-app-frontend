@@ -9,6 +9,7 @@ import {
 import { RequireStockAccess } from "../../components/RequireStockAccess";
 import { useStockAccess } from "../../hooks/useStockAccess";
 import { useStockEntries, useStockExits } from "../../hooks/useStock";
+import { StockSyncStatusBadge } from "../../offline";
 import {
   STOCK_MOVEMENT_STATUS_LABELS,
   STOCK_MOVEMENT_TYPE_LABELS,
@@ -100,9 +101,12 @@ export default function StockMovementsListPage() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-              Mouvements de stock
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
+                Mouvements de stock
+              </h1>
+              <StockSyncStatusBadge />
+            </div>
             <p className="text-sm text-gray-500">
               Entrées (UC-S03) et sorties (UC-S04).
             </p>

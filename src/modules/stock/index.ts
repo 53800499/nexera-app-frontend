@@ -21,3 +21,12 @@ export {
 } from "./inventory";
 export { StockAlertsPage } from "./alerts";
 export { StockValuationPage } from "./valuation";
+export {
+  StockOfflineProvider,
+  StockSyncStatusBadge,
+  useStockSync,
+  stockOfflineService,
+  inventoryOfflineService,
+  alertsOfflineService,
+  valuationOfflineService,
+} from "./offline";

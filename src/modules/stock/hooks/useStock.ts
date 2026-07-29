@@ -2,7 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryEnabled } from "@/shared/hooks/useQueryEnabled";
-import { stockApi } from "../services/stockApi.service";
+import { stockOfflineService } from "../offline/services/stockOffline.service";
+import { refreshStockSyncMeta } from "../offline/services/stockSyncActions";
+import { useStockSyncStore } from "../offline/store/stockSyncStore";
+
 import type {
   CreateStockItemPayload,
   CreateWarehouseLocationPayload,
@@ -22,25 +25,43 @@ export const STOCK_ENTRIES_KEY = ["stock", "entries"] as const;
 export const STOCK_EXITS_KEY = ["stock", "exits"] as const;
 export const STOCK_TRANSFERS_KEY = ["stock", "transfers"] as const;
 
+function stockQueryOptions(isOffline: boolean) {
+  return {
+    networkMode: "always" as const,
+    retry: false,
+    staleTime: isOffline ? Number.POSITIVE_INFINITY : 0,
+    refetchOnMount: isOffline ? false : ("always" as const),
+    refetchOnReconnect: true,
+  };
+}
+
+const stockMutationOptions = {
+  networkMode: "always" as const,
+};
+
 export function useStockArticles(q?: string) {
   const queryEnabled = useQueryEnabled();
+  const isOffline = useStockSyncStore((state) => state.isOffline);
   const search = q?.trim() ?? "";
 
   return useQuery({
     queryKey: [...STOCK_ARTICLES_KEY, search],
-    queryFn: () => stockApi.listArticles(search || undefined),
+    queryFn: () => stockOfflineService.listArticles(search || undefined),
     enabled: queryEnabled,
+    ...stockQueryOptions(isOffline),
     placeholderData: (previous) => previous,
   });
 }
 
 export function useStockByCatalogItem(catalogItemId: string) {
   const queryEnabled = useQueryEnabled(Boolean(catalogItemId));
+  const isOffline = useStockSyncStore((state) => state.isOffline);
 
   return useQuery({
     queryKey: ["stock", "by-catalog", catalogItemId],
-    queryFn: () => stockApi.getByCatalogItem(catalogItemId),
+    queryFn: () => stockOfflineService.getByCatalogItem(catalogItemId),
     enabled: queryEnabled,
+    ...stockQueryOptions(isOffline),
   });
 }
 
@@ -48,29 +69,33 @@ export function useStockItemMutations() {
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
+    ...stockMutationOptions,
     mutationFn: (payload: CreateStockItemPayload) =>
-      stockApi.createItem(payload),
+      stockOfflineService.createItem(payload),
     onSuccess: (item) => {
       queryClient.invalidateQueries({ queryKey: STOCK_ARTICLES_KEY });
       queryClient.invalidateQueries({
         queryKey: ["stock", "by-catalog", item.commercialItemId],
       });
+      void refreshStockSyncMeta();
     },
   });
 
   const updateMutation = useMutation({
+    ...stockMutationOptions,
     mutationFn: ({
       id,
       payload,
     }: {
       id: string;
       payload: UpdateStockItemPayload;
-    }) => stockApi.updateItem(id, payload),
+    }) => stockOfflineService.updateItem(id, payload),
     onSuccess: (item) => {
       queryClient.invalidateQueries({ queryKey: STOCK_ARTICLES_KEY });
       queryClient.invalidateQueries({
         queryKey: ["stock", "by-catalog", item.commercialItemId],
       });
+      void refreshStockSyncMeta();
     },
   });
 
@@ -80,61 +105,71 @@ export function useStockItemMutations() {
 export function useWarehouses(includeArchived = true) {
   const queryClient = useQueryClient();
   const queryEnabled = useQueryEnabled();
+  const isOffline = useStockSyncStore((state) => state.isOffline);
 
   const warehousesQuery = useQuery({
     queryKey: [...STOCK_WAREHOUSES_KEY, includeArchived],
-    queryFn: () => stockApi.listWarehouses(includeArchived),
+    queryFn: () => stockOfflineService.listWarehouses(includeArchived),
     enabled: queryEnabled,
+    ...stockQueryOptions(isOffline),
   });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: STOCK_WAREHOUSES_KEY });
+    void refreshStockSyncMeta();
   };
 
   const createWarehouseMutation = useMutation({
+    ...stockMutationOptions,
     mutationFn: (payload: CreateWarehousePayload) =>
-      stockApi.createWarehouse(payload),
+      stockOfflineService.createWarehouse(payload),
     onSuccess: invalidate,
   });
 
   const updateWarehouseMutation = useMutation({
+    ...stockMutationOptions,
     mutationFn: ({
       id,
       payload,
     }: {
       id: string;
       payload: UpdateWarehousePayload;
-    }) => stockApi.updateWarehouse(id, payload),
+    }) => stockOfflineService.updateWarehouse(id, payload),
     onSuccess: invalidate,
   });
 
   const setDefaultMutation = useMutation({
-    mutationFn: (id: string) => stockApi.setDefaultWarehouse(id),
+    ...stockMutationOptions,
+    mutationFn: (id: string) => stockOfflineService.setDefaultWarehouse(id),
     onSuccess: invalidate,
   });
 
   const archiveMutation = useMutation({
-    mutationFn: (id: string) => stockApi.archiveWarehouse(id),
+    ...stockMutationOptions,
+    mutationFn: (id: string) => stockOfflineService.archiveWarehouse(id),
     onSuccess: invalidate,
   });
 
   const reactivateMutation = useMutation({
-    mutationFn: (id: string) => stockApi.reactivateWarehouse(id),
+    ...stockMutationOptions,
+    mutationFn: (id: string) => stockOfflineService.reactivateWarehouse(id),
     onSuccess: invalidate,
   });
 
   const createLocationMutation = useMutation({
+    ...stockMutationOptions,
     mutationFn: ({
       warehouseId,
       payload,
     }: {
       warehouseId: string;
       payload: CreateWarehouseLocationPayload;
-    }) => stockApi.createLocation(warehouseId, payload),
+    }) => stockOfflineService.createLocation(warehouseId, payload),
     onSuccess: invalidate,
   });
 
   const updateLocationMutation = useMutation({
+    ...stockMutationOptions,
     mutationFn: ({
       warehouseId,
       locationId,
@@ -143,7 +178,7 @@ export function useWarehouses(includeArchived = true) {
       warehouseId: string;
       locationId: string;
       payload: UpdateWarehouseLocationPayload;
-    }) => stockApi.updateLocation(warehouseId, locationId, payload),
+    }) => stockOfflineService.updateLocation(warehouseId, locationId, payload),
     onSuccess: invalidate,
   });
 
@@ -162,29 +197,35 @@ export function useWarehouses(includeArchived = true) {
 export function useStockEntries() {
   const queryClient = useQueryClient();
   const queryEnabled = useQueryEnabled();
+  const isOffline = useStockSyncStore((state) => state.isOffline);
 
   const entriesQuery = useQuery({
     queryKey: STOCK_ENTRIES_KEY,
-    queryFn: () => stockApi.listEntries(),
+    queryFn: () => stockOfflineService.listEntries(),
     enabled: queryEnabled,
+    ...stockQueryOptions(isOffline),
   });
 
   const createEntryMutation = useMutation({
+    ...stockMutationOptions,
     mutationFn: (payload: CreateStockEntryPayload) =>
-      stockApi.createEntry(payload),
+      stockOfflineService.createEntry(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: STOCK_ENTRIES_KEY });
       queryClient.invalidateQueries({ queryKey: STOCK_ARTICLES_KEY });
+      void refreshStockSyncMeta();
     },
   });
 
   const validateEntryMutation = useMutation({
-    mutationFn: (id: string) => stockApi.validateEntry(id),
+    ...stockMutationOptions,
+    mutationFn: (id: string) => stockOfflineService.validateEntry(id),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: STOCK_ENTRIES_KEY });
       queryClient.invalidateQueries({ queryKey: STOCK_EXITS_KEY });
       queryClient.invalidateQueries({ queryKey: ["stock", "movements", id] });
       queryClient.invalidateQueries({ queryKey: STOCK_ARTICLES_KEY });
+      void refreshStockSyncMeta();
     },
   });
 
@@ -194,19 +235,23 @@ export function useStockEntries() {
 export function useStockExits() {
   const queryClient = useQueryClient();
   const queryEnabled = useQueryEnabled();
+  const isOffline = useStockSyncStore((state) => state.isOffline);
 
   const exitsQuery = useQuery({
     queryKey: STOCK_EXITS_KEY,
-    queryFn: () => stockApi.listExits(),
+    queryFn: () => stockOfflineService.listExits(),
     enabled: queryEnabled,
+    ...stockQueryOptions(isOffline),
   });
 
   const createExitMutation = useMutation({
+    ...stockMutationOptions,
     mutationFn: (payload: CreateStockExitPayload) =>
-      stockApi.createExit(payload),
+      stockOfflineService.createExit(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: STOCK_EXITS_KEY });
       queryClient.invalidateQueries({ queryKey: STOCK_ARTICLES_KEY });
+      void refreshStockSyncMeta();
     },
   });
 
@@ -216,26 +261,31 @@ export function useStockExits() {
 export function useStockTransfers() {
   const queryClient = useQueryClient();
   const queryEnabled = useQueryEnabled();
+  const isOffline = useStockSyncStore((state) => state.isOffline);
 
   const transfersQuery = useQuery({
     queryKey: STOCK_TRANSFERS_KEY,
-    queryFn: () => stockApi.listTransfers(),
+    queryFn: () => stockOfflineService.listTransfers(),
     enabled: queryEnabled,
+    ...stockQueryOptions(isOffline),
   });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: STOCK_TRANSFERS_KEY });
     queryClient.invalidateQueries({ queryKey: STOCK_ARTICLES_KEY });
+    void refreshStockSyncMeta();
   };
 
   const createTransferMutation = useMutation({
+    ...stockMutationOptions,
     mutationFn: (payload: CreateStockTransferPayload) =>
-      stockApi.createTransfer(payload),
+      stockOfflineService.createTransfer(payload),
     onSuccess: () => invalidate(),
   });
 
   const submitTransferMutation = useMutation({
-    mutationFn: (id: string) => stockApi.submitTransfer(id),
+    ...stockMutationOptions,
+    mutationFn: (id: string) => stockOfflineService.submitTransfer(id),
     onSuccess: (_, id) => {
       invalidate();
       queryClient.invalidateQueries({ queryKey: ["stock", "transfers", id] });
@@ -243,7 +293,8 @@ export function useStockTransfers() {
   });
 
   const shipTransferMutation = useMutation({
-    mutationFn: (id: string) => stockApi.shipTransfer(id),
+    ...stockMutationOptions,
+    mutationFn: (id: string) => stockOfflineService.shipTransfer(id),
     onSuccess: (_, id) => {
       invalidate();
       queryClient.invalidateQueries({ queryKey: ["stock", "transfers", id] });
@@ -251,13 +302,14 @@ export function useStockTransfers() {
   });
 
   const receiveTransferMutation = useMutation({
+    ...stockMutationOptions,
     mutationFn: ({
       id,
       payload,
     }: {
       id: string;
       payload: ReceiveStockTransferPayload;
-    }) => stockApi.receiveTransfer(id, payload),
+    }) => stockOfflineService.receiveTransfer(id, payload),
     onSuccess: (_, { id }) => {
       invalidate();
       queryClient.invalidateQueries({ queryKey: ["stock", "transfers", id] });
@@ -265,7 +317,8 @@ export function useStockTransfers() {
   });
 
   const cancelTransferMutation = useMutation({
-    mutationFn: (id: string) => stockApi.cancelTransfer(id),
+    ...stockMutationOptions,
+    mutationFn: (id: string) => stockOfflineService.cancelTransfer(id),
     onSuccess: (_, id) => {
       invalidate();
       queryClient.invalidateQueries({ queryKey: ["stock", "transfers", id] });
@@ -284,19 +337,25 @@ export function useStockTransfers() {
 
 export function useStockTransfer(id: string) {
   const queryEnabled = useQueryEnabled(Boolean(id));
+  const isOffline = useStockSyncStore((state) => state.isOffline);
+
   return useQuery({
     queryKey: ["stock", "transfers", id],
-    queryFn: () => stockApi.getTransfer(id),
+    queryFn: () => stockOfflineService.getTransfer(id),
     enabled: queryEnabled,
+    ...stockQueryOptions(isOffline),
   });
 }
 
 export function useStockMovement(id: string) {
   const queryEnabled = useQueryEnabled(Boolean(id));
+  const isOffline = useStockSyncStore((state) => state.isOffline);
+
   return useQuery({
     queryKey: ["stock", "movements", id],
-    queryFn: () => stockApi.getMovement(id),
+    queryFn: () => stockOfflineService.getMovement(id),
     enabled: queryEnabled,
+    ...stockQueryOptions(isOffline),
   });
 }
 
@@ -304,9 +363,12 @@ export function useAvailableLots(stockItemId: string, warehouseId: string) {
   const queryEnabled = useQueryEnabled(
     Boolean(stockItemId) && Boolean(warehouseId),
   );
+  const isOffline = useStockSyncStore((state) => state.isOffline);
+
   return useQuery({
     queryKey: ["stock", "available-lots", stockItemId, warehouseId],
-    queryFn: () => stockApi.listAvailableLots(stockItemId, warehouseId),
+    queryFn: () => stockOfflineService.listAvailableLots(stockItemId, warehouseId),
     enabled: queryEnabled,
+    ...stockQueryOptions(isOffline),
   });
 }

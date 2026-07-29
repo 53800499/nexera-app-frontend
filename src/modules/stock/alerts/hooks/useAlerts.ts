@@ -2,11 +2,28 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryEnabled } from "@/shared/hooks/useQueryEnabled";
-import { alertsApi } from "../services/alertsApi.service";
+import { alertsOfflineService } from "../../offline/services/alertsOffline.service";
+import { refreshStockSyncMeta } from "../../offline/services/stockSyncActions";
+import { useStockSyncStore } from "../../offline/store/stockSyncStore";
+
 import type { StockAlertStatus, StockAlertType } from "../types/alerts.types";
 
 export const ALERTS_KEY = ["stock", "alerts"] as const;
 export const REPLENISHMENTS_KEY = ["stock", "replenishments"] as const;
+
+function stockQueryOptions(isOffline: boolean) {
+  return {
+    networkMode: "always" as const,
+    retry: false,
+    staleTime: isOffline ? Number.POSITIVE_INFINITY : 0,
+    refetchOnMount: isOffline ? false : ("always" as const),
+    refetchOnReconnect: true,
+  };
+}
+
+const stockMutationOptions = {
+  networkMode: "always" as const,
+};
 
 export function useStockAlerts(filters?: {
   status?: StockAlertStatus;
@@ -14,42 +31,50 @@ export function useStockAlerts(filters?: {
 }) {
   const queryClient = useQueryClient();
   const queryEnabled = useQueryEnabled();
+  const isOffline = useStockSyncStore((state) => state.isOffline);
 
   const alertsQuery = useQuery({
     queryKey: [...ALERTS_KEY, filters?.status ?? "", filters?.alertType ?? ""],
-    queryFn: () => alertsApi.list(filters),
+    queryFn: () => alertsOfflineService.list(filters),
     enabled: queryEnabled,
+    ...stockQueryOptions(isOffline),
   });
 
   const summaryQuery = useQuery({
     queryKey: [...ALERTS_KEY, "summary"],
-    queryFn: () => alertsApi.summary(),
+    queryFn: () => alertsOfflineService.summary(),
     enabled: queryEnabled,
+    ...stockQueryOptions(isOffline),
   });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ALERTS_KEY });
     queryClient.invalidateQueries({ queryKey: REPLENISHMENTS_KEY });
+    void refreshStockSyncMeta();
   };
 
   const scanMutation = useMutation({
-    mutationFn: (dormantDays?: number) => alertsApi.scan(dormantDays),
+    ...stockMutationOptions,
+    mutationFn: (dormantDays?: number) => alertsOfflineService.scan(dormantDays),
     onSuccess: invalidate,
   });
 
   const acknowledgeMutation = useMutation({
-    mutationFn: (id: string) => alertsApi.acknowledge(id),
+    ...stockMutationOptions,
+    mutationFn: (id: string) => alertsOfflineService.acknowledge(id),
     onSuccess: invalidate,
   });
 
   const dismissMutation = useMutation({
-    mutationFn: (id: string) => alertsApi.dismiss(id),
+    ...stockMutationOptions,
+    mutationFn: (id: string) => alertsOfflineService.dismiss(id),
     onSuccess: invalidate,
   });
 
   const createReplenishmentMutation = useMutation({
+    ...stockMutationOptions,
     mutationFn: (payload: { alertId: string; qtyProposed?: number }) =>
-      alertsApi.createReplenishment(payload),
+      alertsOfflineService.createReplenishment(payload),
     onSuccess: invalidate,
   });
 
@@ -66,26 +91,31 @@ export function useStockAlerts(filters?: {
 export function useReplenishments() {
   const queryClient = useQueryClient();
   const queryEnabled = useQueryEnabled();
+  const isOffline = useStockSyncStore((state) => state.isOffline);
 
   const listQuery = useQuery({
     queryKey: REPLENISHMENTS_KEY,
-    queryFn: () => alertsApi.listReplenishments(),
+    queryFn: () => alertsOfflineService.listReplenishments(),
     enabled: queryEnabled,
+    ...stockQueryOptions(isOffline),
   });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: REPLENISHMENTS_KEY });
     queryClient.invalidateQueries({ queryKey: ALERTS_KEY });
+    void refreshStockSyncMeta();
   };
 
   const approveMutation = useMutation({
-    mutationFn: (id: string) => alertsApi.approveReplenishment(id),
+    ...stockMutationOptions,
+    mutationFn: (id: string) => alertsOfflineService.approveReplenishment(id),
     onSuccess: invalidate,
   });
 
   const rejectMutation = useMutation({
+    ...stockMutationOptions,
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
-      alertsApi.rejectReplenishment(id, reason),
+      alertsOfflineService.rejectReplenishment(id, reason),
     onSuccess: invalidate,
   });
 

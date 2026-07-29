@@ -1,6 +1,6 @@
 export type ActionConfirmVariant = "default" | "danger" | "warning";
 
-export type ActionResultVariant = "success" | "error";
+export type ActionResultVariant = "success" | "error" | "brand";
 
 export type ActionConfirmOptions = {
   title: string;
@@ -15,6 +15,7 @@ export type ActionResultOptions = {
   title: string;
   message?: string;
   closeLabel?: string;
+  autoCloseMs?: number;
 };
 
 export type RunActionOptions<T> = {

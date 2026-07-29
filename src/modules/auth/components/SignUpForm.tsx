@@ -54,14 +54,21 @@ export default function SignUpForm() {
 
   const onSubmit = handleSubmit(async (values) => {
     clearError();
-    await registerUser({
-      firstName: values.firstName,
-      lastName: values.lastName,
-      email: values.email,
-      password: values.password,
-      tenantName: values.tenantName,
-      tenantType: values.tenantType,
-    });
+    try {
+      const redirectPath = await registerUser({
+        firstName: values.firstName,
+        lastName: values.lastName,
+        email: values.email,
+        password: values.password,
+        tenantName: values.tenantName,
+        tenantType: values.tenantType,
+      });
+      if (redirectPath) {
+        window.location.assign(redirectPath);
+      }
+    } catch {
+      // L'erreur est gérée par useAuth et affichée dans l'alerte
+    }
   });
 
   return (
