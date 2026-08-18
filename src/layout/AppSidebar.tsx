@@ -54,12 +54,11 @@ const AppSidebar: React.FC = () => {
   return (
     <aside
       className={`fixed top-0 left-0 z-50 mt-16 flex h-screen flex-col border-r border-gray-200 border-l-4 border-l-brand-500 bg-white px-5 text-gray-900 transition-all duration-300 ease-in-out dark:border-gray-800 dark:bg-gray-900 lg:mt-0
-        ${
-          isExpanded || isMobileOpen
+        ${isExpanded || isMobileOpen
+          ? "w-[290px]"
+          : isHovered
             ? "w-[290px]"
-            : isHovered
-              ? "w-[290px]"
-              : "w-[90px]"
+            : "w-[90px]"
         }
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0`}
@@ -67,9 +66,8 @@ const AppSidebar: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`flex flex-col py-8 ${
-          !isExpanded && !isHovered ? "lg:items-center" : "items-start"
-        }`}
+        className={`flex flex-col py-8 ${!isExpanded && !isHovered ? "lg:items-center" : "items-start"
+          }`}
       >
         <Link href={homeHref} className="block">
           {showLabels ? (
@@ -84,11 +82,10 @@ const AppSidebar: React.FC = () => {
           <div className="flex flex-col gap-4">
             <div>
               <h2
-                className={`mb-4 flex text-xs leading-[20px] text-gray-400 uppercase ${
-                  !isExpanded && !isHovered
+                className={`mb-4 flex text-xs leading-[20px] text-gray-400 uppercase ${!isExpanded && !isHovered
                     ? "lg:justify-center"
                     : "justify-start"
-                }`}
+                  }`}
               >
                 {showLabels ? "Menu" : <HorizontaLDots />}
               </h2>
@@ -104,11 +101,10 @@ const AppSidebar: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => toggleSubmenu(nav.name)}
-                          className={`menu-item group w-full ${
-                            active
+                          className={`menu-item group w-full ${active
                               ? "menu-item-active"
                               : "menu-item-inactive"
-                          }`}
+                            }`}
                         >
                           <span
                             className={
@@ -125,11 +121,10 @@ const AppSidebar: React.FC = () => {
                                 {nav.name}
                               </span>
                               <ChevronDownIcon
-                                className={`ml-auto size-5 transition-transform duration-200 ${
-                                  isOpen
+                                className={`ml-auto size-5 transition-transform duration-200 ${isOpen
                                     ? "menu-item-arrow-active"
                                     : "menu-item-arrow-inactive"
-                                }`}
+                                  }`}
                               />
                             </>
                           ) : null}
@@ -142,11 +137,10 @@ const AppSidebar: React.FC = () => {
                                 <li key={sub.path}>
                                   <Link
                                     href={sub.path}
-                                    className={`menu-dropdown-item ${
-                                      subActive
+                                    className={`menu-dropdown-item ${subActive
                                         ? "menu-dropdown-item-active"
                                         : "menu-dropdown-item-inactive"
-                                    }`}
+                                      }`}
                                   >
                                     {sub.name}
                                   </Link>
@@ -164,11 +158,10 @@ const AppSidebar: React.FC = () => {
                       <Link
                         href={nav.path}
                         onClick={closeSubmenu}
-                        className={`menu-item group ${
-                          active
+                        className={`menu-item group ${active
                             ? "menu-item-active"
                             : "menu-item-inactive"
-                        }`}
+                          }`}
                       >
                         <span
                           className={

@@ -28,9 +28,12 @@ export async function authorizedFetch<T>(
     typeof (options.headers as Record<string, string> | undefined)?.["x-auth-retried"] ===
     "string";
 
+  const wireHeaders = { ...headers };
+  delete wireHeaders["x-auth-retried"];
+
   const response = await fetchWithOfflineGuard(`${env.apiBaseUrl}${path}`, {
     ...options,
-    headers,
+    headers: wireHeaders,
   });
 
   if (response.status === 401 && path !== "/auth/refresh" && !alreadyRetried) {

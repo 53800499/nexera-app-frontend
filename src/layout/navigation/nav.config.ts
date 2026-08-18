@@ -103,6 +103,25 @@ export const MAIN_NAV_CONFIG: NavItemConfig[] = [
     path: "/roles",
     canAccess: (p) => p.roles,
   },
+  {
+    id: "rh",
+    name: "RH & Paie",
+    iconKey: "group",
+    path: "/rh",
+    canAccess: (p) => p.rh,
+    subItems: [
+      { name: "Tableau de Bord", path: "/rh" },
+      { name: "Salariés & Dossiers", path: "/rh/employes" },
+      { name: "Contrats & Carrières", path: "/rh/contrats" },
+      { name: "Temps & Congés", path: "/rh/temps-absences" },
+      { name: "Cycles de Paie", path: "/rh/paie" },
+      { name: "Bulletins de Paie", path: "/rh/bulletins" },
+      { name: "Solde de Tout Compte", path: "/rh/solde-tout-compte" },
+      { name: "Déclarations Fiscales & Sociales", path: "/rh/declarations" },
+      { name: "Comptabilisation Paie (OD)", path: "/rh/comptabilite" },
+      { name: "Paramètres RH & Barèmes", path: "/rh/parametres" },
+    ],
+  },
 ];
 
 export function getEmailTemplateLabel(type: string): string | undefined {

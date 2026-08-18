@@ -32,6 +32,17 @@ export const PERMISSION_CODES = {
   MANAGE_ROLES: "manage:roles",
   MANAGE_PERMISSIONS: "manage:permissions",
   CABINET_READ: "cabinet.read",
+  RH_READ: "rh.read",
+  MANAGE_RH: "manage:rh",
+  RH_EMPLOYEES_MANAGE: "rh.employees.manage",
+  RH_CONTRACTS_MANAGE: "rh.contracts.manage",
+  RH_LEAVES_REQUEST: "rh.leaves.request",
+  RH_LEAVES_VALIDATE: "rh.leaves.validate",
+  RH_TIMESHEETS_MANAGE: "rh.timesheets.manage",
+  RH_PAYROLL_CALCULATE: "rh.payroll.calculate",
+  RH_PAYROLL_VALIDATE: "rh.payroll.validate",
+  RH_DECLARATIONS_MANAGE: "rh.declarations.manage",
+  RH_ACCOUNTING_EXPORT: "rh.accounting.export",
 } as const;
 
 export function hasPermissionCode(
@@ -178,3 +189,89 @@ export function canManageStock(user: Pick<AuthUser, "permissions"> | null) {
 export function canReadCabinet(user: Pick<AuthUser, "permissions"> | null) {
   return hasPermissionCode(user, PERMISSION_CODES.CABINET_READ);
 }
+
+export function canReadRh(user: Pick<AuthUser, "permissions"> | null) {
+  return hasAnyPermissionCode(user, [
+    PERMISSION_CODES.RH_READ,
+    PERMISSION_CODES.MANAGE_RH,
+    PERMISSION_CODES.RH_EMPLOYEES_MANAGE,
+    PERMISSION_CODES.RH_PAYROLL_CALCULATE,
+  ]);
+}
+
+export function canManageRh(user: Pick<AuthUser, "permissions"> | null) {
+  return hasPermissionCode(user, PERMISSION_CODES.MANAGE_RH);
+}
+
+export function canManageEmployees(user: Pick<AuthUser, "permissions"> | null) {
+  return hasAnyPermissionCode(user, [
+    PERMISSION_CODES.MANAGE_RH,
+    PERMISSION_CODES.RH_EMPLOYEES_MANAGE,
+  ]);
+}
+
+export function canManagePayroll(user: Pick<AuthUser, "permissions"> | null) {
+  return hasAnyPermissionCode(user, [
+    PERMISSION_CODES.MANAGE_RH,
+    PERMISSION_CODES.RH_PAYROLL_CALCULATE,
+    PERMISSION_CODES.RH_PAYROLL_VALIDATE,
+  ]);
+}
+
+export function canManageContracts(user: Pick<AuthUser, "permissions"> | null) {
+  return hasAnyPermissionCode(user, [
+    PERMISSION_CODES.MANAGE_RH,
+    PERMISSION_CODES.RH_CONTRACTS_MANAGE,
+  ]);
+}
+
+export function canRequestLeaves(user: Pick<AuthUser, "permissions"> | null) {
+  return hasAnyPermissionCode(user, [
+    PERMISSION_CODES.MANAGE_RH,
+    PERMISSION_CODES.RH_LEAVES_REQUEST,
+  ]);
+}
+
+export function canValidateLeaves(user: Pick<AuthUser, "permissions"> | null) {
+  return hasAnyPermissionCode(user, [
+    PERMISSION_CODES.MANAGE_RH,
+    PERMISSION_CODES.RH_LEAVES_VALIDATE,
+  ]);
+}
+
+export function canManageTimesheets(user: Pick<AuthUser, "permissions"> | null) {
+  return hasAnyPermissionCode(user, [
+    PERMISSION_CODES.MANAGE_RH,
+    PERMISSION_CODES.RH_TIMESHEETS_MANAGE,
+  ]);
+}
+
+export function canCalculatePayroll(user: Pick<AuthUser, "permissions"> | null) {
+  return hasAnyPermissionCode(user, [
+    PERMISSION_CODES.MANAGE_RH,
+    PERMISSION_CODES.RH_PAYROLL_CALCULATE,
+  ]);
+}
+
+export function canValidatePayroll(user: Pick<AuthUser, "permissions"> | null) {
+  return hasAnyPermissionCode(user, [
+    PERMISSION_CODES.MANAGE_RH,
+    PERMISSION_CODES.RH_PAYROLL_VALIDATE,
+  ]);
+}
+
+export function canManageDeclarations(user: Pick<AuthUser, "permissions"> | null) {
+  return hasAnyPermissionCode(user, [
+    PERMISSION_CODES.MANAGE_RH,
+    PERMISSION_CODES.RH_DECLARATIONS_MANAGE,
+  ]);
+}
+
+export function canExportAccounting(user: Pick<AuthUser, "permissions"> | null) {
+  return hasAnyPermissionCode(user, [
+    PERMISSION_CODES.MANAGE_RH,
+    PERMISSION_CODES.RH_ACCOUNTING_EXPORT,
+  ]);
+}
+
+
