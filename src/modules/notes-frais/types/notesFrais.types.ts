@@ -178,6 +178,13 @@ export interface NdfAvanceFrais {
   dateVersement: string;
   montantRegularise: number;
   statut: NdfAvanceStatut;
+  employe?: {
+    id: string;
+    matricule: string;
+    nom: string;
+    prenoms: string;
+    emailProfessionnel?: string | null;
+  };
   mission?: NdfMission;
   createdAt: string;
   updatedAt: string;
@@ -248,6 +255,7 @@ export interface NdfDepense {
   depasseSeuilEspeceLegal: boolean;
   depassePolitique: boolean;
   statut: NdfDepenseStatut;
+  rapportFrais?: NdfRapportFrais;
   categorieDepense?: NdfCategorieDepense;
   depenseKilometrique?: NdfDepenseKilometrique | null;
   depensePerDiem?: NdfDepensePerDiem | null;

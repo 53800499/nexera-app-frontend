@@ -268,7 +268,9 @@ export const MissionsAvancesView: React.FC = () => {
                         {new Date(av.dateVersement).toLocaleDateString("fr-FR")}
                       </td>
                       <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                        {av.employe ? `${av.employe.nom} ${av.employe.prenoms}` : "—"}
+                        {av.employe?.nom
+                          ? `${av.employe.nom} ${av.employe.prenoms}`
+                          : "—"}
                       </td>
                       <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
                         {av.mission?.objet || "—"}
