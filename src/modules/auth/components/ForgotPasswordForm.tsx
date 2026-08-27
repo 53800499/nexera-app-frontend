@@ -16,6 +16,7 @@ import {
 } from "../schemas/forgotPassword.schema";
 import { passwordApi } from "../services/passwordApi.service";
 import { AppError } from "@/shared/core/AppError";
+import { ApiValidationError } from "@/shared/core/ApiValidationError";
 
 const SUCCESS_MESSAGE =
   "Si un compte existe pour cette adresse, un e-mail de réinitialisation vient d'être envoyé.";
@@ -28,6 +29,7 @@ export default function ForgotPasswordForm() {
   const {
     register,
     handleSubmit,
+    setError: setFieldError,
     formState: { errors },
   } = useForm<ForgotPasswordFormValues>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -42,6 +44,13 @@ export default function ForgotPasswordForm() {
       await passwordApi.forgotPassword(values.email);
       setIsSuccess(true);
     } catch (err) {
+      if (err instanceof ApiValidationError) {
+        Object.entries(err.fieldErrors).forEach(([field, msg]) => {
+          if (field === "email") {
+            setFieldError("email", { type: "server", message: msg });
+          }
+        });
+      }
       const message =
         err instanceof AppError
           ? err.message

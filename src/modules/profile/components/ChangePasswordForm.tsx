@@ -6,6 +6,7 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { useToast } from "@/shared/components/feedback";
+import { ApiValidationError } from "@/shared/core/ApiValidationError";
 import {
   changePasswordSchema,
   type ChangePasswordFormValues,
@@ -22,6 +23,7 @@ export function ChangePasswordForm({ isSubmitting, onSubmit }: Props) {
     register,
     handleSubmit,
     reset,
+    setError: setFieldError,
     formState: { errors },
   } = useForm<ChangePasswordFormValues>({
     resolver: zodResolver(changePasswordSchema),
@@ -38,6 +40,20 @@ export function ChangePasswordForm({ isSubmitting, onSubmit }: Props) {
       reset();
       toast.success("Mot de passe mis à jour");
     } catch (error) {
+      if (error instanceof ApiValidationError) {
+        Object.entries(error.fieldErrors).forEach(([field, msg]) => {
+          if (
+            field === "currentPassword" ||
+            field === "newPassword" ||
+            field === "confirmPassword"
+          ) {
+            setFieldError(field as keyof ChangePasswordFormValues, {
+              type: "server",
+              message: msg,
+            });
+          }
+        });
+      }
       toast.error(
         "Modification impossible",
         error instanceof Error ? error.message : undefined,

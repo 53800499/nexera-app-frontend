@@ -166,6 +166,26 @@ export const rhApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  creerCompteUtilisateur: (employeId: string, payload: any) =>
+    authorizedFetch<any>(`/rh/employes/${employeId}/creer-compte-utilisateur`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  lierUtilisateur: (employeId: string, payload: any) =>
+    authorizedFetch<any>(`/rh/employes/${employeId}/lier-utilisateur`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  delierUtilisateur: (employeId: string) =>
+    authorizedFetch<any>(`/rh/employes/${employeId}/delier-utilisateur`, {
+      method: "DELETE",
+    }),
+  getMonEspaceCollaborateur: () =>
+    authorizedFetch<any>("/rh/employes/me/espace-collaborateur"),
+  listRoles: async () => {
+    const res = await authorizedFetch<any>("/roles");
+    return normalizeArray<any>(res);
+  },
 
   // ---------------- CONTRATS ----------------
   listContrats: async (params?: { employeId?: string; statut?: string; etablissementId?: string }) => {

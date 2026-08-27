@@ -17,6 +17,7 @@ import {
 } from "../schemas/resetPassword.schema";
 import { passwordApi } from "../services/passwordApi.service";
 import { AppError } from "@/shared/core/AppError";
+import { ApiValidationError } from "@/shared/core/ApiValidationError";
 import { useToast } from "@/shared/components/feedback";
 
 export default function ResetPasswordForm() {
@@ -33,6 +34,7 @@ export default function ResetPasswordForm() {
   const {
     register,
     handleSubmit,
+    setError: setFieldError,
     formState: { errors },
   } = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -56,9 +58,19 @@ export default function ResetPasswordForm() {
       );
       router.push(AUTH_ROUTES.signIn);
     } catch (err) {
+      if (err instanceof ApiValidationError) {
+        Object.entries(err.fieldErrors).forEach(([field, msg]) => {
+          if (field === "password" || field === "confirmPassword") {
+            setFieldError(field as keyof ResetPasswordFormValues, {
+              type: "server",
+              message: msg,
+            });
+          }
+        });
+      }
       const message =
         err instanceof AppError
-          ? err.message.includes("Invalid or expired")
+          ? err.message.includes("Invalid or expired") || err.message.includes("invalide ou a expiré")
             ? "Ce lien est invalide ou a expiré. Demandez un nouveau lien."
             : err.message
           : "Impossible de réinitialiser le mot de passe.";

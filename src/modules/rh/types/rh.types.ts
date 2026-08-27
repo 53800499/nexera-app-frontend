@@ -119,12 +119,46 @@ export interface RhEmploye {
   dateSortie?: string;
   statutEmploi: RhEmploymentStatus;
   photoUrl?: string;
+  utilisateurId?: string;
+  utilisateur?: RhEmployeUserAccount;
   coordonneesBancaires?: RhCoordonneeBancaire[];
   affectations?: RhAffectation[];
   contrats?: RhContrat[];
   personnesACharge?: RhPersonneACharge[];
   documentsAdministratifs?: RhDocumentAdministratif[];
   documents?: any[];
+  soldesConges?: any[];
+  bulletinsPaie?: any[];
+  historiquesSalaire?: any[];
+}
+
+export interface RhEmployeUserAccount {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  isActive: boolean;
+  roles?: Array<{
+    id?: string;
+    roleId?: string;
+    role?: {
+      id: string;
+      name: string;
+      code: string;
+      description?: string;
+    };
+  }>;
+}
+
+export interface CreerCompteUtilisateurPayload {
+  email?: string;
+  roleIds?: string[];
+  password?: string;
+  envoyerInvitation?: boolean;
+}
+
+export interface LierCompteUtilisateurPayload {
+  utilisateurId: string;
 }
 
 export interface RhPersonneACharge {

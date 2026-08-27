@@ -4,8 +4,18 @@ import React, { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { rhApi } from "../services/rhApi.service";
 import type { RhDepartement, RhEmploye, RhEtablissement, RhPoste } from "../types/rh.types";
-import { DocsIcon, PlusIcon, PencilIcon, TrashBinIcon } from "@/icons";
+import {
+  DocsIcon,
+  PlusIcon,
+  PencilIcon,
+  TrashBinIcon,
+  LockIcon,
+  UserCircleIcon,
+  CheckCircleIcon,
+  UserIcon,
+} from "@/icons";
 import { useActionFeedback, useToast } from "@/shared/components/feedback";
+import { CreerCompteErpModal } from "./CreerCompteErpModal";
 
 interface Props {
   employe: RhEmploye | null;
@@ -27,11 +37,12 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
   const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<
-    "civil" | "contrat" | "banque" | "famille" | "carriere" | "docs"
+    "civil" | "contrat" | "banque" | "famille" | "carriere" | "docs" | "compte"
   >("civil");
 
   const [employe, setEmploye] = useState<RhEmploye | null>(initialEmploye);
   const [loading, setLoading] = useState(false);
+  const [isCreerCompteOpen, setIsCreerCompteOpen] = useState(false);
 
   // Sub-actions modal forms
   const [isAddBankOpen, setIsAddBankOpen] = useState(false);
@@ -268,6 +279,32 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
     });
   };
 
+  const handleDelierCompte = async () => {
+    if (!employe) return;
+    await runAction({
+      confirm: {
+        title: "Dissocier le compte utilisateur ?",
+        message: `Le compte utilisateur (${employe.utilisateur?.email || "lié"}) ne sera plus associé à la fiche de ${employe.prenoms} ${employe.nom}. Le compte ne sera pas supprimé.`,
+        confirmLabel: "Dissocier",
+        variant: "danger",
+      },
+      loadingMessage: "Dissociation du compte utilisateur...",
+      success: {
+        title: "Compte dissocié",
+        message: "Le compte d'accès ERP a été dissocié du dossier collaborateur.",
+      },
+      error: {
+        title: "Erreur de dissociation",
+        message: "Impossible de dissocier le compte utilisateur.",
+      },
+      action: async () => {
+        await rhApi.delierUtilisateur(employe.id);
+        await refreshEmployeData();
+        onRefresh?.();
+      },
+    });
+  };
+
   const safeEtabs = Array.isArray(etablissements) ? etablissements : [];
   const safeDepts = Array.isArray(departements) ? departements : [];
   const safePostes = Array.isArray(postes) ? postes : [];
@@ -298,6 +335,12 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
                 >
                   {employe.statutEmploi || "ACTIF"}
                 </span>
+                {employe.utilisateur && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-2xs font-semibold text-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
+                    <LockIcon className="h-3 w-3" />
+                    <span>ERP Actif</span>
+                  </span>
+                )}
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 {affectationActuelle?.poste?.intitule || "Poste non défini"} •{" "}
@@ -330,6 +373,10 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
             { id: "famille", label: `Famille & Déductions (${employe.personnesACharge?.length || 0})` },
             { id: "carriere", label: `Carrière & Affectations (${employe.affectations?.length || 0})` },
             { id: "docs", label: `Coffre-fort Documents (${rawDocs.length})` },
+            {
+              id: "compte",
+              label: employe.utilisateur ? "Compte ERP & Accès" : "Compte ERP & Accès",
+            },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -921,6 +968,98 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
               )}
             </div>
           )}
+
+          {/* 7. COMPTE ERP & ACCÈS */}
+          {activeTab === "compte" && (
+            <div className="space-y-6">
+              {employe.utilisateur ? (
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-brand-200 bg-linear-to-r from-brand-50/50 to-white p-5 dark:border-brand-900/40 dark:from-brand-950/20 dark:to-gray-900">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-500 text-white shadow-md">
+                          <UserCircleIcon className="h-7 w-7" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-900 dark:text-white text-base">
+                              {employe.utilisateur.email}
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                              <CheckCircleIcon className="h-3.5 w-3.5" />
+                              <span>{employe.utilisateur.isActive ? "Compte Actif" : "Compte Désactivé"}</span>
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            Compte utilisateur relié au dossier collaborateur
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleDelierCompte}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50/50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100/70 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300 transition-colors"
+                      >
+                        <TrashBinIcon className="h-4 w-4" />
+                        <span>Dissocier le compte</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Rôles et habilitations */}
+                  <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-850 space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      <LockIcon className="h-4 w-4 text-brand-500" />
+                      <span>Rôles & Permissions Attribués</span>
+                    </div>
+
+                    {employe.utilisateur.roles && employe.utilisateur.roles.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {employe.utilisateur.roles.map((r, idx) => (
+                          <div
+                            key={idx}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50/60 px-3 py-1.5 text-xs font-medium text-brand-900 dark:border-brand-900/40 dark:bg-brand-950/30 dark:text-brand-300"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+                            <span>{r.role?.name || r.role?.code || "Rôle standard"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Aucun rôle spécifique attribué (Accès standard).
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50/60 p-8 text-center dark:border-gray-700 dark:bg-gray-850/40 space-y-4">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-950/50 dark:text-brand-400 border border-brand-200/50 dark:border-brand-900/50">
+                    <LockIcon className="h-7 w-7" />
+                  </div>
+                  <div className="max-w-md mx-auto space-y-1">
+                    <h4 className="font-bold text-gray-900 dark:text-white text-base">
+                      Aucun compte d'accès ERP associé
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Ce collaborateur n'a pas encore de compte utilisateur pour se connecter à Nexera (devis, factures, portail salarié).
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsCreerCompteOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-xs font-semibold text-white hover:bg-brand-600 shadow-sm transition-all active:scale-[0.98]"
+                    >
+                      <PlusIcon className="h-4 w-4" />
+                      <span>Créer un compte d'accès ERP</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Pied de page modal */}
@@ -933,6 +1072,19 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
           </button>
         </div>
       </div>
+
+      {/* Modale de création de compte ERP */}
+      {isCreerCompteOpen && (
+        <CreerCompteErpModal
+          isOpen={isCreerCompteOpen}
+          onClose={() => setIsCreerCompteOpen(false)}
+          employe={employe}
+          onSuccess={() => {
+            refreshEmployeData();
+            onRefresh?.();
+          }}
+        />
+      )}
     </Modal>
   );
 };

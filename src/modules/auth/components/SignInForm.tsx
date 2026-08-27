@@ -10,6 +10,7 @@ import { NexeraLogo } from "@/components/brand/NexeraLogo";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useState } from "react";
+import { ApiValidationError } from "@/shared/core/ApiValidationError";
 import { Controller, useForm } from "react-hook-form";
 import { AUTH_ROUTES } from "../constants/routes";
 import { useAuth } from "../hooks/useAuth";
@@ -25,6 +26,7 @@ export default function SignInForm() {
     register,
     control,
     handleSubmit,
+    setError: setFieldError,
     formState: { errors },
   } = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema),
@@ -37,7 +39,17 @@ export default function SignInForm() {
 
   const onSubmit = handleSubmit(async (values) => {
     clearError();
-    await login(values);
+    try {
+      await login(values);
+    } catch (err) {
+      if (err instanceof ApiValidationError) {
+        Object.entries(err.fieldErrors).forEach(([field, msg]) => {
+          if (field === "email" || field === "password") {
+            setFieldError(field, { type: "server", message: msg });
+          }
+        });
+      }
+    }
   });
 
   return (

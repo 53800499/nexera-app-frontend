@@ -6,7 +6,7 @@ import type { RhEmploye } from "../types/rh.types";
 import { EmployeDetail360Modal } from "./EmployeDetail360Modal";
 import { EmployeFormModal } from "./EmployeFormModal";
 import { ContratFormModal } from "./ContratFormModal";
-import { GroupIcon, EyeIcon, PlusIcon, PencilIcon, TrashBinIcon, DocsIcon } from "@/icons";
+import { GroupIcon, EyeIcon, PlusIcon, PencilIcon, TrashBinIcon, DocsIcon, LockIcon } from "@/icons";
 import { useActionFeedback } from "@/shared/components/feedback";
 
 export const EmployeListView: React.FC = () => {
@@ -199,8 +199,17 @@ export const EmployeListView: React.FC = () => {
                             {emp.prenoms?.[0] || ""}
                           </div>
                           <div>
-                            <div className="font-semibold text-gray-900 dark:text-white">
-                              {emp.nom} {emp.prenoms}
+                            <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
+                              <span>{emp.nom} {emp.prenoms}</span>
+                              {emp.utilisateur && (
+                                <span
+                                  title={`Compte ERP Actif (${emp.utilisateur.email})`}
+                                  className="inline-flex items-center gap-0.5 rounded-full bg-blue-50 px-1.5 py-0.5 text-2xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/50 dark:border-blue-900/50"
+                                >
+                                  <LockIcon className="h-2.5 w-2.5" />
+                                  <span>ERP</span>
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs text-gray-500">
                               Entré le {dateEntree ? new Date(dateEntree).toLocaleDateString("fr-FR") : "-"}

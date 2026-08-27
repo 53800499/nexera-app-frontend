@@ -274,4 +274,71 @@ export function canExportAccounting(user: Pick<AuthUser, "permissions"> | null) 
   ]);
 }
 
+// ----------------------------------------------------
+// NOTES DE FRAIS (M5)
+// ----------------------------------------------------
+
+function isNdfAdminOrManager(user: any): boolean {
+  if (!user) return false;
+  return (
+    user.role === "admin" ||
+    user.role === "dirigeant" ||
+    user.roles?.includes("ADMIN") ||
+    user.roles?.includes("CEO") ||
+    user.roles?.includes("RH_MANAGER") ||
+    user.workspace === "entreprise"
+  );
+}
+
+export function canReadNotesFrais(user: any) {
+  if (!user) return false;
+  if (isNdfAdminOrManager(user)) return true;
+  return hasAnyPermissionCode(user, [
+    "ndf.read",
+    "ndf.write",
+    "manage:ndf",
+    "ndf.expenses.submit",
+    "ndf.reports.validate",
+    "dashboard.read",
+  ]);
+}
+
+export function canSubmitExpenses(user: any) {
+  if (!user) return false;
+  if (isNdfAdminOrManager(user)) return true;
+  return hasAnyPermissionCode(user, [
+    "ndf.expenses.submit",
+    "ndf.write",
+    "manage:ndf",
+  ]);
+}
+
+export function canValidateExpenseReports(user: any) {
+  if (!user) return false;
+  if (isNdfAdminOrManager(user)) return true;
+  return hasAnyPermissionCode(user, [
+    "ndf.reports.validate",
+    "manage:ndf",
+  ]);
+}
+
+export function canManageReimbursements(user: any) {
+  if (!user) return false;
+  if (isNdfAdminOrManager(user)) return true;
+  return hasAnyPermissionCode(user, [
+    "ndf.refund.manage",
+    "manage:ndf",
+  ]);
+}
+
+export function canReconcileCorporateCards(user: any) {
+  if (!user) return false;
+  if (isNdfAdminOrManager(user)) return true;
+  return hasAnyPermissionCode(user, [
+    "ndf.cards.reconcile",
+    "manage:ndf",
+  ]);
+}
+
+
 

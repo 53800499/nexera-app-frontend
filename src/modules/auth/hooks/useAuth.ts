@@ -124,10 +124,10 @@ export function useAuth() {
       } catch (err) {
         const message =
           err instanceof OfflineError
-            ? "Connexion impossible : vérifiez votre réseau ou que le serveur API est démarré."
+            ? "Connexion impossible : vérifiez votre connexion réseau ou l'état du serveur."
             : err instanceof AppError
               ? err.message
-              : "Impossible de se connecter";
+              : "Impossible de se connecter. Vérifiez vos identifiants et réessayez.";
         setError(message);
         await logAuthAudit({
           action: "login",
@@ -168,9 +168,11 @@ export function useAuth() {
         return redirectPath;
       } catch (err) {
         const message =
-          err instanceof AppError
-            ? err.message
-            : "Impossible de créer le compte";
+          err instanceof OfflineError
+            ? "Inscription impossible : vérifiez votre connexion réseau ou l'état du serveur."
+            : err instanceof AppError
+              ? err.message
+              : "Impossible de créer le compte. Vérifiez les informations saisies.";
         setError(message);
         await logAuthAudit({
           action: "register",

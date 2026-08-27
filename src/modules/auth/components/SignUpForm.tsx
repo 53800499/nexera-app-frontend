@@ -11,6 +11,7 @@ import { NexeraLogo } from "@/components/brand/NexeraLogo";
 import { useSignupWorkspace } from "../context/SignupWorkspaceContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { ApiValidationError } from "@/shared/core/ApiValidationError";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { AUTH_ROUTES } from "../constants/routes";
@@ -30,6 +31,7 @@ export default function SignUpForm() {
     control,
     handleSubmit,
     watch,
+    setError: setFieldError,
     formState: { errors },
   } = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
@@ -66,8 +68,25 @@ export default function SignUpForm() {
       if (redirectPath) {
         window.location.assign(redirectPath);
       }
-    } catch {
-      // L'erreur est gérée par useAuth et affichée dans l'alerte
+    } catch (err) {
+      if (err instanceof ApiValidationError) {
+        Object.entries(err.fieldErrors).forEach(([field, msg]) => {
+          if (
+            field === "email" ||
+            field === "password" ||
+            field === "firstName" ||
+            field === "lastName" ||
+            field === "tenantName" ||
+            field === "tenantType" ||
+            field === "acceptTerms"
+          ) {
+            setFieldError(field as keyof SignUpFormValues, {
+              type: "server",
+              message: msg,
+            });
+          }
+        });
+      }
     }
   });
 

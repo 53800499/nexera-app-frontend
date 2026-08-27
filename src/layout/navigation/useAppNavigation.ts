@@ -27,14 +27,14 @@ export function useAppNavigation() {
 
     if (isCabinetWorkspace) {
       for (const nav of CABINET_NAV_CONFIG) {
-        if (!nav.canAccess(cabinetPermissions)) continue;
+        if (!nav || !nav.canAccess || !nav.canAccess(cabinetPermissions)) continue;
         items.push({
           name: nav.name,
           icon: NAV_ICONS[nav.iconKey],
           path: nav.path,
           subItems: nav.subItems
             ?.filter((sub) =>
-              sub.canAccess ? sub.canAccess(cabinetPermissions) : true,
+              sub?.canAccess ? sub.canAccess(cabinetPermissions) : true,
             )
             .map((sub) => ({ name: sub.name, path: sub.path })),
         });
@@ -43,7 +43,7 @@ export function useAppNavigation() {
     }
 
     for (const nav of MAIN_NAV_CONFIG) {
-      if (!nav.canAccess(permissions)) continue;
+      if (!nav || !nav.canAccess || !nav.canAccess(permissions)) continue;
       items.push({
         name: nav.name,
         icon: NAV_ICONS[nav.iconKey],

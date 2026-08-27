@@ -43,6 +43,8 @@ export type NavPermissions = {
   roles: boolean;
   rh: boolean;
   canManageRh: boolean;
+  notesFrais: boolean;
+  canManageNotesFrais: boolean;
   canManageClients: boolean;
   canManageCatalogue: boolean;
   canManageStock: boolean;

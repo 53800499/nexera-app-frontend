@@ -9,10 +9,17 @@ type ApiErrorBody = {
 };
 
 const FIELD_PATTERNS: { pattern: RegExp; field: string; label: string }[] = [
-  { pattern: /\bemail\b/i, field: "email", label: "E-mail" },
-  { pattern: /\bfirstName\b/i, field: "firstName", label: "Prénom" },
-  { pattern: /\blastName\b/i, field: "lastName", label: "Nom" },
-  { pattern: /\bpassword\b/i, field: "password", label: "Mot de passe" },
+  { pattern: /\bemail\b|courriel|adresse email/i, field: "email", label: "E-mail" },
+  { pattern: /\bfirstName\b|prénom/i, field: "firstName", label: "Prénom" },
+  { pattern: /\blastName\b|nom de famille/i, field: "lastName", label: "Nom" },
+  { pattern: /\bcurrentPassword\b|\boldPassword\b|mot de passe actuel/i, field: "currentPassword", label: "Mot de passe actuel" },
+  { pattern: /\bnewPassword\b|nouveau mot de passe/i, field: "newPassword", label: "Nouveau mot de passe" },
+  { pattern: /\bconfirmPassword\b|confirmation.*mot de passe/i, field: "confirmPassword", label: "Confirmation du mot de passe" },
+  { pattern: /\bpassword\b|mot de passe/i, field: "password", label: "Mot de passe" },
+  { pattern: /\btenantName\b|nom de l'entreprise|nom du cabinet|raison sociale/i, field: "tenantName", label: "Nom de l'organisation" },
+  { pattern: /\btenantType\b|type d'organisation/i, field: "tenantType", label: "Type d'organisation" },
+  { pattern: /\bacceptTerms\b|conditions générales/i, field: "acceptTerms", label: "Conditions générales" },
+  { pattern: /\btoken\b|jeton de réinitialisation/i, field: "token", label: "Jeton de réinitialisation" },
   { pattern: /\broleIds\b/i, field: "roleIds", label: "Rôles" },
   { pattern: /\broleId\b/i, field: "roleIds", label: "Rôle" },
   { pattern: /\bpermissionIds\b/i, field: "permissionIds", label: "Permissions" },
@@ -121,13 +128,42 @@ function getFieldLabel(fieldName: string): string {
 const FULL_MESSAGE_TRANSLATIONS: { pattern: RegExp; message: string }[] = [
   {
     pattern:
+      /invalid credentials|identifiants invalides|email ou mot de passe incorrect/i,
+    message: "Email ou mot de passe incorrect. Vérifiez vos identifiants et réessayez.",
+  },
+  {
+    pattern: /account.*disabled|compte.*désactivé/i,
+    message: "Votre compte est désactivé. Veuillez contacter votre administrateur.",
+  },
+  {
+    pattern: /session.*expired|session.*expirée/i,
+    message: "Votre session a expiré. Veuillez vous reconnecter.",
+  },
+  {
+    pattern: /tenant.*not found|organisation introuvable/i,
+    message: "Organisation introuvable. Vérifiez l'identifiant ou le nom de l'entreprise.",
+  },
+  {
+    pattern: /tenant.*name.*required|nom de l'entreprise est obligatoire/i,
+    message: "Le nom de l'entreprise est obligatoire pour créer un compte.",
+  },
+  {
+    pattern: /reset.*token.*invalid|lien de réinitialisation est invalide/i,
+    message: "Le lien de réinitialisation est invalide ou a expiré. Demandez un nouveau lien.",
+  },
+  {
+    pattern: /current.*password.*invalid|mot de passe actuel incorrect/i,
+    message: "Le mot de passe actuel saisi est incorrect.",
+  },
+  {
+    pattern:
       /role already exists|code already exists|duplicate.*code|code.*already|already.*code/i,
     message: "Ce code de rôle est déjà utilisé pour cette organisation.",
   },
   {
     pattern:
-      /user already exists|user with this email|email already|email.*already|already.*email|duplicate.*email|email.*taken|email.*registered|unique.*email|e11000.*email/i,
-    message: "Cette adresse e-mail est déjà utilisée par un autre compte.",
+      /user already exists|user with this email|email already|email.*already|already.*email|duplicate.*email|email.*taken|email.*registered|unique.*email|e11000.*email|compte existe déjà/i,
+    message: "Cette adresse e-mail est déjà utilisée par un autre compte. Connectez-vous ou utilisez une autre adresse.",
   },
   {
     pattern: /each value in roleIds|roleids.*uuid|invalid role|roles?.*not found|role.*does not exist/i,
@@ -143,7 +179,7 @@ const FULL_MESSAGE_TRANSLATIONS: { pattern: RegExp; message: string }[] = [
   },
   {
     pattern: /^unauthorized$/i,
-    message: "Vous n'avez pas les droits pour effectuer cette action.",
+    message: "Identifiants invalides ou droits insuffisants.",
   },
   {
     pattern: /^forbidden$/i,
@@ -151,7 +187,7 @@ const FULL_MESSAGE_TRANSLATIONS: { pattern: RegExp; message: string }[] = [
   },
   {
     pattern: /^conflict$/i,
-    message: "Ces informations entrent en conflit avec un compte existant.",
+    message: "Ces informations entrent en conflit avec un compte ou une ressource existante.",
   },
   {
     pattern: /^bad request$/i,
@@ -218,14 +254,18 @@ function inferFieldFromMessage(raw: string): string | null {
     );
   }
 
+  if (/currentPassword|oldPassword|mot de passe actuel/i.test(raw)) return "currentPassword";
+  if (/newPassword|nouveau mot de passe/i.test(raw)) return "newPassword";
+  if (/confirmPassword|confirmation.*mot de passe/i.test(raw)) return "confirmPassword";
+  if (/tenantName|nom de l'entreprise|nom du cabinet|raison sociale/i.test(raw)) return "tenantName";
+  if (/tenantType|type d'organisation/i.test(raw)) return "tenantType";
+  if (/acceptTerms|conditions générales/i.test(raw)) return "acceptTerms";
   if (/role already exists|code already exists|duplicate.*code/i.test(raw)) return "code";
-  if (/user already exists/i.test(raw)) return "email";
-  if (/email/i.test(raw) && /already|exist|duplicate|taken|registered|unique/i.test(raw)) {
-    return "email";
-  }
-  if (/\bpassword\b/i.test(raw)) return "password";
-  if (/\bfirstName\b/i.test(raw)) return "firstName";
-  if (/\blastName\b/i.test(raw)) return "lastName";
+  if (/user already exists|compte existe déjà/i.test(raw)) return "email";
+  if (/email|e-mail|courriel|adresse email/i.test(raw)) return "email";
+  if (/\bpassword\b|mot de passe/i.test(raw)) return "password";
+  if (/\bfirstName\b|prénom/i.test(raw)) return "firstName";
+  if (/\blastName\b|nom de famille/i.test(raw)) return "lastName";
   if (/\broleIds?\b/i.test(raw) || /\broles?\b/i.test(raw)) return "roleIds";
 
   const match = FIELD_PATTERNS.find(({ pattern }) => pattern.test(raw));
