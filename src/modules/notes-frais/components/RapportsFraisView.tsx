@@ -416,10 +416,14 @@ export const RapportsFraisView: React.FC = () => {
                 <div>
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      selectedRapport.statut === "COMPTABILISEE" || selectedRapport.statut === "REMBOURSEE"
+                      selectedRapport.statut === "VALIDE"
                         ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                        : selectedRapport.statut === "VALIDEE"
+                        : selectedRapport.statut === "REMBOURSE"
                         ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                        : selectedRapport.statut === "EN_VALIDATION"
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                        : selectedRapport.statut === "REJETE"
+                        ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
                         : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
                     }`}
                   >
@@ -430,7 +434,7 @@ export const RapportsFraisView: React.FC = () => {
               <div>
                 <span className="text-xs text-gray-500">Avance Déduite :</span>
                 <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
-                  {formatCurrency(selectedRapport.avanceSurMission?.montantAvance)}
+                  {formatCurrency(selectedRapport.avanceFrais?.montant || selectedRapport.avanceSurMission?.montantAvance)}
                 </p>
               </div>
             </div>

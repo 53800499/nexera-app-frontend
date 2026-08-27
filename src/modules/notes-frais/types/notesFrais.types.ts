@@ -316,9 +316,13 @@ export interface NdfRapportFrais {
   };
   mission?: NdfMission | null;
   avanceFrais?: NdfAvanceFrais | null;
+  avanceSurMission?: {
+    montantAvance?: number;
+  } | null;
   depenses?: NdfDepense[];
   anomalies?: NdfAnomalieDetectee[];
   etapesValidation?: NdfEtapeValidation[];
+  ecrituresComptables?: any[];
   createdAt: string;
   updatedAt: string;
 }
@@ -332,6 +336,12 @@ export interface NdfRemboursement {
   dateRemboursement?: string | null;
   referenceBancaire?: string | null;
   referenceBulletinPaieM4?: string | null;
+  remboursementPaieTransmis?: {
+    id?: string;
+    periodePaieCible?: string;
+    referenceElementVariableM4?: string | null;
+    statut?: string;
+  } | null;
   statut: NdfRemboursementStatut;
   rapportFrais?: NdfRapportFrais;
   createdAt: string;
