@@ -107,6 +107,21 @@ const FIELD_PATTERNS: { pattern: RegExp; field: string; label: string }[] = [
     field: "directorEmail",
     label: "E-mail dirigeant",
   },
+  {
+    pattern: /\bobjetId\b/i,
+    field: "objetId",
+    label: "Identifiant de l'objet",
+  },
+  {
+    pattern: /\bobjetType\b/i,
+    field: "objetType",
+    label: "Type d'objet",
+  },
+  {
+    pattern: /\bcabinetCircuitValidationId\b/i,
+    field: "cabinetCircuitValidationId",
+    label: "Circuit de validation",
+  },
 ];
 
 function toMessageList(message: ApiErrorBody["message"]): string[] {

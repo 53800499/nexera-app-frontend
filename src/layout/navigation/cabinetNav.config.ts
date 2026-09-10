@@ -10,6 +10,14 @@ import type { AuthUser } from "@/modules/auth/types/auth.types";
 export type CabinetNavPermissions = {
   cockpit: boolean;
   dossiers: boolean;
+  missions: boolean;
+  calendrier: boolean;
+  supervision: boolean;
+  validations: boolean;
+  honoraires: boolean;
+  communication: boolean;
+  collaborateurs: boolean;
+  deontologie: boolean;
   users: boolean;
   settings: boolean;
 };
@@ -18,9 +26,18 @@ export function getCabinetNavPermissions(
   user: Pick<AuthUser, "permissions"> | null | undefined,
 ): CabinetNavPermissions {
   const permissionsUser = user ?? null;
+  const canCabinet = canReadCabinet(permissionsUser);
   return {
-    cockpit: canReadCabinet(permissionsUser),
-    dossiers: canReadCabinet(permissionsUser),
+    cockpit: canCabinet,
+    dossiers: canCabinet,
+    missions: canCabinet,
+    calendrier: canCabinet,
+    supervision: canCabinet,
+    validations: canCabinet,
+    honoraires: canCabinet,
+    communication: canCabinet,
+    collaborateurs: canCabinet,
+    deontologie: canCabinet,
     users: hasPermissionCode(permissionsUser, PERMISSION_CODES.MANAGE_USERS),
     settings: canReadSettings(permissionsUser),
   };
@@ -36,17 +53,66 @@ export const CABINET_NAV_CONFIG: NavItemConfig<CabinetNavPermissions>[] = [
   },
   {
     id: "dossiers",
-    name: "Dossiers",
+    name: "Portefeuille & Mandats",
     iconKey: "group",
     path: "/cabinet/dossiers",
     canAccess: (p) => p.dossiers,
   },
   {
-    id: "utilisateurs",
-    name: "Utilisateurs",
+    id: "missions",
+    name: "Missions & Tâches",
+    iconKey: "task",
+    path: "/cabinet/missions",
+    canAccess: (p) => p.missions,
+  },
+  {
+    id: "calendrier",
+    name: "Calendrier Consolidé",
+    iconKey: "chart",
+    path: "/cabinet/calendrier",
+    canAccess: (p) => p.calendrier,
+  },
+  {
+    id: "supervision",
+    name: "Supervision & Revue",
+    iconKey: "docs",
+    path: "/cabinet/supervision",
+    canAccess: (p) => p.supervision,
+  },
+  {
+    id: "validations",
+    name: "Validations & Visas",
+    iconKey: "file",
+    path: "/cabinet/validations",
+    canAccess: (p) => p.validations,
+  },
+  {
+    id: "honoraires",
+    name: "Temps & Honoraires",
+    iconKey: "dollar",
+    path: "/cabinet/honoraires",
+    canAccess: (p) => p.honoraires,
+  },
+  {
+    id: "communication",
+    name: "Demandes & Échanges",
+    iconKey: "bell",
+    path: "/cabinet/communication",
+    canAccess: (p) => p.communication,
+  },
+  {
+    id: "collaborateurs",
+    name: "Équipe & Habilitations",
     iconKey: "user",
-    path: "/utilisateurs",
-    canAccess: (p) => p.users,
+    path: "/cabinet/collaborateurs",
+    canAccess: (p) => p.collaborateurs,
+  },
+  {
+    id: "deontologie",
+    name: "Déontologie & Secret Pro",
+    iconKey: "lock",
+    path: "/cabinet/deontologie",
+    canAccess: (p) => p.deontologie,
   },
   {
     id: "parametres",
