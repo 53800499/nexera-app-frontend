@@ -103,7 +103,7 @@ export const CABINET_NAV_CONFIG: NavItemConfig<CabinetNavPermissions>[] = [
   {
     id: "collaborateurs",
     name: "Équipe & Habilitations",
-    iconKey: "user",
+    iconKey: "group",
     path: "/cabinet/collaborateurs",
     canAccess: (p) => p.collaborateurs,
   },
@@ -115,10 +115,23 @@ export const CABINET_NAV_CONFIG: NavItemConfig<CabinetNavPermissions>[] = [
     canAccess: (p) => p.deontologie,
   },
   {
+    id: "profile",
+    name: "Mon Profil",
+    iconKey: "user",
+    path: "/profile",
+    canAccess: () => true,
+  },
+  {
     id: "parametres",
     name: "Paramètres",
     iconKey: "plug",
     path: "/parametres",
     canAccess: (p) => p.settings,
+    /* subItems: [
+      { name: "Vue d'ensemble", path: "/parametres" },
+      { name: "Fiche Cabinet", path: "/parametres/entreprise" },
+      { name: "Code d'invitation", path: "/parametres/cabinet" },
+      { name: "Devises", path: "/parametres/devises" },
+    ], */
   },
 ];

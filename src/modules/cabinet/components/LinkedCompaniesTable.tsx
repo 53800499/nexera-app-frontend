@@ -59,9 +59,8 @@ export function LinkedCompaniesTable({ companies }: Props) {
         </thead>
         <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-gray-900">
           {companies.map((company) => {
-            const canViewInvoices = hasCabinetScopePermission(
-              company.permissions,
-              CABINET_SCOPE_PERMISSIONS.INVOICES_READ,
+            const hasAnyPermission = Boolean(
+              company.permissions && company.permissions.length > 0,
             );
 
             return (
@@ -82,16 +81,16 @@ export function LinkedCompaniesTable({ companies }: Props) {
                   />
                 </td>
                 <td className="px-4 py-3 text-right">
-                  {canViewInvoices ? (
+                  {hasAnyPermission ? (
                     <Link
                       href={CABINET_ROUTES.dossier(company.id)}
                       className="text-sm font-medium text-brand-500 hover:text-brand-600"
                     >
-                      Consulter les factures
+                      Consulter le dossier
                     </Link>
                   ) : (
                     <span className="text-sm text-gray-400">
-                      Factures non autorisées
+                      Accès non autorisé
                     </span>
                   )}
                 </td>

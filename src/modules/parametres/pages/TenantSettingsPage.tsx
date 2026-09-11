@@ -6,6 +6,8 @@ import {
   useActionFeedback,
   useActionFeedbackStore,
 } from "@/shared/components/feedback";
+import { useAuthUser } from "@/modules/auth/hooks/useAuthUser";
+import { WORKSPACE_TYPES } from "@/modules/auth/types/user.types";
 import { SettingsPageHeader } from "../components/SettingsPageHeader";
 import { TenantSettingsForm } from "../components/TenantSettingsForm";
 import { useSettingsAccess } from "../hooks/useSettingsAccess";
@@ -26,6 +28,8 @@ function buildTenantPayload(values: TenantSettingsFormValues) {
     siret: values.siret || undefined,
     vatNumber: values.vatNumber || undefined,
     registrationNumber: values.registrationNumber || undefined,
+    numeroInscriptionOrdre: values.numeroInscriptionOrdre || undefined,
+    paysCode: values.paysCode || undefined,
     shareCapital: values.shareCapital || undefined,
     companyAddress: {
       street: values.street || undefined,
@@ -46,14 +50,21 @@ export default function TenantSettingsPage() {
   const isBusy = useActionFeedbackStore(
     (state) => state.loadingCount > 0 || state.isRedirecting,
   );
+  const user = useAuthUser();
+  const isCabinet = user?.workspace === WORKSPACE_TYPES.CABINET;
   const { canManageSettings } = useSettingsAccess();
   const { tenantQuery, updateMutation } = useTenantSettings();
 
   const handleSubmit = async (values: TenantSettingsFormValues) => {
-    const label = values.tradeName || values.legalName || "votre entreprise";
+    const label =
+      values.tradeName ||
+      values.legalName ||
+      (isCabinet ? "votre cabinet" : "votre entreprise");
     await runAction({
       confirm: {
-        title: "Enregistrer les paramètres entreprise ?",
+        title: isCabinet
+          ? "Enregistrer les paramètres du cabinet ?"
+          : "Enregistrer les paramètres entreprise ?",
         message: `Les informations de ${label} seront mises à jour sur vos documents et dans l'application.`,
         confirmLabel: "Enregistrer",
       },
@@ -76,8 +87,12 @@ export default function TenantSettingsPage() {
   return (
     <div className="space-y-6">
       <SettingsPageHeader
-        title="Entreprise"
-        description="Identité légale, coordonnées et paramètres financiers de votre organisation."
+        title={isCabinet ? "Cabinet d'expertise comptable" : "Entreprise"}
+        description={
+          isCabinet
+            ? "Identité légale, inscription à l'Ordre et coordonnées de votre cabinet."
+            : "Identité légale, coordonnées et paramètres financiers de votre organisation."
+        }
       />
 
       {tenantQuery.isPending && !tenantQuery.data && (
@@ -95,6 +110,7 @@ export default function TenantSettingsPage() {
       {tenantQuery.data ? (
         <TenantSettingsForm
           settings={tenantQuery.data}
+          isCabinet={isCabinet}
           readOnly={!canManageSettings}
           isSubmitting={updateMutation.isPending || isBusy}
           onSubmit={handleSubmit}

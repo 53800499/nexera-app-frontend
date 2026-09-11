@@ -14,6 +14,7 @@ import {
 } from "@/icons";
 import { useSettingsAccess } from "../hooks/useSettingsAccess";
 import { useAuthUser } from "@/modules/auth/hooks/useAuthUser";
+import { WORKSPACE_TYPES } from "@/modules/auth/types/user.types";
 import {
   getSettingsSectionsByGroupForWorkspace,
   type SettingsSection,
@@ -60,6 +61,7 @@ function SettingsHubCard({ section }: { section: SettingsSection }) {
 export default function SettingsHubPage() {
   const { canManageSettings } = useSettingsAccess();
   const user = useAuthUser();
+  const isCabinet = user?.workspace === WORKSPACE_TYPES.CABINET;
   const groups = getSettingsSectionsByGroupForWorkspace(user?.workspace);
 
   return (
@@ -80,8 +82,9 @@ export default function SettingsHubPage() {
           )}
         </div>
         <p className="max-w-2xl text-sm text-gray-500">
-          Configurez votre entreprise, la facturation, les documents commerciaux
-          et les communications automatiques.
+          {isCabinet
+            ? "Configurez l'identité légale et ordinale de votre cabinet, votre identifiant de liaison et vos devises."
+            : "Configurez votre entreprise, la facturation, les documents commerciaux et les communications automatiques."}
         </p>
       </div>
 
@@ -90,15 +93,30 @@ export default function SettingsHubPage() {
           Conseil
         </p>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Commencez par renseigner les informations{" "}
-          <Link
-            href="/parametres/entreprise"
-            className="font-medium text-brand-600 hover:underline dark:text-brand-400"
-          >
-            Entreprise
-          </Link>
-          , puis configurez la TVA et la numérotation avant d&apos;émettre vos
-          premiers documents.
+          {isCabinet ? (
+            <>
+              Commencez par vérifier la{" "}
+              <Link
+                href="/parametres/entreprise"
+                className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+              >
+                Fiche Cabinet
+              </Link>
+              , puis transmettez votre identifiant d&apos;invitation à vos clients entreprise pour lier leurs dossiers.
+            </>
+          ) : (
+            <>
+              Commencez par renseigner les informations{" "}
+              <Link
+                href="/parametres/entreprise"
+                className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+              >
+                Entreprise
+              </Link>
+              , puis configurez la TVA et la numérotation avant d&apos;émettre vos
+              premiers documents.
+            </>
+          )}
         </p>
       </div>
 

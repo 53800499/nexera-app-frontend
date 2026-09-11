@@ -3,9 +3,16 @@
 import React, { useState } from "react";
 import { useDeontologie } from "../hooks/useDeontologie";
 import { usePortefeuille } from "../hooks/usePortefeuille";
+import { useLinkedCompanies } from "../hooks/useLinkedCompanies";
 import { ErrorState, LoadingBlock } from "@/shared/components/feedback";
 import { RequireCabinetAccess } from "./RequireCabinetAccess";
 import type { CabinetDecisionConflit } from "../types/cabinet.types";
+import {
+  formatTypeMandat,
+  formatModuleSource,
+  formatDecisionConflit,
+  formatMandatSelectOption,
+} from "../utils/cabinetLabels";
 
 export function DeontologieView() {
   const [activeTab, setActiveTab] = useState<"conflits" | "journal">("conflits");
@@ -19,6 +26,10 @@ export function DeontologieView() {
   } = useDeontologie(selectedMandatId || undefined);
 
   const { mandatsQuery } = usePortefeuille();
+  const { companiesQuery } = useLinkedCompanies();
+
+  const getClientName = (tenantId?: string | null) =>
+    companiesQuery.data?.find((c) => c.id === tenantId)?.name;
 
   const [isConflitModalOpen, setIsConflitModalOpen] = useState(false);
   const [isArbitrageModalOpen, setIsArbitrageModalOpen] = useState(false);
@@ -93,7 +104,7 @@ export function DeontologieView() {
             onClick={() => setActiveTab("conflits")}
             className={`border-b-2 px-4 py-2 text-sm font-semibold ${
               activeTab === "conflits"
-                ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                ? "border-brand-500 text-brand-600 dark:border-brand-400 dark:text-brand-400"
                 : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -104,7 +115,7 @@ export function DeontologieView() {
             onClick={() => setActiveTab("journal")}
             className={`border-b-2 px-4 py-2 text-sm font-semibold ${
               activeTab === "journal"
-                ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                ? "border-brand-500 text-brand-600 dark:border-brand-400 dark:text-brand-400"
                 : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -134,8 +145,8 @@ export function DeontologieView() {
                         <span className="font-semibold text-gray-900 dark:text-white text-sm">
                           {c.collaborateur?.nomPrenoms}
                         </span>
-                        <span className="text-xs text-gray-400">
-                          sur le dossier {c.mandat?.typeMandat} (#{c.mandat?.clientTenantId.slice(0, 8)})
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          sur le dossier {formatMandatSelectOption(c.mandat, getClientName(c.mandat?.clientTenantId))}
                         </span>
                       </div>
                       <p className="text-xs text-gray-700 dark:text-gray-300">
@@ -156,7 +167,7 @@ export function DeontologieView() {
                               : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
                         }`}
                       >
-                        {c.decision.replace(/_/g, " ")}
+                        {formatDecisionConflit(c.decision)}
                       </span>
 
                       <button
@@ -181,12 +192,12 @@ export function DeontologieView() {
               <select
                 value={selectedMandatId}
                 onChange={(e) => setSelectedMandatId(e.target.value)}
-                className="block w-full sm:w-80 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                className="block w-full sm:w-96 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               >
-                <option value="">Tous les dossiers audités...</option>
+                <option value="">Tous les dossiers clients audités...</option>
                 {mandats.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.typeMandat} (#{m.clientTenantId.slice(0, 8)})
+                    {formatMandatSelectOption(m, getClientName(m.clientTenantId))}
                   </option>
                 ))}
               </select>
@@ -221,11 +232,11 @@ export function DeontologieView() {
                         <td className="py-3 px-4 font-bold text-gray-900 dark:text-white">
                           {log.collaborateur?.nomPrenoms || "Collaborateur"}
                         </td>
-                        <td className="py-3 px-4 text-gray-600 dark:text-gray-300">
-                          {log.mandat?.typeMandat} (#{log.mandat?.clientTenantId.slice(0, 8)})
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300 font-sans font-medium">
+                          {formatMandatSelectOption(log.mandat, getClientName(log.mandat?.clientTenantId))}
                         </td>
-                        <td className="py-3 px-4 text-indigo-600 dark:text-indigo-400">
-                          {log.moduleConsulte}
+                        <td className="py-3 px-4 text-brand-600 dark:text-brand-400 font-sans">
+                          {formatModuleSource(log.moduleConsulte)}
                         </td>
                         <td className="py-3 px-4 text-gray-500">
                           {log.actionRealisee || "Consultation standard"}
@@ -250,18 +261,18 @@ export function DeontologieView() {
               <form onSubmit={handleDeclareConflit} className="mt-4 space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                    Mandat Client Concerné *
+                    Dossier Client Concerné *
                   </label>
                   <select
                     value={mandatId}
                     onChange={(e) => setMandatId(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
-                    <option value="">Sélectionnez un mandat...</option>
+                    <option value="">Sélectionnez un dossier client...</option>
                     {mandats.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.typeMandat} (#{m.clientTenantId.slice(0, 8)})
+                        {formatMandatSelectOption(m, getClientName(m.clientTenantId))}
                       </option>
                     ))}
                   </select>
@@ -277,7 +288,7 @@ export function DeontologieView() {
                     rows={3}
                     placeholder="Décrivez précisément la situation de conflit d'intérêt..."
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -320,7 +331,7 @@ export function DeontologieView() {
                     onChange={(e) =>
                       setDecision(e.target.value as CabinetDecisionConflit)
                     }
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
                     <option value="RETRAIT_DU_DOSSIER">
                       Retrait immédiat du collaborateur du dossier
@@ -343,7 +354,7 @@ export function DeontologieView() {
                     onChange={(e) => setCommentaireDecision(e.target.value)}
                     rows={2}
                     placeholder="Justifiez la décision arbitrale..."
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -358,7 +369,7 @@ export function DeontologieView() {
                   <button
                     type="submit"
                     disabled={arbitrerConflitMutation.isPending}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
                   >
                     {arbitrerConflitMutation.isPending ? "Arbitrage..." : "Appliquer la Décision"}
                   </button>

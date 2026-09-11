@@ -4,9 +4,11 @@ import React, { useState } from "react";
 import { useHonoraires } from "../hooks/useHonoraires";
 import { useMissions } from "../hooks/useMissions";
 import { usePortefeuille } from "../hooks/usePortefeuille";
+import { useLinkedCompanies } from "../hooks/useLinkedCompanies";
 import { ErrorState, LoadingBlock } from "@/shared/components/feedback";
 import { RequireCabinetAccess } from "./RequireCabinetAccess";
 import type { CabinetStatutNoteHonoraires } from "../types/cabinet.types";
+import { formatTypeMandat, formatStatutNoteHonoraires, formatMandatSelectOption } from "../utils/cabinetLabels";
 
 export function HonorairesView() {
   const [activeTab, setActiveTab] = useState<"temps" | "notes">("temps");
@@ -26,6 +28,10 @@ export function HonorairesView() {
     mandatId: filterMandat || undefined,
   });
   const { mandatsQuery } = usePortefeuille();
+  const { companiesQuery } = useLinkedCompanies();
+
+  const getClientName = (tenantId?: string | null) =>
+    companiesQuery.data?.find((c) => c.id === tenantId)?.name;
 
   const [isTempsModalOpen, setIsTempsModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
@@ -124,14 +130,14 @@ export function HonorairesView() {
             <button
               type="button"
               onClick={() => setIsTempsModalOpen(true)}
-              className="inline-flex items-center justify-center rounded-lg border border-indigo-600 px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:border-indigo-400 dark:text-indigo-400 dark:hover:bg-indigo-950"
+              className="inline-flex items-center justify-center rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-400 dark:text-brand-400 dark:hover:bg-brand-950/30"
             >
               ⏱️ Déclarer du Temps
             </button>
             <button
               type="button"
               onClick={() => setIsNoteModalOpen(true)}
-              className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none"
+              className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               + Émettre Note d'Honoraires
             </button>
@@ -145,7 +151,7 @@ export function HonorairesView() {
             onClick={() => setActiveTab("temps")}
             className={`border-b-2 px-4 py-2 text-sm font-semibold ${
               activeTab === "temps"
-                ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                ? "border-brand-500 text-brand-600 dark:border-brand-400 dark:text-brand-400"
                 : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -156,7 +162,7 @@ export function HonorairesView() {
             onClick={() => setActiveTab("notes")}
             className={`border-b-2 px-4 py-2 text-sm font-semibold ${
               activeTab === "notes"
-                ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                ? "border-brand-500 text-brand-600 dark:border-brand-400 dark:text-brand-400"
                 : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -205,8 +211,8 @@ export function HonorairesView() {
                           <p className="font-medium text-gray-900 dark:text-white">
                             {t.mission?.libelle}
                           </p>
-                          <p className="text-xs text-gray-500">
-                            {t.mission?.mandat?.typeMandat} (#{t.mission?.mandat?.clientTenantId.slice(0, 8)})
+                          <p className="text-xs text-gray-500 font-medium">
+                            {formatMandatSelectOption(t.mission?.mandat, getClientName(t.mission?.mandat?.clientTenantId))}
                           </p>
                         </td>
                         <td className="py-3.5 px-4 text-xs text-gray-600 dark:text-gray-300">
@@ -255,7 +261,7 @@ export function HonorairesView() {
                     <tr>
                       <th className="py-3.5 px-4">Numéro</th>
                       <th className="py-3.5 px-4">Date Émission</th>
-                      <th className="py-3.5 px-4">Dossier Mandat</th>
+                      <th className="py-3.5 px-4">Dossier Client</th>
                       <th className="py-3.5 px-4">Total HT</th>
                       <th className="py-3.5 px-4">Total TTC</th>
                       <th className="py-3.5 px-4">Statut</th>
@@ -272,8 +278,8 @@ export function HonorairesView() {
                           {new Date(n.dateEmission).toLocaleDateString("fr-FR")}
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
-                            {n.mandat?.typeMandat} (#{n.mandat?.clientTenantId.slice(0, 8)})
+                          <span className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                            {formatMandatSelectOption(n.mandat, getClientName(n.mandat?.clientTenantId))}
                           </span>
                         </td>
                         <td className="py-3.5 px-4 font-medium text-gray-700 dark:text-gray-300">
@@ -296,11 +302,11 @@ export function HonorairesView() {
                                   : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
                             }`}
                           >
-                            <option value="BROUILLON">BROUILLON</option>
-                            <option value="EMISE">ÉMISE</option>
-                            <option value="PAYEE">PAYÉE ✓</option>
-                            <option value="EN_RETARD">EN RETARD</option>
-                            <option value="ANNULEE">ANNULÉE</option>
+                            <option value="BROUILLON">Brouillon</option>
+                            <option value="EMISE">Émise</option>
+                            <option value="PAYEE">Payée ✓</option>
+                            <option value="EN_RETARD">En retard</option>
+                            <option value="ANNULEE">Annulée</option>
                           </select>
                         </td>
                         <td className="py-3.5 pr-4 text-right">
@@ -338,12 +344,12 @@ export function HonorairesView() {
                     value={missionId}
                     onChange={(e) => setMissionId(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
-                    <option value="">Sélectionnez une mission...</option>
+                    <option value="">Sélectionnez la mission concernée...</option>
                     {missions.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.libelle} ({m.mandat?.typeMandat})
+                        {m.libelle} — {formatMandatSelectOption(m.mandat, getClientName(m.mandat?.clientTenantId))}
                       </option>
                     ))}
                   </select>
@@ -359,7 +365,7 @@ export function HonorairesView() {
                       value={datePrestation}
                       onChange={(e) => setDatePrestation(e.target.value)}
                       required
-                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>
                   <div>
@@ -373,7 +379,7 @@ export function HonorairesView() {
                       value={dureeHeures}
                       onChange={(e) => setDureeHeures(Number(e.target.value))}
                       required
-                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>
                 </div>
@@ -387,7 +393,7 @@ export function HonorairesView() {
                     onChange={(e) => setDescription(e.target.value)}
                     rows={2}
                     placeholder="Ex: Rapprochements bancaires BOA et Ecobank Q4..."
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -397,7 +403,7 @@ export function HonorairesView() {
                     id="facturable"
                     checked={facturable}
                     onChange={(e) => setFacturable(e.target.checked)}
-                    className="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    className="size-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                   />
                   <label htmlFor="facturable" className="text-xs text-gray-700 dark:text-gray-300">
                     Prestation facturable au client
@@ -415,7 +421,7 @@ export function HonorairesView() {
                   <button
                     type="submit"
                     disabled={createTempsMutation.isPending}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
                   >
                     {createTempsMutation.isPending ? "Enregistrement..." : "Enregistrer Temps"}
                   </button>
@@ -442,12 +448,12 @@ export function HonorairesView() {
                     value={mandatId}
                     onChange={(e) => setMandatId(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
-                    <option value="">Sélectionnez un mandat...</option>
+                    <option value="">Sélectionnez le dossier client...</option>
                     {mandats.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.typeMandat} (#{m.clientTenantId.slice(0, 8)})
+                        {formatMandatSelectOption(m, getClientName(m.clientTenantId))}
                       </option>
                     ))}
                   </select>
@@ -463,7 +469,7 @@ export function HonorairesView() {
                       value={noteNumero}
                       onChange={(e) => setNoteNumero(e.target.value)}
                       required
-                      className="mt-1 block w-full font-mono rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      className="mt-1 block w-full font-mono rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>
                   <div>
@@ -475,7 +481,7 @@ export function HonorairesView() {
                       value={dateEmission}
                       onChange={(e) => setDateEmission(e.target.value)}
                       required
-                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>
                 </div>
@@ -489,7 +495,7 @@ export function HonorairesView() {
                     value={ligneLibelle}
                     onChange={(e) => setLigneLibelle(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -505,7 +511,7 @@ export function HonorairesView() {
                       value={montantHt}
                       onChange={(e) => setMontantHt(Number(e.target.value))}
                       required
-                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>
                   <div>
@@ -516,7 +522,7 @@ export function HonorairesView() {
                       type="number"
                       value={tauxTva}
                       onChange={(e) => setTauxTva(Number(e.target.value))}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>
                 </div>
@@ -526,7 +532,7 @@ export function HonorairesView() {
                     Montant TVA :{" "}
                     <strong>{((montantHt * tauxTva) / 100).toLocaleString("fr-FR")} XOF</strong>
                   </p>
-                  <p className="mt-1 text-sm font-bold text-indigo-700 dark:text-indigo-300">
+                  <p className="mt-1 text-sm font-bold text-brand-700 dark:text-brand-300">
                     Total TTC à payer :{" "}
                     {(montantHt + (montantHt * tauxTva) / 100).toLocaleString("fr-FR")} XOF
                   </p>
@@ -543,7 +549,7 @@ export function HonorairesView() {
                   <button
                     type="submit"
                     disabled={createNoteMutation.isPending}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
                   >
                     {createNoteMutation.isPending ? "Émission..." : "Émettre la Note"}
                   </button>

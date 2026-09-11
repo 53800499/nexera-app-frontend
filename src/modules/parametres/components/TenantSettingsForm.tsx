@@ -21,6 +21,7 @@ import type { TenantSettings } from "../types/settings.types";
 
 type Props = {
   settings: TenantSettings;
+  isCabinet?: boolean;
   isSubmitting: boolean;
   readOnly?: boolean;
   onSubmit: (values: TenantSettingsFormValues) => Promise<void>;
@@ -40,6 +41,8 @@ function toFormValues(settings: TenantSettings): TenantSettingsFormValues {
     siret: settings.siret ?? "",
     vatNumber: settings.vatNumber ?? "",
     registrationNumber: settings.registrationNumber ?? "",
+    numeroInscriptionOrdre: settings.numeroInscriptionOrdre ?? "",
+    paysCode: settings.paysCode ?? "BJ",
     shareCapital: settings.shareCapital ?? "",
     street: settings.companyAddress?.street ?? "",
     city: settings.companyAddress?.city ?? "",
@@ -55,6 +58,7 @@ function toFormValues(settings: TenantSettings): TenantSettingsFormValues {
 
 export function TenantSettingsForm({
   settings,
+  isCabinet = false,
   isSubmitting,
   readOnly = false,
   onSubmit,
@@ -149,19 +153,45 @@ export function TenantSettingsForm({
       </ComponentCard>
 
       <ComponentCard
-        title="Identité entreprise"
-        desc="Informations légales affichées sur vos documents."
+        title={isCabinet ? "Identité du cabinet" : "Identité entreprise"}
+        desc={
+          isCabinet
+            ? "Informations légales, ordinales et administratives du cabinet."
+            : "Informations légales affichées sur vos documents."
+        }
         className="!bg-transparent !shadow-none"
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div data-form-field="legalName">
-            <Label>Raison sociale</Label>
+            <Label>
+              {isCabinet ? "Raison sociale du cabinet" : "Raison sociale"}
+            </Label>
             <Input {...register("legalName")} disabled={readOnly} />
           </div>
           <div>
-            <Label>Nom commercial</Label>
+            <Label>{isCabinet ? "Nom usuel / Enseigne" : "Nom commercial"}</Label>
             <Input {...register("tradeName")} disabled={readOnly} />
           </div>
+          {isCabinet && (
+            <>
+              <div data-form-field="numeroInscriptionOrdre">
+                <Label>N° d'inscription à l'Ordre</Label>
+                <Input
+                  placeholder="ex: OECCA-BJ-2024-042"
+                  {...register("numeroInscriptionOrdre")}
+                  disabled={readOnly}
+                />
+              </div>
+              <div data-form-field="paysCode">
+                <Label>Pays de l'Ordre (Code pays ex: BJ, FR)</Label>
+                <Input
+                  placeholder="BJ"
+                  {...register("paysCode")}
+                  disabled={readOnly}
+                />
+              </div>
+            </>
+          )}
           <div data-form-field="siret">
             <Label>SIRET</Label>
             <Input {...register("siret")} disabled={readOnly} />
@@ -182,8 +212,16 @@ export function TenantSettingsForm({
       </ComponentCard>
 
       <ComponentCard
-        title="Coordonnées & mentions"
-        desc="Adresse, contacts et conditions générales."
+        title={
+          isCabinet
+            ? "Coordonnées officielles du cabinet"
+            : "Coordonnées & mentions"
+        }
+        desc={
+          isCabinet
+            ? "Adresse du cabinet, contacts officiels et mentions légales."
+            : "Adresse, contacts et conditions générales."
+        }
         className="!bg-transparent !shadow-none"
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

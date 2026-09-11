@@ -5,6 +5,14 @@ import Link from "next/link";
 import { useCabinetCockpit } from "../hooks/useCabinetCockpit";
 import { ErrorState, LoadingBlock } from "@/shared/components/feedback";
 import { RequireCabinetAccess } from "./RequireCabinetAccess";
+import {
+  formatTypeMandat,
+  formatStatutMandat,
+  formatStatutMission,
+  formatModuleSource,
+  formatObjetMetier,
+  formatNiveauSeverite,
+} from "../utils/cabinetLabels";
 
 export function CockpitDashboardView() {
   const { cockpitQuery } = useCabinetCockpit();
@@ -41,7 +49,7 @@ export function CockpitDashboardView() {
           <div className="flex items-center gap-3">
             <Link
               href="/cabinet/dossiers"
-              className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
             >
               + Nouveau Mandat
             </Link>
@@ -55,7 +63,7 @@ export function CockpitDashboardView() {
               <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
                 Dossiers Actifs
               </span>
-              <span className="inline-flex size-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+              <span className="inline-flex size-8 items-center justify-center rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
                 📁
               </span>
             </div>
@@ -129,7 +137,7 @@ export function CockpitDashboardView() {
               </h2>
               <Link
                 href="/cabinet/missions"
-                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                className="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
               >
                 Voir tout ({missionsRecentes.length})
               </Link>
@@ -148,7 +156,7 @@ export function CockpitDashboardView() {
                         {m.libelle}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Mandat : <span className="font-medium text-gray-700 dark:text-gray-300">{m.mandat?.typeMandat}</span> — Échéance : {m.dateEcheance ? new Date(m.dateEcheance).toLocaleDateString("fr-FR") : "Non définie"}
+                        Mandat : <span className="font-medium text-gray-700 dark:text-gray-300">{formatTypeMandat(m.mandat?.typeMandat)}</span> — Échéance : {m.dateEcheance ? new Date(m.dateEcheance).toLocaleDateString("fr-FR") : "Non définie"}
                       </p>
                     </div>
                     <span
@@ -157,10 +165,10 @@ export function CockpitDashboardView() {
                           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                           : m.statut === "EN_RETARD"
                             ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                            : "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
+                            : "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
                       }`}
                     >
-                      {m.statut}
+                      {formatStatutMission(m.statut)}
                     </span>
                   </div>
                 ))}
@@ -176,7 +184,7 @@ export function CockpitDashboardView() {
               </h2>
               <Link
                 href="/cabinet/supervision"
-                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                className="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
               >
                 Accéder au Hub
               </Link>
@@ -201,10 +209,10 @@ export function CockpitDashboardView() {
                                 : "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
                           }`}
                         >
-                          {p.niveau}
+                          {formatNiveauSeverite(p.niveau)}
                         </span>
-                        <span className="text-xs font-mono text-gray-400">
-                          {p.moduleSource} / {p.objetType}
+                        <span className="text-xs text-gray-500">
+                          {formatModuleSource(p.moduleSource)} • {formatObjetMetier(p.objetType)}
                         </span>
                       </div>
                       <p className="text-xs text-gray-800 dark:text-gray-200 line-clamp-2">
@@ -229,7 +237,7 @@ export function CockpitDashboardView() {
             </h2>
             <Link
               href="/cabinet/dossiers"
-              className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+              className="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
             >
               Gérer tout le portefeuille ({kpis.totalMandatsActifs})
             </Link>
@@ -251,7 +259,7 @@ export function CockpitDashboardView() {
                 {mandatsRecents.map((mandat) => (
                   <tr key={mandat.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
                     <td className="py-3 pr-4 font-medium text-gray-900 dark:text-white">
-                      {mandat.typeMandat.replace(/_/g, " ")}
+                      {formatTypeMandat(mandat.typeMandat)}
                     </td>
                     <td className="py-3 px-4 text-gray-600 dark:text-gray-300">
                       {mandat.collaborateurResponsable?.nomPrenoms || "Non assigné"}
@@ -264,13 +272,13 @@ export function CockpitDashboardView() {
                     </td>
                     <td className="py-3 px-4">
                       <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                        {mandat.statut}
+                        {formatStatutMandat(mandat.statut)}
                       </span>
                     </td>
                     <td className="py-3 pl-4 text-right">
                       <Link
                         href={`/cabinet/dossiers/${mandat.clientTenantId}`}
-                        className="font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                        className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
                       >
                         Consulter →
                       </Link>

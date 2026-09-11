@@ -3,9 +3,15 @@
 import React, { useState } from "react";
 import { useCollaborateurs } from "../hooks/useCollaborateurs";
 import { usePortefeuille } from "../hooks/usePortefeuille";
+import { useLinkedCompanies } from "../hooks/useLinkedCompanies";
 import { ErrorState, LoadingBlock } from "@/shared/components/feedback";
 import { RequireCabinetAccess } from "./RequireCabinetAccess";
 import type { CabinetNiveauHabilitation } from "../types/cabinet.types";
+import {
+  formatTypeMandat,
+  formatNiveauHabilitation,
+  formatMandatSelectOption,
+} from "../utils/cabinetLabels";
 
 export function CollaborateursView() {
   const [selectedMandatId, setSelectedMandatId] = useState("");
@@ -20,6 +26,10 @@ export function CollaborateursView() {
   } = useCollaborateurs(selectedMandatId || undefined);
 
   const { mandatsQuery } = usePortefeuille();
+  const { companiesQuery } = useLinkedCompanies();
+
+  const getClientName = (tenantId?: string | null) =>
+    companiesQuery.data?.find((c) => c.id === tenantId)?.name;
 
   const [isCollabModalOpen, setIsCollabModalOpen] = useState(false);
   const [isHabModalOpen, setIsHabModalOpen] = useState(false);
@@ -86,7 +96,7 @@ export function CollaborateursView() {
           <button
             type="button"
             onClick={() => setIsCollabModalOpen(true)}
-            className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none"
+            className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500"
           >
             + Nouveau Collaborateur
           </button>
@@ -112,10 +122,10 @@ export function CollaborateursView() {
                   className="rounded-xl border border-gray-100 bg-gray-50/50 p-4 shadow-2xs dark:border-gray-800 dark:bg-gray-800/40"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="inline-flex size-10 items-center justify-center rounded-full bg-indigo-100 font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                    <span className="inline-flex size-10 items-center justify-center rounded-full bg-brand-100 font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
                       {collab.nomPrenoms.charAt(0)}
                     </span>
-                    <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                    <span className="inline-flex rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
                       {collab.role?.libelle || "Collaborateur"}
                     </span>
                   </div>
@@ -159,7 +169,7 @@ export function CollaborateursView() {
               <button
                 type="button"
                 onClick={() => setIsHabModalOpen(true)}
-                className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600"
               >
                 + Habiliter un collaborateur
               </button>
@@ -170,12 +180,12 @@ export function CollaborateursView() {
             <select
               value={selectedMandatId}
               onChange={(e) => setSelectedMandatId(e.target.value)}
-              className="block w-full sm:w-80 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              className="block w-full sm:w-96 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             >
-              <option value="">Sélectionnez un dossier mandat pour voir les droits...</option>
+              <option value="">Sélectionnez un dossier client pour gérer les habilitations...</option>
               {mandats.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.typeMandat} (#{m.clientTenantId.slice(0, 8)})
+                  {formatMandatSelectOption(m, getClientName(m.clientTenantId))}
                 </option>
               ))}
             </select>
@@ -212,17 +222,17 @@ export function CollaborateursView() {
                           </td>
                           <td className="py-2.5 px-3">
                             <span
-                              className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                                 h.niveauAcces === "SIGNATURE"
                                   ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
                                   : h.niveauAcces === "VALIDATION"
                                     ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                                     : h.niveauAcces === "ANNOTATION"
-                                      ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
+                                      ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
                                       : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
                               }`}
                             >
-                              {h.niveauAcces}
+                              {formatNiveauHabilitation(h.niveauAcces)}
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-gray-400">
@@ -266,7 +276,7 @@ export function CollaborateursView() {
                     onChange={(e) => setNomPrenoms(e.target.value)}
                     placeholder="Ex: Paul MENSAH"
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -280,7 +290,7 @@ export function CollaborateursView() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="p.mensah@cabinet-audit.com"
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -292,12 +302,12 @@ export function CollaborateursView() {
                     value={roleId}
                     onChange={(e) => setRoleId(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
                     <option value="">Sélectionnez un rôle...</option>
                     {roles.map((r) => (
                       <option key={r.id} value={r.id}>
-                        {r.libelle} ({r.code})
+                        {r.libelle}
                       </option>
                     ))}
                   </select>
@@ -312,7 +322,7 @@ export function CollaborateursView() {
                     value={numeroOrdre}
                     onChange={(e) => setNumeroOrdre(e.target.value)}
                     placeholder="Ex: OECCA-TG-042"
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -327,7 +337,7 @@ export function CollaborateursView() {
                   <button
                     type="submit"
                     disabled={createCollaborateurMutation.isPending}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
                   >
                     {createCollaborateurMutation.isPending ? "Création..." : "Ajouter"}
                   </button>
@@ -354,7 +364,7 @@ export function CollaborateursView() {
                     value={habCollabId}
                     onChange={(e) => setHabCollabId(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
                     <option value="">Sélectionnez un collaborateur...</option>
                     {collaborateurs.map((c) => (
@@ -374,19 +384,19 @@ export function CollaborateursView() {
                     onChange={(e) =>
                       setNiveauAcces(e.target.value as CabinetNiveauHabilitation)
                     }
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
                     <option value="CONSULTATION">
-                      1. CONSULTATION (Lecture seule sans annotation)
+                      1. Consultation (Lecture seule sans annotation)
                     </option>
                     <option value="ANNOTATION">
-                      2. ANNOTATION (Points de revue & observations)
+                      2. Annotation (Points de revue & observations)
                     </option>
                     <option value="VALIDATION">
-                      3. VALIDATION (Visas d'étape et approbation)
+                      3. Validation (Visa des écritures & livrables)
                     </option>
                     <option value="SIGNATURE">
-                      4. SIGNATURE (Signature électronique certifiée)
+                      4. Signature (Signature certifiée & engagement cabinet)
                     </option>
                   </select>
                 </div>
@@ -402,7 +412,7 @@ export function CollaborateursView() {
                   <button
                     type="submit"
                     disabled={createHabilitationMutation.isPending}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
                   >
                     {createHabilitationMutation.isPending ? "Attribution..." : "Habiliter"}
                   </button>

@@ -1,3 +1,21 @@
+export type CabinetProfileInfo = {
+  id: string;
+  raisonSociale: string;
+  numeroInscriptionOrdre?: string | null;
+  paysCode: string;
+  adresse?: string | null;
+  telephone?: string | null;
+  emailContact?: string | null;
+};
+
+export type CollaborateurProfileInfo = {
+  id: string;
+  nomPrenoms: string;
+  statut: string;
+  numeroOrdreProfessionnel?: string | null;
+  role?: { code: string; libelle: string } | null;
+};
+
 export type ProfileTenant = {
   id: string;
   name: string;
@@ -6,6 +24,7 @@ export type ProfileTenant = {
   tradeName?: string | null;
   primaryCurrency: string;
   companyEmail?: string | null;
+  cabinet?: CabinetProfileInfo | null;
 };
 
 export type ProfileResponse = {
@@ -20,6 +39,8 @@ export type ProfileResponse = {
   isSuperAdmin: boolean;
   roles: string[];
   permissions: string[];
+  cabinet?: CabinetProfileInfo | null;
+  collaborateur?: CollaborateurProfileInfo | null;
   createdAt: string;
   updatedAt: string;
 };

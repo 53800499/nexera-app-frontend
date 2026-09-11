@@ -4,9 +4,16 @@ import React, { useState } from "react";
 import { useMissions } from "../hooks/useMissions";
 import { usePortefeuille } from "../hooks/usePortefeuille";
 import { useCollaborateurs } from "../hooks/useCollaborateurs";
+import { useLinkedCompanies } from "../hooks/useLinkedCompanies";
 import { ErrorState, LoadingBlock } from "@/shared/components/feedback";
 import { RequireCabinetAccess } from "./RequireCabinetAccess";
 import type { CabinetStatutMission, CabinetTypeMission } from "../types/cabinet.types";
+import {
+  formatTypeMandat,
+  formatTypeMission,
+  formatStatutMission,
+  formatMandatSelectOption,
+} from "../utils/cabinetLabels";
 
 export function MissionsView() {
   const [filterMandat, setFilterMandat] = useState("");
@@ -20,6 +27,10 @@ export function MissionsView() {
 
   const { mandatsQuery } = usePortefeuille();
   const { collaborateursQuery } = useCollaborateurs();
+  const { companiesQuery } = useLinkedCompanies();
+
+  const getClientName = (tenantId?: string) =>
+    companiesQuery.data?.find((c) => c.id === tenantId)?.name;
 
   const [isMissionModalOpen, setIsMissionModalOpen] = useState(false);
   const [isTacheModalOpen, setIsTacheModalOpen] = useState(false);
@@ -98,7 +109,7 @@ export function MissionsView() {
           <button
             type="button"
             onClick={() => setIsMissionModalOpen(true)}
-            className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none"
+            className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500"
           >
             + Nouvelle Mission
           </button>
@@ -106,33 +117,33 @@ export function MissionsView() {
 
         {/* FILTRES */}
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-xs dark:border-gray-800 dark:bg-gray-900">
-          <div className="w-full sm:w-64">
+          <div className="w-full sm:w-72">
             <select
               value={filterMandat}
               onChange={(e) => setFilterMandat(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             >
-              <option value="">Tous les dossiers / mandats</option>
+              <option value="">Tous les dossiers clients</option>
               {mandats.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.typeMandat} (#{m.clientTenantId.slice(0, 8)})
+                  {formatMandatSelectOption(m, getClientName(m.clientTenantId))}
                 </option>
               ))}
             </select>
           </div>
 
-          <div className="w-full sm:w-48">
+          <div className="w-full sm:w-56">
             <select
               value={filterStatut}
               onChange={(e) => setFilterStatut(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             >
-              <option value="">Tous les statuts</option>
-              <option value="PLANIFIEE">PLANIFIEE</option>
-              <option value="EN_COURS">EN COURS</option>
-              <option value="EN_REVUE">EN REVUE</option>
-              <option value="EN_RETARD">EN RETARD</option>
-              <option value="TERMINEE">TERMINEE</option>
+              <option value="">Tous les statuts de mission</option>
+              <option value="PLANIFIEE">Planifiée (À démarrer)</option>
+              <option value="EN_COURS">En cours de traitement</option>
+              <option value="EN_REVUE">En revue / Contrôle</option>
+              <option value="EN_RETARD">En retard (Échéance dépassée)</option>
+              <option value="TERMINEE">Terminée et validée</option>
             </select>
           </div>
         </div>
@@ -159,8 +170,8 @@ export function MissionsView() {
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
-                    <span className="inline-flex rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                      {m.typeMission}
+                    <span className="inline-flex rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+                      {formatTypeMission(m.typeMission)}
                     </span>
                     <select
                       value={m.statut}
@@ -175,11 +186,11 @@ export function MissionsView() {
                             : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
                       }`}
                     >
-                      <option value="PLANIFIEE">PLANIFIÉE</option>
-                      <option value="EN_COURS">EN COURS</option>
-                      <option value="EN_REVUE">EN REVUE</option>
-                      <option value="EN_RETARD">EN RETARD</option>
-                      <option value="TERMINEE">TERMINÉE</option>
+                      <option value="PLANIFIEE">Planifiée (À faire)</option>
+                      <option value="EN_COURS">En cours de traitement</option>
+                      <option value="EN_REVUE">En revue / Supervision</option>
+                      <option value="EN_RETARD">En retard</option>
+                      <option value="TERMINEE">Terminée ✓</option>
                     </select>
                   </div>
 
@@ -187,7 +198,7 @@ export function MissionsView() {
                     {m.libelle}
                   </h3>
                   <p className="mt-1 text-xs text-gray-500">
-                    Dossier : <span className="font-medium text-gray-700 dark:text-gray-300">{m.mandat?.typeMandat}</span> ({m.mandat?.clientTenantId.slice(0, 8)})
+                    Dossier : <span className="font-medium text-gray-700 dark:text-gray-300">{getClientName(m.mandat?.clientTenantId) || "Dossier client"}</span> — {formatTypeMandat(m.mandat?.typeMandat)}
                   </p>
 
                   <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
@@ -214,7 +225,7 @@ export function MissionsView() {
                           setSelectedMissionId(m.id);
                           setIsTacheModalOpen(true);
                         }}
-                        className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                        className="text-brand-600 hover:text-brand-700 dark:text-brand-400"
                       >
                         + Ajouter tâche
                       </button>
@@ -259,12 +270,12 @@ export function MissionsView() {
                     value={mandatId}
                     onChange={(e) => setMandatId(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
-                    <option value="">Sélectionnez un mandat...</option>
+                    <option value="">Sélectionnez un dossier client...</option>
                     {mandats.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.typeMandat} (#{m.clientTenantId.slice(0, 8)})
+                        {formatMandatSelectOption(m, getClientName(m.clientTenantId))}
                       </option>
                     ))}
                   </select>
@@ -280,7 +291,7 @@ export function MissionsView() {
                     onChange={(e) => setLibelle(e.target.value)}
                     placeholder="Ex: Clôture mensuelle & Déclarations TVA"
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -292,10 +303,10 @@ export function MissionsView() {
                     <select
                       value={typeMission}
                       onChange={(e) => setTypeMission(e.target.value as CabinetTypeMission)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     >
-                      <option value="RECURRENTE">Récurrente (mensuelle/périodique)</option>
-                      <option value="PONCTUELLE">Ponctuelle</option>
+                      <option value="RECURRENTE">Mission récurrente (mensuelle, trimestrielle, annuelle)</option>
+                      <option value="PONCTUELLE">Mission ponctuelle (audit, conseil exceptionnel)</option>
                     </select>
                   </div>
                   <div>
@@ -307,7 +318,7 @@ export function MissionsView() {
                       value={periodeReference}
                       onChange={(e) => setPeriodeReference(e.target.value)}
                       placeholder="Ex: 2026-02"
-                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>
                 </div>
@@ -320,7 +331,7 @@ export function MissionsView() {
                     type="date"
                     value={dateEcheance}
                     onChange={(e) => setDateEcheance(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -335,7 +346,7 @@ export function MissionsView() {
                   <button
                     type="submit"
                     disabled={createMissionMutation.isPending}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
                   >
                     {createMissionMutation.isPending ? "Création..." : "Créer Mission"}
                   </button>
@@ -364,7 +375,7 @@ export function MissionsView() {
                     onChange={(e) => setTacheLibelle(e.target.value)}
                     placeholder="Ex: Rapprochement bancaire BOA"
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -375,12 +386,12 @@ export function MissionsView() {
                   <select
                     value={assigneId}
                     onChange={(e) => setAssigneId(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
-                    <option value="">Sélectionner un collaborateur...</option>
+                    <option value="">Sélectionner un collaborateur assigné...</option>
                     {collaborateurs.map((collab) => (
                       <option key={collab.id} value={collab.id}>
-                        {collab.nomPrenoms} ({collab.role?.libelle || "Collaborateur"})
+                        {collab.nomPrenoms} — {collab.role?.libelle || "Collaborateur"}
                       </option>
                     ))}
                   </select>
@@ -394,7 +405,7 @@ export function MissionsView() {
                     type="date"
                     value={tacheDateEcheance}
                     onChange={(e) => setTacheDateEcheance(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -409,7 +420,7 @@ export function MissionsView() {
                   <button
                     type="submit"
                     disabled={createTacheMutation.isPending}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
                   >
                     {createTacheMutation.isPending ? "Ajout..." : "Ajouter Tâche"}
                   </button>

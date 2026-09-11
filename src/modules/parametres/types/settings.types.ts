@@ -17,6 +17,8 @@ export type TenantSettings = {
   siret?: string | null;
   vatNumber?: string | null;
   registrationNumber?: string | null;
+  numeroInscriptionOrdre?: string | null;
+  paysCode?: string | null;
   shareCapital?: string | null;
   companyAddress?: CompanyAddress | null;
   companyPhone?: string | null;

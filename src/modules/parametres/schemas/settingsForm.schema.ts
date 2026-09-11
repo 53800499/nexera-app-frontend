@@ -10,6 +10,8 @@ export const tenantSettingsSchema = z.object({
   siret: z.string().optional(),
   vatNumber: z.string().optional(),
   registrationNumber: z.string().optional(),
+  numeroInscriptionOrdre: z.string().optional(),
+  paysCode: z.string().optional(),
   shareCapital: z.string().optional(),
   street: z.string().optional(),
   city: z.string().optional(),

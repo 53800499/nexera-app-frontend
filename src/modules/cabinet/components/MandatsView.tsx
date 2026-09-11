@@ -8,6 +8,7 @@ import { useLinkedCompanies } from "../hooks/useLinkedCompanies";
 import { ErrorState, LoadingBlock } from "@/shared/components/feedback";
 import { RequireCabinetAccess } from "./RequireCabinetAccess";
 import type { CabinetTypeMandat } from "../types/cabinet.types";
+import { formatTypeMandat, formatStatutMandat } from "../utils/cabinetLabels";
 
 export function MandatsView() {
   const { mandatsQuery, createMandatMutation } = usePortefeuille();
@@ -57,7 +58,7 @@ export function MandatsView() {
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none"
+            className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500"
           >
             + Formaliser un Mandat
           </button>
@@ -95,14 +96,14 @@ export function MandatsView() {
                   <tr key={m.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
                     <td className="py-4 px-4">
                       <p className="font-semibold text-gray-900 dark:text-white">
-                        Dossier #{m.clientTenantId.slice(0, 8)}
+                        {companies.find((c) => c.id === m.clientTenantId)?.name || "Dossier client"}
                       </p>
                       <p className="text-xs text-gray-500">
                         {m.contactsClient?.length ? `${m.contactsClient.length} contact(s)` : "Aucun contact renseigné"}
                       </p>
                     </td>
-                    <td className="py-4 px-4 font-medium text-indigo-600 dark:text-indigo-400">
-                      {m.typeMandat.replace(/_/g, " ")}
+                    <td className="py-4 px-4 font-medium text-brand-600 dark:text-brand-400">
+                      {formatTypeMandat(m.typeMandat)}
                     </td>
                     <td className="py-4 px-4 text-gray-600 dark:text-gray-300">
                       {m.collaborateurResponsable?.nomPrenoms || (
@@ -118,13 +119,13 @@ export function MandatsView() {
                     </td>
                     <td className="py-4 px-4">
                       <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                        {m.statut}
+                        {formatStatutMandat(m.statut)}
                       </span>
                     </td>
                     <td className="py-4 pr-4 text-right">
                       <Link
                         href={`/cabinet/dossiers/${m.clientTenantId}`}
-                        className="inline-flex items-center rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900"
+                        className="inline-flex items-center rounded-md bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-300 dark:hover:bg-brand-500/25"
                       >
                         Ouvrir Dossier →
                       </Link>
@@ -156,12 +157,12 @@ export function MandatsView() {
                     value={selectedCompanyId}
                     onChange={(e) => setSelectedCompanyId(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
                     <option value="">Sélectionnez une entreprise liée...</option>
                     {companies.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name} ({c.id.slice(0, 8)})
+                        {c.name}
                       </option>
                     ))}
                   </select>
@@ -175,14 +176,14 @@ export function MandatsView() {
                     value={typeMandat}
                     onChange={(e) => setTypeMandat(e.target.value as CabinetTypeMandat)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
                     <option value="TENUE_COMPTABLE">Tenue comptable mensuelle SYSCOHADA</option>
-                    <option value="REVISION_ANNUELLE">Révision annuelle des comptes</option>
-                    <option value="EXPERTISE_PAIE">Expertise sociale & Paie</option>
-                    <option value="ASSISTANCE_FISCALE">Assistance & Déclarations fiscales</option>
+                    <option value="REVISION_ANNUELLE">Révision & Clôture annuelle des comptes</option>
+                    <option value="EXPERTISE_PAIE">Gestion sociale & Paie</option>
+                    <option value="ASSISTANCE_FISCALE">Fiscalité & Déclarations</option>
                     <option value="AUDIT_CONTRACTUEL">Audit contractuel</option>
-                    <option value="MISSION_PONCTUELLE">Mission ponctuelle de conseil</option>
+                    <option value="MISSION_PONCTUELLE">Conseil & Mission ponctuelle</option>
                   </select>
                 </div>
 
@@ -196,7 +197,7 @@ export function MandatsView() {
                       value={dateDebut}
                       onChange={(e) => setDateDebut(e.target.value)}
                       required
-                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>
                   <div>
@@ -207,7 +208,7 @@ export function MandatsView() {
                       type="date"
                       value={dateFin}
                       onChange={(e) => setDateFin(e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>
                 </div>
@@ -219,9 +220,9 @@ export function MandatsView() {
                   <select
                     value={responsableId}
                     onChange={(e) => setResponsableId(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
-                    <option value="">Sélectionner un collaborateur...</option>
+                    <option value="">Sélectionner un collaborateur responsable...</option>
                     {collaborateurs.map((collab) => (
                       <option key={collab.id} value={collab.id}>
                         {collab.nomPrenoms} ({collab.role?.libelle || "Collaborateur"})
@@ -241,7 +242,7 @@ export function MandatsView() {
                   <button
                     type="submit"
                     disabled={createMandatMutation.isPending}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
                   >
                     {createMandatMutation.isPending ? "Création..." : "Créer le Mandat"}
                   </button>

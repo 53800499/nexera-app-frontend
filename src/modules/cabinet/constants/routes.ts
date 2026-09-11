@@ -9,4 +9,8 @@ export const CABINET_QUERY_KEYS = {
   linkedCompanies: ["cabinet", "companies"] as const,
   companyInvoices: (companyTenantId: string, page: number, limit: number) =>
     ["cabinet", "companies", companyTenantId, "invoices", page, limit] as const,
+  companyPayments: (companyTenantId: string, page: number, limit: number) =>
+    ["cabinet", "companies", companyTenantId, "payments", page, limit] as const,
+  companyClients: (companyTenantId: string, page: number, limit: number) =>
+    ["cabinet", "companies", companyTenantId, "clients", page, limit] as const,
 };

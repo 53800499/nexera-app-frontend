@@ -6,9 +6,16 @@ import { ErrorState, LoadingBlock, useToast } from "@/shared/components/feedback
 import { AppError } from "@/shared/core/AppError";
 import { RequireCabinetAccess } from "./RequireCabinetAccess";
 import type {
+  CabinetCircuitValidation,
   CabinetDecisionValidation,
   CabinetMethodeSignature,
 } from "../types/cabinet.types";
+import {
+  formatObjetMetier,
+  formatRoleCode,
+  formatDecisionValidation,
+  formatMethodeSignature,
+} from "../utils/cabinetLabels";
 
 export function ValidationsView() {
   const toast = useToast();
@@ -121,14 +128,14 @@ export function ValidationsView() {
             <button
               type="button"
               onClick={() => setIsVisaModalOpen(true)}
-              className="inline-flex items-center justify-center rounded-lg border border-indigo-600 px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:border-indigo-400 dark:text-indigo-400 dark:hover:bg-indigo-950"
+              className="inline-flex items-center justify-center rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-400 dark:text-brand-400 dark:hover:bg-brand-950/30"
             >
               + Apposer un Visa
             </button>
             <button
               type="button"
               onClick={() => setIsSignatureModalOpen(true)}
-              className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none"
+              className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 focus:outline-none"
             >
               🔏 Signature Probante
             </button>
@@ -157,26 +164,26 @@ export function ValidationsView() {
                 >
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-indigo-700 dark:text-indigo-300">
-                        {circuit.typeObjetCible}
+                      <span className="text-xs font-bold text-brand-700 dark:text-brand-300">
+                        {formatObjetMetier(circuit.typeObjetCible)}
                       </span>
                       <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                        {circuit.actif ? "ACTIF" : "INACTIF"}
+                        {circuit.actif ? "Actif" : "Inactif"}
                       </span>
                     </div>
 
                     <div className="mt-4 space-y-2.5">
                       {circuit.etapes.map((e) => (
                         <div key={e.etape} className="flex items-start gap-2 text-xs">
-                          <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 font-bold text-white">
+                          <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand-500 font-bold text-white">
                             {e.etape}
                           </span>
                           <div>
                             <p className="font-semibold text-gray-800 dark:text-gray-200">
                               {e.libelle}
                             </p>
-                            <p className="font-mono text-[10px] text-gray-400">
-                              Rôle requis : {e.roleCode}
+                            <p className="text-[10px] text-gray-500">
+                              Rôle requis : {formatRoleCode(e.roleCode)}
                             </p>
                           </div>
                         </div>
@@ -206,12 +213,12 @@ export function ValidationsView() {
                     value={circuitId}
                     onChange={(e) => setCircuitId(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
-                    <option value="">Sélectionnez un circuit...</option>
+                    <option value="">Sélectionnez un circuit de validation...</option>
                     {circuits.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.typeObjetCible} ({c.etapes.length} étapes)
+                        {formatObjetMetier(c.typeObjetCible)} — ({c.etapes.length} étapes de visa)
                       </option>
                     ))}
                   </select>
@@ -226,7 +233,7 @@ export function ValidationsView() {
                     value={visaObjetType}
                     onChange={(e) => setVisaObjetType(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -240,26 +247,26 @@ export function ValidationsView() {
                     onChange={(e) => setVisaObjetId(e.target.value)}
                     placeholder="Ex: b5f0535e-9a29-450f-9080-1a0678d4baec, rh_cycle_2026_08..."
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                    Décision *
+                    Décision de validation *
                   </label>
                   <select
                     value={decision}
                     onChange={(e) =>
                       setDecision(e.target.value as CabinetDecisionValidation)
                     }
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
-                    <option value="APPROUVE">APPROUVÉ (Bon pour émission)</option>
+                    <option value="APPROUVE">Approuvé (Bon pour émission / Clôture)</option>
                     <option value="RENVOYE_POUR_CORRECTION">
-                      RENVOYÉ POUR CORRECTION
+                      Renvoyé pour correction (Modifications requises)
                     </option>
-                    <option value="REJETE">REJETÉ</option>
+                    <option value="REJETE">Rejeté (Non conforme)</option>
                   </select>
                 </div>
 
@@ -272,7 +279,7 @@ export function ValidationsView() {
                     onChange={(e) => setCommentaire(e.target.value)}
                     rows={2}
                     placeholder="Précisions éventuelles sur la validation..."
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -287,7 +294,7 @@ export function ValidationsView() {
                   <button
                     type="submit"
                     disabled={submitValidationMutation.isPending}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
                   >
                     {submitValidationMutation.isPending
                       ? "Enregistrement..."
@@ -320,7 +327,7 @@ export function ValidationsView() {
                     value={sigObjetType}
                     onChange={(e) => setSigObjetType(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -334,7 +341,7 @@ export function ValidationsView() {
                     onChange={(e) => setSigObjetId(e.target.value)}
                     placeholder="Ex: b5f0535e-9a29-450f-9080-1a0678d4baec, tax_liasse_2026..."
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -347,16 +354,16 @@ export function ValidationsView() {
                     onChange={(e) =>
                       setMethode(e.target.value as CabinetMethodeSignature)
                     }
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
                     <option value="SIGNATURE_ELECTRONIQUE_QUALIFIEE">
-                      Signature Électronique Qualifiée (SEQ)
+                      Signature Électronique Qualifiée (Certificat eIDAS / RGS**)
                     </option>
                     <option value="SIGNATURE_ELECTRONIQUE_SIMPLE">
-                      Signature Électronique Simple (SES)
+                      Signature Électronique Standard (Horodatage sécurisé)
                     </option>
                     <option value="SIGNATURE_MANUSCRITE_SCANNEE">
-                      Signature Manuscrite Scannée
+                      Signature Manuscrite Numérisée (Griffe cabinet)
                     </option>
                   </select>
                 </div>
@@ -370,7 +377,7 @@ export function ValidationsView() {
                     value={empreinte}
                     onChange={(e) => setEmpreinte(e.target.value)}
                     required
-                    className="mt-1 block w-full font-mono rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full font-mono rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -385,7 +392,7 @@ export function ValidationsView() {
                   <button
                     type="submit"
                     disabled={apposeSignatureMutation.isPending}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
                   >
                     {apposeSignatureMutation.isPending
                       ? "Signature en cours..."

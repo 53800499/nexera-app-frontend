@@ -7,7 +7,11 @@ import { useAuthStore } from "@/modules/auth/store/authStore";
 import { WORKSPACE_TYPES } from "@/modules/auth/types/user.types";
 import { LoadingBlock } from "@/shared/components/feedback";
 
-const CABINET_ALLOWED_ADMIN_PATHS = ["/utilisateurs", "/parametres"];
+const CABINET_ALLOWED_ADMIN_PATHS = [
+  "/utilisateurs",
+  "/parametres",
+  "/profile",
+];
 
 type Props = {
   children: React.ReactNode;

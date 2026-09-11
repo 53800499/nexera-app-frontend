@@ -29,6 +29,8 @@ import type {
   GrantCabinetAccessPayload,
   LinkedCompany,
   PaginatedCabinetInvoices,
+  PaginatedCabinetPayments,
+  PaginatedCabinetClients,
   UpdateCabinetPermissionsPayload,
 } from "../types/cabinet.types";
 
@@ -83,6 +85,32 @@ export const cabinetApi = {
     const query = search.toString();
     return authorizedFetch<PaginatedCabinetInvoices>(
       `/cabinet/companies/${companyTenantId}/invoices${query ? `?${query}` : ""}`,
+    );
+  },
+
+  listCompanyPayments: (
+    companyTenantId: string,
+    params: { page?: number; limit?: number } = {},
+  ) => {
+    const search = new URLSearchParams();
+    if (params.page) search.set("page", String(params.page));
+    if (params.limit) search.set("limit", String(params.limit));
+    const query = search.toString();
+    return authorizedFetch<PaginatedCabinetPayments>(
+      `/cabinet/companies/${companyTenantId}/payments${query ? `?${query}` : ""}`,
+    );
+  },
+
+  listCompanyClients: (
+    companyTenantId: string,
+    params: { page?: number; limit?: number } = {},
+  ) => {
+    const search = new URLSearchParams();
+    if (params.page) search.set("page", String(params.page));
+    if (params.limit) search.set("limit", String(params.limit));
+    const query = search.toString();
+    return authorizedFetch<PaginatedCabinetClients>(
+      `/cabinet/companies/${companyTenantId}/clients${query ? `?${query}` : ""}`,
     );
   },
 

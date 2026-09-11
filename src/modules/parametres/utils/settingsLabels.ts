@@ -52,7 +52,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     href: "/parametres/entreprise",
     group: "billing",
     groupLabel: SETTINGS_GROUP_LABELS.billing,
-    workspaces: [WORKSPACE_TYPES.ENTREPRISE],
+    workspaces: [WORKSPACE_TYPES.ENTREPRISE, WORKSPACE_TYPES.CABINET],
   },
   {
     title: "Cabinet comptable",
@@ -92,7 +92,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     href: "/parametres/devises",
     group: "billing",
     groupLabel: SETTINGS_GROUP_LABELS.billing,
-    workspaces: [WORKSPACE_TYPES.ENTREPRISE],
+    workspaces: [WORKSPACE_TYPES.ENTREPRISE, WORKSPACE_TYPES.CABINET],
   },
   {
     title: "Numérotation",
@@ -135,7 +135,24 @@ export function getSettingsSectionsForWorkspace(
   return SETTINGS_SECTIONS.filter(
     (section) =>
       !section.workspaces || section.workspaces.includes(current),
-  );
+  ).map((section) => {
+    if (current === WORKSPACE_TYPES.CABINET) {
+      if (section.href === "/parametres/entreprise") {
+        return {
+          ...section,
+          title: "Fiche Cabinet",
+          description: "Raison sociale, N° d'ordre, coordonnées et identité du cabinet",
+        };
+      }
+      if (section.href === "/parametres/devises") {
+        return {
+          ...section,
+          description: "Devise principale et devises secondaires du cabinet",
+        };
+      }
+    }
+    return section;
+  });
 }
 
 export function getSettingsSectionsByGroupForWorkspace(
@@ -145,10 +162,14 @@ export function getSettingsSectionsByGroupForWorkspace(
   label: string;
   sections: SettingsSection[];
 }> {
+  const current = workspace ?? WORKSPACE_TYPES.ENTREPRISE;
   const sections = getSettingsSectionsForWorkspace(workspace);
   return SETTINGS_GROUP_ORDER.map((id) => ({
     id,
-    label: SETTINGS_GROUP_LABELS[id],
+    label:
+      current === WORKSPACE_TYPES.CABINET && id === "billing"
+        ? "Cabinet & facturation"
+        : SETTINGS_GROUP_LABELS[id],
     sections: sections.filter((section) => section.group === id),
   })).filter((group) => group.sections.length > 0);
 }

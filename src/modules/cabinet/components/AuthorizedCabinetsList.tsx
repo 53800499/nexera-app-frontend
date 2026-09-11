@@ -85,11 +85,16 @@ function CabinetAccessRow({
     <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h4 className="text-sm font-semibold text-gray-800 dark:text-white/90">
-            {cabinet.name}
-          </h4>
+          <div className="flex items-center gap-2">
+            <h4 className="text-base font-semibold text-gray-800 dark:text-white/90">
+              {cabinet.details?.raisonSociale || cabinet.name}
+            </h4>
+            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+              Accès actif
+            </span>
+          </div>
           <p className="mt-1 text-xs text-gray-500">
-            Autorisé depuis le {formatDate(cabinet.linkedAt)}
+            Cabinet comptable autorisé depuis le {formatDate(cabinet.linkedAt)}
           </p>
         </div>
         {canManage && !isEditing ? (
@@ -108,6 +113,54 @@ function CabinetAccessRow({
           </div>
         ) : null}
       </div>
+
+      {/* Détails du cabinet */}
+      {cabinet.details ? (
+        <div className="mt-3 grid grid-cols-1 gap-2.5 rounded-lg border border-gray-100 bg-gray-50/80 p-3.5 text-xs text-gray-600 sm:grid-cols-2 lg:grid-cols-3 dark:border-gray-800/60 dark:bg-gray-800/40 dark:text-gray-300">
+          {cabinet.details.email ? (
+            <div>
+              <span className="font-medium text-gray-500 dark:text-gray-400">Email : </span>
+              <a
+                href={`mailto:${cabinet.details.email}`}
+                className="font-medium text-brand-500 hover:underline"
+              >
+                {cabinet.details.email}
+              </a>
+            </div>
+          ) : null}
+          {cabinet.details.telephone ? (
+            <div>
+              <span className="font-medium text-gray-500 dark:text-gray-400">Téléphone : </span>
+              <a
+                href={`tel:${cabinet.details.telephone}`}
+                className="font-medium text-brand-500 hover:underline"
+              >
+                {cabinet.details.telephone}
+              </a>
+            </div>
+          ) : null}
+          {cabinet.details.numeroInscriptionOrdre ? (
+            <div>
+              <span className="font-medium text-gray-500 dark:text-gray-400">N° Ordre des Experts-Comptables : </span>
+              <span className="font-semibold text-gray-700 dark:text-gray-200">
+                {cabinet.details.numeroInscriptionOrdre}
+              </span>
+            </div>
+          ) : null}
+          {cabinet.details.adresse ? (
+            <div className="sm:col-span-2">
+              <span className="font-medium text-gray-500 dark:text-gray-400">Adresse : </span>
+              <span>{cabinet.details.adresse}</span>
+            </div>
+          ) : null}
+          {cabinet.details.siret ? (
+            <div>
+              <span className="font-medium text-gray-500 dark:text-gray-400">SIRET : </span>
+              <span className="font-medium">{cabinet.details.siret}</span>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {isEditing ? (
         <div className="mt-4 space-y-4">

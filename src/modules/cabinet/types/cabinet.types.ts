@@ -6,7 +6,19 @@ export type LinkedCompany = {
   permissions: string[];
 };
 
-export type AuthorizedCabinet = LinkedCompany;
+export type CabinetDetailsSummary = {
+  raisonSociale: string;
+  email?: string | null;
+  telephone?: string | null;
+  adresse?: string | null;
+  numeroInscriptionOrdre?: string | null;
+  paysCode?: string | null;
+  siret?: string | null;
+};
+
+export type AuthorizedCabinet = LinkedCompany & {
+  details?: CabinetDetailsSummary;
+};
 
 export type GrantCabinetAccessPayload = {
   inviteCode?: string;
@@ -44,6 +56,73 @@ export type PaginatedCabinetInvoices = {
   page: number;
   limit: number;
 };
+
+export type CabinetCompanyPaymentImputation = {
+  id: string;
+  amount: number;
+  invoice: {
+    id: string;
+    number: string;
+  };
+};
+
+export type CabinetCompanyPayment = {
+  id: string;
+  reference?: string | null;
+  paymentDate: string;
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  isCancelled: boolean;
+  unallocatedAmount: number;
+  client: {
+    id: string;
+    companyName: string;
+  };
+  imputations?: CabinetCompanyPaymentImputation[];
+};
+
+export type PaginatedCabinetPayments = {
+  items: CabinetCompanyPayment[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+export type CabinetCompanyClientContactRef = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email?: string | null;
+  phone?: string | null;
+  isPrimary?: boolean;
+};
+
+export type CabinetCompanyClient = {
+  id: string;
+  code: string;
+  companyName: string;
+  tradeName?: string | null;
+  clientType: string;
+  siret?: string | null;
+  taxId?: string | null;
+  defaultCurrency?: string;
+  isArchived: boolean;
+  createdAt: string;
+  contacts?: CabinetCompanyClientContactRef[];
+  _count?: {
+    invoices: number;
+    payments: number;
+  };
+};
+
+export type PaginatedCabinetClients = {
+  items: CabinetCompanyClient[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
 
 // ==========================================
 // MODULE 6 — TYPES OFFICIELS SFD & MBD

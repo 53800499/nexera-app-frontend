@@ -22,14 +22,14 @@ export const CABINET_SCOPE_PERMISSION_OPTIONS: {
   {
     code: CABINET_SCOPE_PERMISSIONS.PAYMENTS_READ,
     label: "Consulter les encaissements",
-    description: "Suivi des paiements reçus (bientôt disponible).",
-    available: false,
+    description: "Suivi des paiements et encaissements reçus par l'entreprise.",
+    available: true,
   },
   {
     code: CABINET_SCOPE_PERMISSIONS.CLIENTS_READ,
     label: "Consulter les clients",
-    description: "Référentiel clients de l'entreprise (bientôt disponible).",
-    available: false,
+    description: "Référentiel et fiches clients de l'entreprise.",
+    available: true,
   },
 ];
 

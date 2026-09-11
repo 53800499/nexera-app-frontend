@@ -3,9 +3,11 @@
 import React, { useState } from "react";
 import { useMissions } from "../hooks/useMissions";
 import { usePortefeuille } from "../hooks/usePortefeuille";
+import { useLinkedCompanies } from "../hooks/useLinkedCompanies";
 import { ErrorState, LoadingBlock } from "@/shared/components/feedback";
 import { RequireCabinetAccess } from "./RequireCabinetAccess";
 import type { CabinetStatutEcheance } from "../types/cabinet.types";
+import { formatTypeMandat, formatStatutEcheance, formatMandatSelectOption } from "../utils/cabinetLabels";
 
 export function CalendrierView() {
   const [filterMandat, setFilterMandat] = useState("");
@@ -17,6 +19,7 @@ export function CalendrierView() {
   });
 
   const { mandatsQuery } = usePortefeuille();
+  const { companiesQuery } = useLinkedCompanies();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [mandatId, setMandatId] = useState("");
@@ -26,6 +29,9 @@ export function CalendrierView() {
 
   const echeances = calendrierQuery.data ?? [];
   const mandats = mandatsQuery.data ?? [];
+
+  const getClientName = (tenantId?: string | null) =>
+    companiesQuery.data?.find((c) => c.id === tenantId)?.name;
 
   const handleCreateEcheance = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,17 +50,18 @@ export function CalendrierView() {
     setRefM7("");
   };
 
-  const handleStatusUpdate = async (id: string, statut: CabinetStatutEcheance) => {
+  const handleStatusUpdate = async (id: string, newStatut: CabinetStatutEcheance) => {
     await updateEcheanceMutation.mutateAsync({
       id,
-      payload: { statut },
+      payload: { statut: newStatut },
     });
   };
 
   return (
     <RequireCabinetAccess>
       <div className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* EN-TÊTE */}
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               Calendrier Consolidé du Cabinet
@@ -66,7 +73,7 @@ export function CalendrierView() {
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none"
+            className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500"
           >
             + Ajouter une Échéance
           </button>
@@ -74,32 +81,32 @@ export function CalendrierView() {
 
         {/* FILTRES */}
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-xs dark:border-gray-800 dark:bg-gray-900">
-          <div className="w-full sm:w-64">
+          <div className="w-full sm:w-72">
             <select
               value={filterMandat}
               onChange={(e) => setFilterMandat(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             >
-              <option value="">Tous les dossiers / mandats</option>
+              <option value="">Tous les dossiers clients</option>
               {mandats.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.typeMandat} (#{m.clientTenantId.slice(0, 8)})
+                  {formatMandatSelectOption(m, getClientName(m.clientTenantId))}
                 </option>
               ))}
             </select>
           </div>
 
-          <div className="w-full sm:w-48">
+          <div className="w-full sm:w-56">
             <select
               value={filterStatut}
               onChange={(e) => setFilterStatut(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             >
-              <option value="">Tous les statuts</option>
-              <option value="A_VENIR">À VENIR</option>
-              <option value="DUE">DUE</option>
-              <option value="TRAITEE">TRAITÉE</option>
-              <option value="EN_RETARD">EN RETARD</option>
+              <option value="">Tous les statuts d'échéance</option>
+              <option value="A_VENIR">À venir (Dans les délais)</option>
+              <option value="DUE">Échue (À traiter)</option>
+              <option value="TRAITEE">Traitée (Validée)</option>
+              <option value="EN_RETARD">En retard (Action requise)</option>
             </select>
           </div>
         </div>
@@ -157,8 +164,8 @@ export function CalendrierView() {
                         )}
                       </td>
                       <td className="py-4 px-4">
-                        <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
-                          {ech.mandat?.typeMandat} (#{ech.mandat?.clientTenantId.slice(0, 8)})
+                        <span className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                          {formatMandatSelectOption(ech.mandat, getClientName(ech.mandat?.clientTenantId))}
                         </span>
                       </td>
                       <td className="py-4 px-4">
@@ -180,7 +187,7 @@ export function CalendrierView() {
                                 : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
                           }`}
                         >
-                          {isLate && ech.statut !== "TRAITEE" ? "EN RETARD" : ech.statut}
+                          {formatStatutEcheance(ech.statut, isLate)}
                         </span>
                       </td>
                       <td className="py-4 pr-4 text-right">
@@ -215,18 +222,18 @@ export function CalendrierView() {
               <form onSubmit={handleCreateEcheance} className="mt-4 space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                    Mandat / Dossier Client *
+                    Dossier Client associé *
                   </label>
                   <select
                     value={mandatId}
                     onChange={(e) => setMandatId(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
-                    <option value="">Sélectionnez un mandat...</option>
+                    <option value="">Sélectionnez un dossier client...</option>
                     {mandats.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.typeMandat} (#{m.clientTenantId.slice(0, 8)})
+                        {formatMandatSelectOption(m, getClientName(m.clientTenantId))}
                       </option>
                     ))}
                   </select>
@@ -242,7 +249,7 @@ export function CalendrierView() {
                     onChange={(e) => setLibelle(e.target.value)}
                     placeholder="Ex: Déclaration mensuelle de TVA (CA3)"
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -255,7 +262,7 @@ export function CalendrierView() {
                     value={dateLimite}
                     onChange={(e) => setDateLimite(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -268,7 +275,7 @@ export function CalendrierView() {
                     value={refM7}
                     onChange={(e) => setRefM7(e.target.value)}
                     placeholder="Ex: TVA-2026-02"
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -283,7 +290,7 @@ export function CalendrierView() {
                   <button
                     type="submit"
                     disabled={createEcheanceMutation.isPending}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
                   >
                     {createEcheanceMutation.isPending ? "Ajout..." : "Enregistrer"}
                   </button>
