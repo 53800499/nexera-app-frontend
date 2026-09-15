@@ -16,6 +16,7 @@ import {
 import { RequireStockAccess } from "../../components/RequireStockAccess";
 import {
   useAvailableLots,
+  useAvailableSerials,
   useStockArticles,
   useStockExits,
   useWarehouses,
@@ -68,7 +69,39 @@ function ExitLineFields({
     (a) => a.stockItem?.id === line.stockItemId,
   )?.stockItem;
   const lotsQuery = useAvailableLots(line.stockItemId, warehouseId);
+  const serialsQuery = useAvailableSerials(line.stockItemId, warehouseId);
   const isFifo = item?.valuationMethod === "fifo" && item?.trackLots;
+
+  const parsedSerials = line.serialNumbers
+    .split(/[\n,;]+/)
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+
+  const availableList = serialsQuery.data?.serials ?? [];
+  const targetQty = Math.round(Number(line.qty) || 0);
+
+  const duplicateSerials = parsedSerials.filter(
+    (sn, idx, arr) => arr.indexOf(sn) !== idx,
+  );
+
+  const unavailableSerials =
+    availableList.length > 0
+      ? parsedSerials.filter(
+          (sn) => !availableList.some((s) => s.serialNumber.toUpperCase() === sn),
+        )
+      : [];
+
+  const toggleSerial = (sn: string) => {
+    const upper = sn.trim().toUpperCase();
+    if (parsedSerials.includes(upper)) {
+      const next = parsedSerials.filter((s) => s !== upper);
+      onChange({ serialNumbers: next.join("\n") });
+    } else {
+      if (parsedSerials.length >= targetQty) return;
+      const next = [...parsedSerials, upper];
+      onChange({ serialNumbers: next.join("\n") });
+    }
+  };
 
   return (
     <div className="space-y-3 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
@@ -86,7 +119,7 @@ function ExitLineFields({
           <select
             value={line.stockItemId}
             onChange={(e) =>
-              onChange({ stockItemId: e.target.value, lotId: "" })
+              onChange({ stockItemId: e.target.value, lotId: "", serialNumbers: "" })
             }
             required
             className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm dark:border-gray-700 dark:bg-gray-900"
@@ -94,7 +127,7 @@ function ExitLineFields({
             <option value="">— Choisir —</option>
             {(configuredArticles ?? []).map((a) => (
               <option key={a.stockItem!.id} value={a.stockItem!.id}>
-                {a.reference} — {a.name} (dispo miroir: {a.stockQuantity})
+                {a.reference} — {a.name} (disponible : {a.stockQuantity})
               </option>
             ))}
           </select>
@@ -113,7 +146,7 @@ function ExitLineFields({
         {item?.trackLots ? (
           <div>
             <Label>
-              Lot {isFifo ? "(FIFO auto si vide)" : "(obligatoire)"}
+              Lot {isFifo ? "(sélection automatique FIFO si non renseigné)" : "(obligatoire)"}
             </Label>
             <select
               value={line.lotId}
@@ -122,7 +155,7 @@ function ExitLineFields({
               className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm dark:border-gray-700 dark:bg-gray-900"
             >
               <option value="">
-                {isFifo ? "— FIFO automatique —" : "— Choisir —"}
+                {isFifo ? "— FIFO automatique (plus ancien d'abord) —" : "— Choisir —"}
               </option>
               {(lotsQuery.data?.levels ?? [])
                 .filter((l) => l.lotId)
@@ -135,22 +168,80 @@ function ExitLineFields({
             </select>
             {isFifo && !line.lotId ? (
               <p className="mt-1 text-xs text-gray-500">
-                Le lot le plus ancien sera sélectionné (RM-OUT02).
+                Le lot le plus ancien sera automatiquement déstocké en priorité.
               </p>
             ) : null}
           </div>
         ) : null}
         {item?.trackSerials ? (
-          <div className="md:col-span-2">
-            <Label>N° de série sortis (RM-OUT05)</Label>
+          <div className="space-y-2 md:col-span-2">
+            <div className="flex items-center justify-between">
+              <Label>Numéros de série à sortir</Label>
+              <span
+                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                  parsedSerials.length === targetQty
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    : parsedSerials.length > targetQty
+                      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                }`}
+              >
+                {parsedSerials.length} / {targetQty} numéro{targetQty > 1 ? "s" : ""} sélectionné{parsedSerials.length > 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {availableList.length > 0 ? (
+              <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-2.5 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="mb-1.5 text-xs text-gray-500">
+                  Cliquer pour sélectionner parmi les numéros disponibles en stock :
+                </p>
+                <div className="flex max-h-36 flex-wrap gap-1.5 overflow-y-auto">
+                  {availableList.map((s) => {
+                    const isSelected = parsedSerials.includes(s.serialNumber.toUpperCase());
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => toggleSerial(s.serialNumber)}
+                        className={`rounded-md border px-2.5 py-1 font-mono text-xs transition-colors ${
+                          isSelected
+                            ? "border-primary bg-primary text-white shadow-sm"
+                            : "border-gray-300 bg-white text-gray-700 hover:border-primary/50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                        }`}
+                      >
+                        {s.serialNumber}
+                        {s.locationCode ? ` (${s.locationCode})` : ""}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : line.stockItemId && warehouseId ? (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Aucun numéro de série actuellement disponible en stock pour cet article dans cet entrepôt.
+              </p>
+            ) : null}
+
             <textarea
               value={line.serialNumbers}
               onChange={(e) => onChange({ serialNumbers: e.target.value })}
               rows={3}
               required
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-mono text-sm dark:border-gray-700 dark:bg-gray-900"
-              placeholder={"SN001\nSN002"}
+              placeholder={"Saisir ou scanner les numéros de série (un par ligne ou séparés par virgule)"}
             />
+
+            {duplicateSerials.length > 0 ? (
+              <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                Attention : le numéro « {duplicateSerials[0]} » est saisi plusieurs fois.
+              </p>
+            ) : null}
+
+            {unavailableSerials.length > 0 && availableList.length > 0 ? (
+              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                Attention : le numéro « {unavailableSerials[0]} » n&apos;est pas détecté parmi les stocks disponibles de cet entrepôt.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>

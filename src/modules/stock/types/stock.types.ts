@@ -218,6 +218,25 @@ export type AvailableLotsResponse = {
   }>;
 };
 
+export type AvailableSerialsResponse = {
+  stockItemId: string;
+  serials: Array<{
+    id: string;
+    serialNumber: string;
+    warehouseId: string | null;
+    locationId: string | null;
+    locationCode: string | null;
+    lotId: string | null;
+    lotNumber: string | null;
+    receivedDate: string;
+  }>;
+};
+
+export type UpdateDraftSerialsPayload = {
+  lineId: string;
+  serialNumbers: string[];
+};
+
 export type StockMovement = {
   id: string;
   number: string;
@@ -241,6 +260,7 @@ export type StockMovement = {
     cmupBefore?: number | null;
     cmupAfter?: number | null;
     lotNumber?: string | null;
+    serialNumbers?: string[];
     stockItem?: {
       id: string;
       commercialItem?: { reference: string; name: string };

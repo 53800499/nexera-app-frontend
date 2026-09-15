@@ -5,6 +5,7 @@ import { useQueryEnabled } from "@/shared/hooks/useQueryEnabled";
 import { stockOfflineService } from "../offline/services/stockOffline.service";
 import { refreshStockSyncMeta } from "../offline/services/stockSyncActions";
 import { useStockSyncStore } from "../offline/store/stockSyncStore";
+import { stockApi } from "../services/stockApi.service";
 
 import type {
   CreateStockItemPayload,
@@ -17,6 +18,7 @@ import type {
   CreateStockExitPayload,
   CreateStockTransferPayload,
   ReceiveStockTransferPayload,
+  UpdateDraftSerialsPayload,
 } from "../types/stock.types";
 
 export const STOCK_ARTICLES_KEY = ["stock", "articles"] as const;
@@ -371,4 +373,46 @@ export function useAvailableLots(stockItemId: string, warehouseId: string) {
     enabled: queryEnabled,
     ...stockQueryOptions(isOffline),
   });
+}
+
+export function useAvailableSerials(stockItemId: string, warehouseId: string) {
+  const queryEnabled = useQueryEnabled(
+    Boolean(stockItemId) && Boolean(warehouseId),
+  );
+
+  return useQuery({
+    queryKey: ["stock", "available-serials", stockItemId, warehouseId],
+    queryFn: () => stockApi.listAvailableSerials(stockItemId, warehouseId),
+    enabled: queryEnabled,
+  });
+}
+
+export function useDraftMovementActions() {
+  const queryClient = useQueryClient();
+
+  const updateDraftSerialsMutation = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: UpdateDraftSerialsPayload;
+    }) => stockApi.updateDraftSerials(id, payload),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["stock", "movements", id] });
+      queryClient.invalidateQueries({ queryKey: STOCK_ENTRIES_KEY });
+      queryClient.invalidateQueries({ queryKey: STOCK_EXITS_KEY });
+    },
+  });
+
+  const deleteDraftMovementMutation = useMutation({
+    mutationFn: (id: string) => stockApi.deleteDraftMovement(id),
+    onSuccess: (_, id) => {
+      queryClient.removeQueries({ queryKey: ["stock", "movements", id] });
+      queryClient.invalidateQueries({ queryKey: STOCK_ENTRIES_KEY });
+      queryClient.invalidateQueries({ queryKey: STOCK_EXITS_KEY });
+    },
+  });
+
+  return { updateDraftSerialsMutation, deleteDraftMovementMutation };
 }

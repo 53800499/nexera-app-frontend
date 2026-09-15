@@ -14,6 +14,8 @@ import type {
   CreateStockEntryPayload,
   CreateStockExitPayload,
   AvailableLotsResponse,
+  AvailableSerialsResponse,
+  UpdateDraftSerialsPayload,
   StockMovement,
   StockTransfer,
   CreateStockTransferPayload,
@@ -130,6 +132,24 @@ export const stockApi = {
     authorizedFetch<AvailableLotsResponse>(
       `/stock/items/${stockItemId}/available-lots?warehouseId=${encodeURIComponent(warehouseId)}`,
     ),
+
+  listAvailableSerials: (stockItemId: string, warehouseId?: string) => {
+    const query = warehouseId ? `?warehouseId=${encodeURIComponent(warehouseId)}` : "";
+    return authorizedFetch<AvailableSerialsResponse>(
+      `/stock/items/${stockItemId}/available-serials${query}`,
+    );
+  },
+
+  updateDraftSerials: (id: string, payload: UpdateDraftSerialsPayload) =>
+    authorizedFetch<StockMovement>(`/stock/movements/${id}/serials`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  deleteDraftMovement: (id: string) =>
+    authorizedFetch<{ success: boolean }>(`/stock/movements/${id}`, {
+      method: "DELETE",
+    }),
 
   listTransfers: () =>
     authorizedFetch<StockTransfer[]>("/stock/transfers"),

@@ -461,23 +461,59 @@ export default function CreateStockEntryPage() {
                           ) : null}
                         </>
                       ) : null}
-                      {item?.trackSerials ? (
-                        <div className="md:col-span-2">
-                          <Label>N° de série (un par ligne / séparés)</Label>
-                          <textarea
-                            value={line.serialNumbers}
-                            onChange={(e) =>
-                              updateLine(line.key, {
-                                serialNumbers: e.target.value,
-                              })
-                            }
-                            rows={3}
-                            required
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-mono text-sm dark:border-gray-700 dark:bg-gray-900"
-                            placeholder={"SN001\nSN002"}
-                          />
-                        </div>
-                      ) : null}
+                      {item?.trackSerials ? (() => {
+                        const parsed = line.serialNumbers
+                          .split(/[\n,;]+/)
+                          .map((s) => s.trim().toUpperCase())
+                          .filter(Boolean);
+                        const expected = Math.round(
+                          line.qtyActual.trim()
+                            ? Number(line.qtyActual)
+                            : Number(line.qtyPlanned) || 0,
+                        );
+                        const duplicateSerials = parsed.filter(
+                          (sn, idx, arr) => arr.indexOf(sn) !== idx,
+                        );
+                        return (
+                          <div className="space-y-2 md:col-span-2">
+                            <div className="flex items-center justify-between">
+                              <Label>Numéros de série réceptionnés</Label>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                  parsed.length === expected
+                                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                    : parsed.length > expected
+                                      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                }`}
+                              >
+                                {parsed.length} / {expected} numéro
+                                {expected > 1 ? "s" : ""} renseigné
+                                {parsed.length > 1 ? "s" : ""}
+                              </span>
+                            </div>
+                            <textarea
+                              value={line.serialNumbers}
+                              onChange={(e) =>
+                                updateLine(line.key, {
+                                  serialNumbers: e.target.value,
+                                })
+                              }
+                              rows={3}
+                              required
+                              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-mono text-sm dark:border-gray-700 dark:bg-gray-900"
+                              placeholder={
+                                "Saisir ou scanner les numéros de série (un par ligne ou séparés par virgule)"
+                              }
+                            />
+                            {duplicateSerials.length > 0 ? (
+                              <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                                Attention : le numéro de série « {duplicateSerials[0]} » est saisi plusieurs fois.
+                              </p>
+                            ) : null}
+                          </div>
+                        );
+                      })() : null}
                     </div>
                   </div>
                 );
