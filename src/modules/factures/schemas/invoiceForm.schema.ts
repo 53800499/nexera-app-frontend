@@ -9,6 +9,7 @@ export const invoiceLineSchema = z.object({
   unitPriceHt: z.number().min(0, "Prix unitaire obligatoire"),
   discountPct: z.number().min(0).max(100),
   taxRateId: z.string().min(1, "TVA obligatoire"),
+  taxGroup: z.enum(["A", "B", "C", "D", "E", "F"]).optional(),
 });
 
 const invoiceTypeSchema = z.enum([
@@ -37,6 +38,7 @@ export const invoiceFormSchema = z.object({
   exchangeRate: z.number().min(0.0001, "Taux de change invalide"),
   paymentTermId: z.string().optional(),
   globalDiscountPct: z.number().min(0).max(100),
+  mecefAibType: z.enum(["NONE", "A", "B"]).optional(),
   notes: z.string().optional(),
   internalNotes: z.string().optional(),
   lines: z.array(invoiceLineSchema).min(1, "Ajoutez au moins une ligne"),

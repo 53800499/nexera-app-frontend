@@ -5,10 +5,13 @@ import type {
   CreateCreditNotePayload,
   CreateInvoicePayload,
   InvoiceDetail,
+  MecefConfig,
+  NormalizeInvoicePayload,
   PaginatedInvoices,
   RecordInvoicePaymentPayload,
   SendInvoicePayload,
   UpdateInvoicePayload,
+  UpdateMecefConfigPayload,
 } from "../types/invoice.types";
 
 type ListParams = {
@@ -77,6 +80,21 @@ export const invoicesApi = {
   recordPayment: (id: string, payload: RecordInvoicePaymentPayload) =>
     authorizedFetch<InvoiceDetail>(`/invoices/${id}/payments`, {
       method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  normalize: (id: string, payload: NormalizeInvoicePayload = {}) =>
+    authorizedFetch<InvoiceDetail>(`/invoices/${id}/normalize`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getMecefConfig: () =>
+    authorizedFetch<MecefConfig>("/invoices/mecef/config"),
+
+  updateMecefConfig: (payload: UpdateMecefConfigPayload) =>
+    authorizedFetch<MecefConfig>("/invoices/mecef/config", {
+      method: "PATCH",
       body: JSON.stringify(payload),
     }),
 

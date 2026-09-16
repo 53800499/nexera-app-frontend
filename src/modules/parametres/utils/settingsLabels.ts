@@ -95,6 +95,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     workspaces: [WORKSPACE_TYPES.ENTREPRISE, WORKSPACE_TYPES.CABINET],
   },
   {
+    title: "Facturation e-MECeF",
+    description: "Certification fiscale DGI Bénin, NIM et clés API",
+    href: "/parametres/emecef",
+    group: "billing",
+    groupLabel: SETTINGS_GROUP_LABELS.billing,
+    workspaces: [WORKSPACE_TYPES.ENTREPRISE],
+  },
+  {
     title: "Numérotation",
     description: "Préfixes, compteurs et format des documents",
     href: "/parametres/numerotation",

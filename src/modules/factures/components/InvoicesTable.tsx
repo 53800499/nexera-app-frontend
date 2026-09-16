@@ -6,6 +6,7 @@ import { EmptyState } from "@/shared/components/feedback";
 import { formatMoney } from "@/modules/devis/utils/quotationCalculations";
 import type { InvoiceSummary } from "../types/invoice.types";
 import { InvoiceStatusBadge } from "./InvoiceStatusBadge";
+import { MecefStatusBadge } from "./MecefStatusBadge";
 import {
   invoiceTypeLabel,
   normalizeInvoiceStatus,
@@ -72,7 +73,10 @@ export function InvoicesTable({ invoices, canManage }: Props) {
       key: "status",
       header: "Statut",
       render: (row) => (
-        <InvoiceStatusBadge status={normalizeInvoiceStatus(row.status)} />
+        <div className="flex flex-col items-start gap-1">
+          <InvoiceStatusBadge status={normalizeInvoiceStatus(row.status)} />
+          <MecefStatusBadge status={row.normalizationStatus} />
+        </div>
       ),
     },
     {

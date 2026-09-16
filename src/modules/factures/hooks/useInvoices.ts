@@ -8,6 +8,7 @@ import { useInvoicesSyncStore } from "../offline/store/invoicesSyncStore";
 import type {
   CreateCreditNotePayload,
   CreateInvoicePayload,
+  NormalizeInvoicePayload,
   RecordInvoicePaymentPayload,
   SendInvoicePayload,
   UpdateInvoicePayload,
@@ -152,6 +153,21 @@ export function useInvoices(params: ListParams = {}) {
     },
   });
 
+  const normalizeMutation = useMutation({
+    ...invoicesMutationOptions,
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload?: NormalizeInvoicePayload;
+    }) => invoicesOfflineService.normalize(id, payload),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ["invoices", variables.id] });
+    },
+  });
+
   return {
     invoicesQuery,
     createMutation,
@@ -161,6 +177,7 @@ export function useInvoices(params: ListParams = {}) {
     sendMutation,
     creditNoteMutation,
     recordPaymentMutation,
+    normalizeMutation,
   };
 }
 

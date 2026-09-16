@@ -646,6 +646,7 @@ function buildInvoiceLines(values: InvoiceFormValues) {
     unitPriceHt: line.unitPriceHt,
     ...(line.discountPct > 0 ? { discountPct: line.discountPct } : {}),
     taxRateId: line.taxRateId,
+    ...(line.taxGroup ? { taxGroup: line.taxGroup } : {}),
   }));
 }
 
@@ -663,6 +664,7 @@ export function buildCreateInvoicePayload(
     ...(values.paymentTermId ? { paymentTermId: values.paymentTermId } : {}),
     ...(values.orderId ? { orderId: values.orderId } : {}),
     ...(values.quotationId ? { quotationId: values.quotationId } : {}),
+    ...(values.mecefAibType ? { mecefAibType: values.mecefAibType } : {}),
     ...(values.notes?.trim() ? { notes: values.notes.trim() } : {}),
     ...(values.internalNotes?.trim()
       ? { internalNotes: values.internalNotes.trim() }
@@ -682,6 +684,7 @@ export function buildUpdateInvoicePayload(
     discountPct: values.globalDiscountPct,
     ...(values.dueDate ? { dueDate: values.dueDate } : {}),
     ...(values.paymentTermId ? { paymentTermId: values.paymentTermId } : {}),
+    ...(values.mecefAibType ? { mecefAibType: values.mecefAibType } : {}),
     ...(values.notes?.trim() ? { notes: values.notes.trim() } : {}),
     ...(values.internalNotes?.trim()
       ? { internalNotes: values.internalNotes.trim() }

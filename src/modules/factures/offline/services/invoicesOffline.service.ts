@@ -12,6 +12,7 @@ import type {
   InvoiceDetail,
   InvoiceLine,
   InvoiceLinePayload,
+  NormalizeInvoicePayload,
   PaginatedInvoices,
   RecordInvoicePaymentPayload,
   SendInvoicePayload,
@@ -343,6 +344,13 @@ export const invoicesOfflineService = {
   async recordPayment(id: string, payload: RecordInvoicePaymentPayload) {
     assertOnlineForAction();
     const invoice = await invoicesApi.recordPayment(id, payload);
+    await invoicesOfflineRepository.upsertInvoice(invoice, "synced");
+    return invoice;
+  },
+
+  async normalize(id: string, payload: NormalizeInvoicePayload = {}) {
+    assertOnlineForAction();
+    const invoice = await invoicesApi.normalize(id, payload);
     await invoicesOfflineRepository.upsertInvoice(invoice, "synced");
     return invoice;
   },

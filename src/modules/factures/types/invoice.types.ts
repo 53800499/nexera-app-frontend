@@ -9,6 +9,18 @@ export type InvoiceStatus =
   | "overdue"
   | "cancelled";
 
+export type InvoiceNormalizationStatus =
+  | "not_normalized"
+  | "pending"
+  | "normalized"
+  | "failed";
+
+export type MecefTaxGroup = "A" | "B" | "C" | "D" | "E" | "F";
+
+export type MecefAibType = "NONE" | "A" | "B";
+
+export type MecefEnvironment = "sandbox" | "production";
+
 export type InvoiceType =
   | "standard"
   | "proforma"
@@ -70,6 +82,7 @@ export type InvoiceLine = {
   lineTotalTtc: number;
   item?: InvoiceItemRef | null;
   taxRate?: { id: string; name: string; rate: number } | null;
+  taxGroup?: MecefTaxGroup | null;
 };
 
 export type InvoicePayment = {
@@ -119,6 +132,17 @@ export type InvoiceSummary = {
   amountPaid: number;
   deposits?: InvoiceDepositSummary;
   createdAt?: string;
+  normalizationStatus?: InvoiceNormalizationStatus;
+  mecefNim?: string | null;
+  mecefCounters?: string | null;
+  mecefCode?: string | null;
+  mecefQrCodeData?: string | null;
+  mecefTaxGroupTotals?: Record<string, any> | null;
+  mecefAibType?: MecefAibType;
+  mecefAibAmount?: number;
+  mecefNormalizedAt?: string | null;
+  mecefErrorMessage?: string | null;
+  originalMecefCode?: string | null;
 };
 
 export type InvoiceDetail = InvoiceSummary & {
@@ -147,6 +171,7 @@ export type InvoiceLinePayload = {
   discountPct?: number;
   discountAmount?: number;
   taxRateId: string;
+  taxGroup?: MecefTaxGroup;
 };
 
 export type CreateInvoicePayload = {
@@ -162,6 +187,7 @@ export type CreateInvoicePayload = {
   paymentTermId?: string;
   discountPct?: number;
   discountAmount?: number;
+  mecefAibType?: MecefAibType;
   notes?: string;
   internalNotes?: string;
   lines: InvoiceLinePayload[];
@@ -177,6 +203,7 @@ export type UpdateInvoicePayload = {
   paymentTermId?: string;
   discountPct?: number;
   discountAmount?: number;
+  mecefAibType?: MecefAibType;
   notes?: string;
   internalNotes?: string;
   lines?: InvoiceLinePayload[];
@@ -199,4 +226,37 @@ export type RecordInvoicePaymentPayload = {
   paymentDate?: string;
   reference?: string;
   notes?: string;
+};
+
+export type NormalizeInvoicePayload = {
+  aibType?: MecefAibType;
+  notes?: string;
+};
+
+export type MecefConfig = {
+  mecefApiUrl?: string | null;
+  mecefApiKeyMasked?: string | null;
+  mecefNim?: string | null;
+  mecefEnvironment: MecefEnvironment;
+  mecefAutoNormalize: boolean;
+  isConfigured: boolean;
+  apiUrl?: string | null;
+  nim?: string | null;
+  environment?: MecefEnvironment;
+  autoNormalize?: boolean;
+  configured?: boolean;
+  hasApiKey?: boolean;
+};
+
+export type UpdateMecefConfigPayload = {
+  mecefApiUrl?: string;
+  mecefApiKey?: string;
+  mecefNim?: string;
+  mecefEnvironment?: MecefEnvironment;
+  mecefAutoNormalize?: boolean;
+  apiUrl?: string;
+  apiKey?: string;
+  nim?: string;
+  environment?: MecefEnvironment;
+  autoNormalize?: boolean;
 };

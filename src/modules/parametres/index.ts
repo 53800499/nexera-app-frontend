@@ -8,6 +8,8 @@ export { default as EmailTemplatesPage } from "./pages/EmailTemplatesPage";
 export { default as EmailTemplateEditPage } from "./pages/EmailTemplateEditPage";
 export { default as PdfTemplatePage } from "./pages/PdfTemplatePage";
 export { default as ReminderSettingsPage } from "./pages/ReminderSettingsPage";
+export { default as MecefSettingsPage } from "./pages/MecefSettingsPage";
+export { useMecefConfig, MECEF_CONFIG_KEY } from "./hooks/useMecefConfig";
 
 export { TenantOrganizationSummary } from "./components/TenantOrganizationSummary";
 export { settingsApi } from "./services/settingsApi.service";

@@ -32,6 +32,9 @@ import { InvoicePdfPreviewModal } from "../components/InvoicePdfPreviewModal";
 import { RequireInvoiceAccess } from "../components/RequireInvoiceAccess";
 import { InvoicePaymentForm } from "../components/InvoicePaymentForm";
 import { InvoiceStatusBadge } from "../components/InvoiceStatusBadge";
+import { MecefStatusBadge } from "../components/MecefStatusBadge";
+import { MecefCertificationCard } from "../components/MecefCertificationCard";
+import { NormalizeInvoiceModal } from "../components/NormalizeInvoiceModal";
 import { useInvoiceAccess } from "../hooks/useInvoiceAccess";
 import { useInvoice, useInvoices } from "../hooks/useInvoices";
 import type { InvoiceLine } from "../types/invoice.types";
@@ -118,11 +121,13 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
     sendMutation,
     creditNoteMutation,
     recordPaymentMutation,
+    normalizeMutation,
   } = useInvoices();
   const [creditAmount, setCreditAmount] = useState<number | "">("");
   const [creditAmountError, setCreditAmountError] = useState<string | null>(null);
   const [showCreditForm, setShowCreditForm] = useState(false);
   const [showReminderForm, setShowReminderForm] = useState(false);
+  const [showNormalizeModal, setShowNormalizeModal] = useState(false);
 
   const { canManageReminders } = useReminderAccess();
   const invoiceRemindersQuery = useInvoiceReminders(id);
@@ -222,6 +227,37 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
     });
   };
 
+  const handleNormalize = async (payload: { aibType?: any }) => {
+    if (!invoice) return;
+    await runAction({
+      loadingMessage: "Certification e-MECeF en cours auprès de la DGI...",
+      success: {
+        title: "Facture normalisée avec succès",
+        message: "Code de sécurité et QR code fiscaux générés.",
+      },
+      showResultOnError: false,
+      rethrowOnError: true,
+      action: async () => {
+        await normalizeMutation.mutateAsync({ id: invoice.id, payload });
+        setShowNormalizeModal(false);
+        await invoiceQuery.refetch();
+      },
+    }).catch((error) => {
+      void showResult({
+        variant: "error",
+        title: "Normalisation impossible",
+        message: resolveFormErrorMessage(error),
+      });
+    });
+  };
+
+  const canNormalize =
+    Boolean(invoice) &&
+    canManageInvoices &&
+    status !== "draft" &&
+    invoice?.invoiceType !== "proforma" &&
+    invoice?.normalizationStatus !== "normalized";
+
   return (
     <RequireInvoiceAccess>
       <div className="space-y-4">
@@ -254,6 +290,7 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
                     {invoice.number}
                   </h1>
                   <InvoiceStatusBadge status={status} />
+                  <MecefStatusBadge status={invoice.normalizationStatus} />
                   <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                     {invoiceTypeLabel(normalizeInvoiceType(invoice.invoiceType))}
                   </span>
@@ -302,6 +339,28 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
                       className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
                     >
                       Émettre
+                    </button>
+                  ) : null}
+                  {canNormalize ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowNormalizeModal(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    >
+                      <svg
+                        className="h-4 w-4 text-emerald-600 dark:text-emerald-400"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM13.707 8.707a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      {invoice.normalizationStatus === "failed"
+                        ? "Réessayer e-MECeF"
+                        : "Normaliser (e-MECeF)"}
                     </button>
                   ) : null}
                   {canSendInvoice(status) ? (
@@ -396,6 +455,15 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
                 Cette facture est en statut final ({invoiceStatusLabel(status)}
                 ).
               </p>
+            ) : null}
+
+            {invoice.normalizationStatus === "normalized" ||
+            invoice.normalizationStatus === "failed" ? (
+              <MecefCertificationCard
+                invoice={invoice}
+                onRetry={() => setShowNormalizeModal(true)}
+                isRetrying={normalizeMutation.isPending}
+              />
             ) : null}
 
             {showCreditForm && canManageInvoices && canCreateCreditNote(status) ? (
@@ -558,6 +626,23 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
                       {formatMoney(invoice.totalTtc, invoice.currency)}
                     </dd>
                   </div>
+                  {Boolean(invoice.mecefAibAmount && invoice.mecefAibAmount > 0) && (
+                    <>
+                      <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                        <dt>Acompte AIB ({invoice.mecefAibType === "A" ? "1 %" : "5 %"})</dt>
+                        <dd>+{formatMoney(invoice.mecefAibAmount ?? 0, invoice.currency)}</dd>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <dt className="text-gray-700 dark:text-gray-200">Net à payer</dt>
+                        <dd className="text-emerald-700 dark:text-emerald-400">
+                          {formatMoney(
+                            invoice.totalTtc + (invoice.mecefAibAmount ?? 0),
+                            invoice.currency,
+                          )}
+                        </dd>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between">
                     <dt className="text-gray-500">Payé</dt>
                     <dd>{formatMoney(invoice.amountPaid, invoice.currency)}</dd>
@@ -789,6 +874,15 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
         invoiceNumber={invoice?.number}
         onClose={closePreview}
       />
+      {invoice && (
+        <NormalizeInvoiceModal
+          isOpen={showNormalizeModal}
+          onClose={() => setShowNormalizeModal(false)}
+          invoice={invoice}
+          onConfirm={handleNormalize}
+          isSubmitting={normalizeMutation.isPending || isBusy}
+        />
+      )}
     </RequireInvoiceAccess>
   );
 }
