@@ -284,7 +284,7 @@ export const FecExportView: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60 bg-white dark:bg-gray-800/60">
-                      {resultat.lignes.slice(0, 10).map((l, idx) => (
+                      {(resultat.lignes || []).slice(0, 10).map((l: any, idx: number) => (
                         <tr key={idx}>
                           <td className="px-2 py-1.5 font-bold">{l.codeJournal}</td>
                           <td className="px-2 py-1.5">{l.numEcriture}</td>

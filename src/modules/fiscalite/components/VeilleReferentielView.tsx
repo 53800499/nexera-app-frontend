@@ -300,7 +300,7 @@ export const VeilleReferentielView: React.FC = () => {
                   {parametres.map((p) => (
                     <tr key={p.id}>
                       <td className="px-4 py-3 font-mono font-bold text-amber-700 dark:text-amber-400">
-                        {p.code}
+                        {p.code || p.codeParametre}
                       </td>
                       <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
                         {p.libelle}
@@ -308,7 +308,7 @@ export const VeilleReferentielView: React.FC = () => {
                       <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
                         {p.valeurNumerique !== null && p.valeurNumerique !== undefined
                           ? p.valeurNumerique.toLocaleString("fr-FR")
-                          : p.valeurTexte || "—"}
+                          : (p.valeurTexte || p.valeur || "—")}
                       </td>
                       <td className="px-4 py-3 text-gray-500 font-mono text-[11px]">
                         {p.sourceReglementaire?.reference || "CGI Bénin 2026"}

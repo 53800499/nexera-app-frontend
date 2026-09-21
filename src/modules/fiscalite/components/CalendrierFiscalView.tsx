@@ -71,7 +71,7 @@ export const CalendrierFiscalView: React.FC = () => {
   });
 
   const countEnRetard = echeances.filter((e) => e.statut === "EN_RETARD").length;
-  const countAPayer = echeances.filter((e) => e.statut === "A_PAYER" || e.statut === "A_DECLARER").length;
+  const countAPayer = echeances.filter((e) => e.statut === "DUE" || (e.statut as string) === "A_PAYER" || (e.statut as string) === "A_DECLARER").length;
 
   return (
     <div className="space-y-6">

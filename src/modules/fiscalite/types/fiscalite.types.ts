@@ -81,6 +81,7 @@ export interface TaxBareme {
   statut: TaxStatutBareme;
   sourceReglementaire?: TaxSourceReglementaire;
   tranches?: TaxBaremeTranche[];
+  taxType?: TaxType;
 }
 
 export interface TaxType {
@@ -111,9 +112,12 @@ export interface TaxParametrePays {
   id: string;
   paysCode: string;
   codeParametre: string;
+  code?: string;
   libelle: string;
   typeValeur: string;
   valeur: string;
+  valeurNumerique?: number | null;
+  valeurTexte?: string | null;
   unite?: string;
   dateDebutValidite: string;
   sourceReglementaire?: TaxSourceReglementaire;
@@ -179,6 +183,9 @@ export interface TaxCalculIs {
   totalAcomptesVerses: number;
   soldeAPayer: number;
   statut: 'BROUILLON' | 'VALIDE' | 'DECLARE' | 'TRANSMIS_M3';
+  statutCalcul?: string;
+  tauxApplicable?: number;
+  appliqueMinimumPerception?: boolean;
   valideParUtilisateurId?: string;
   createdAt: string;
 }
@@ -203,6 +210,7 @@ export interface TaxExerciceFiscal {
   calculIs?: TaxCalculIs;
   retraitements?: TaxRetraitementFiscal[];
   acomptesIs?: TaxAcompteIs[];
+  acomptes?: TaxAcompteIs[];
   contribuable?: TaxContribuable;
 }
 
@@ -241,6 +249,13 @@ export interface TaxRetenueAib {
   periodeDeclarative: string;
   imputableIs: boolean;
   createdAt: string;
+  evenementSource?: any;
+  natureAib?: 'SUBIE' | 'OPEREE' | string;
+  tiersNom?: string;
+  tiersIfu?: string;
+  taux?: number;
+  baseCalcul?: number;
+  statut?: string;
 }
 
 export interface TaxDeclarationGeneriqueLigne {
@@ -287,6 +302,8 @@ export interface TaxEcheance {
   montantEstime?: number;
   statut: TaxStatutEcheance;
   statutCalcul?: string;
+  datePaiement?: string;
+  periodeOuExercice?: string;
   penaliteEstimee?: number;
   montantTotalAvecPenalite?: number;
   taxType?: TaxType;
@@ -308,6 +325,7 @@ export interface FecExportResult {
   mimeType: string;
   tailleOctets: number;
   auditConformite: FecAuditConformite;
+  lignes?: any[];
 }
 
 export interface TaxControleFiscal {

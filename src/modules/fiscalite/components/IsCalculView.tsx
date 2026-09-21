@@ -482,7 +482,7 @@ export const IsCalculView: React.FC = () => {
                     </p>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      {acomptes.map((ac) => {
+                      {acomptes.map((ac: any) => {
                         const isPaye = ac.statut === "PAYE";
                         return (
                           <div

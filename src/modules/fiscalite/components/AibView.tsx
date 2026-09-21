@@ -234,43 +234,52 @@ export const AibView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60 bg-white dark:bg-gray-800/60">
-                  {retenues.map((r) => (
-                    <tr key={r.id}>
-                      <td className="px-3 py-2.5 font-medium">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                            r.natureAib === "SUBIE"
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-                              : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                          }`}
-                        >
-                          {r.natureAib === "SUBIE" ? "AIB Subie" : "AIB Opérée"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <p className="font-semibold text-gray-900 dark:text-white">
-                          {r.tiersNom || "Tiers opérationnel"}
-                        </p>
-                        <p className="text-[11px] text-gray-500 font-mono">
-                          IFU : {r.tiersIfu || "Non renseigné"}
-                        </p>
-                      </td>
-                      <td className="px-3 py-2.5 text-center font-bold text-gray-700 dark:text-gray-300">
-                        {r.taux}%
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-gray-700 dark:text-gray-300">
-                        {formatCurrency(r.baseCalcul)}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-bold text-gray-900 dark:text-white">
-                        {formatCurrency(r.montantRetenu)}
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
-                        <span className="text-[11px] px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                          {r.statut || "VALIDE"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {retenues.map((r) => {
+                    const isSubie = r.natureAib ? r.natureAib === "SUBIE" : (r.imputableIs ?? true);
+                    return (
+                      <tr key={r.id}>
+                        <td className="px-3 py-2.5 font-medium">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                              isSubie
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                                : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                            }`}
+                          >
+                            {isSubie ? "AIB Subie" : "AIB Opérée"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <p className="font-semibold text-gray-900 dark:text-white">
+                            {r.tiersNom || (r.natureOperation ? r.natureOperation.replace(/_/g, " ") : "Tiers opérationnel")}
+                          </p>
+                          <p className="text-[11px] text-gray-500 font-mono">
+                            {r.tiersIfu
+                              ? `IFU : ${r.tiersIfu}`
+                              : r.evenementSource?.referenceObjetSource
+                              ? `Réf : ${r.evenementSource.referenceObjetSource}`
+                              : r.evenementSourceId
+                              ? `Réf : ${r.evenementSourceId}`
+                              : "IFU : Non renseigné"}
+                          </p>
+                        </td>
+                        <td className="px-3 py-2.5 text-center font-bold text-gray-700 dark:text-gray-300">
+                          {r.taux ?? r.tauxApplique ?? 1}%
+                        </td>
+                        <td className="px-3 py-2.5 text-right text-gray-700 dark:text-gray-300">
+                          {formatCurrency(r.baseCalcul ?? r.base)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-bold text-gray-900 dark:text-white">
+                          {formatCurrency(r.montantRetenu)}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <span className="text-[11px] px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                            {r.statut || r.periodeDeclarative || "VALIDE"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
