@@ -21,7 +21,7 @@ export function useBulletinPdf() {
         `Le bulletin ${bulletin.numeroBulletin} a été téléchargé en PDF.`,
       );
     } catch (error) {
-      console.error("Erreur lors de l'exportation du bulletin en PDF:", error);
+      console.warn("Erreur lors de l'exportation du bulletin en PDF:", error);
       toast.error(
         "Erreur d'exportation",
         "Impossible de générer le fichier PDF du bulletin.",
@@ -36,7 +36,7 @@ export function useBulletinPdf() {
       setIsExporting(true);
       await openBulletinPdf(bulletin);
     } catch (error) {
-      console.error("Erreur lors de l'ouverture du PDF:", error);
+      console.warn("Erreur lors de l'ouverture du PDF:", error);
       toast.error(
         "Erreur d'affichage",
         "Impossible d'ouvrir l'aperçu PDF du bulletin.",

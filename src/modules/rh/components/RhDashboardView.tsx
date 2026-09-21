@@ -5,6 +5,8 @@ import Link from "next/link";
 import { rhApi } from "../services/rhApi.service";
 import type { RhDashboardSummary } from "../types/rh.types";
 import { GroupIcon, DollarLineIcon, BoxIcon, CalenderIcon } from "@/icons";
+import { getPayrollCycleStatusBadge } from "../utils/rhFormatters";
+import { ErrorState } from "@/shared/components/feedback";
 
 export const RhDashboardView: React.FC = () => {
   const [data, setData] = useState<RhDashboardSummary | null>(null);
@@ -14,11 +16,15 @@ export const RhDashboardView: React.FC = () => {
   const fetchDashboard = async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await rhApi.getDashboardSummary();
       setData(res);
-      setError(null);
     } catch (err: any) {
-      setError(err?.message || "Erreur de chargement du tableau de bord RH");
+      console.warn("Erreur chargement dashboard RH:", err?.message || err);
+      setError(
+        err?.message ||
+          "Serveur ou réseau indisponible. Impossible de charger le tableau de bord RH.",
+      );
     } finally {
       setLoading(false);
     }
@@ -32,13 +38,26 @@ export const RhDashboardView: React.FC = () => {
     new Intl.NumberFormat("fr-FR", {
       style: "currency",
       currency: "XOF",
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
     }).format(val || 0);
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="py-8">
+        <ErrorState
+          title="Serveur ou réseau indisponible"
+          message={error}
+          onRetry={fetchDashboard}
+        />
       </div>
     );
   }
@@ -76,8 +95,14 @@ export const RhDashboardView: React.FC = () => {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/50 dark:text-red-300">
-          {error}
+        <div className="flex items-center justify-between rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800 dark:border-warning-900/50 dark:bg-warning-950/50 dark:text-warning-300">
+          <span>{error}</span>
+          <button
+            onClick={fetchDashboard}
+            className="ml-4 font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+          >
+            Réactualiser
+          </button>
         </div>
       )}
 
@@ -281,9 +306,14 @@ export const RhDashboardView: React.FC = () => {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-500 dark:text-gray-400">Statut</span>
-                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
-                  {dernierCycle.statut}
-                </span>
+                {(() => {
+                  const sBadge = getPayrollCycleStatusBadge(dernierCycle.statut);
+                  return (
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${sBadge.badgeClass}`}>
+                      {sBadge.label}
+                    </span>
+                  );
+                })()}
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-500 dark:text-gray-400">Bulletins générés</span>

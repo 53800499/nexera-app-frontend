@@ -8,6 +8,7 @@ import type {
   RhPoste,
   RhRubriquePaie,
 } from "../types/rh.types";
+import { formatRubricType, formatRubricSens } from "../utils/rhFormatters";
 import { Modal } from "@/components/ui/modal";
 import { useActionFeedback, useToast } from "@/shared/components/feedback";
 import {
@@ -97,16 +98,40 @@ export const ParametresRhView: React.FC = () => {
     ordreAffichage: 100,
   });
 
+  const [error, setError] = useState<string | null>(null);
+
   const loadData = async () => {
     try {
       setLoading(true);
-      const [etabs, depts, pts, rubs, bars] = await Promise.all([
+      setError(null);
+      const [etabsRes, deptsRes, ptsRes, rubsRes, barsRes] = await Promise.allSettled([
         rhApi.listEtablissements(),
         rhApi.listDepartements(),
         rhApi.listPostes(),
         rhApi.listRubriques("BJ"),
         rhApi.listTaxBrackets("BJ"),
       ]);
+
+      const etabs = etabsRes.status === "fulfilled" ? etabsRes.value : [];
+      const depts = deptsRes.status === "fulfilled" ? deptsRes.value : [];
+      const pts = ptsRes.status === "fulfilled" ? ptsRes.value : [];
+      const rubs = rubsRes.status === "fulfilled" ? rubsRes.value : [];
+      const bars = barsRes.status === "fulfilled" ? barsRes.value : [];
+
+      const rejections = [etabsRes, deptsRes, ptsRes, rubsRes, barsRes].filter(
+        (r) => r.status === "rejected",
+      ) as PromiseRejectedResult[];
+
+      if (rejections.length > 0) {
+        const msg = rejections[0].reason?.message || "Serveur ou réseau indisponible";
+        console.warn("Avertissement chargement paramètres RH:", msg);
+        setError(
+          msg.includes("indisponible") || msg.includes("fetch")
+            ? "Serveur ou réseau indisponible. Certaines données n'ont pas pu être actualisées."
+            : msg,
+        );
+      }
+
       const safeEtabs = Array.isArray(etabs) ? etabs : ((etabs as any)?.data || []);
       const safeDepts = Array.isArray(depts) ? depts : ((depts as any)?.data || []);
       const safePts = Array.isArray(pts) ? pts : ((pts as any)?.data || []);
@@ -120,13 +145,9 @@ export const ParametresRhView: React.FC = () => {
       setBaremes(safeBars);
       if (safeEtabs.length > 0) setDeptForm((prev) => ({ ...prev, etablissementId: prev.etablissementId || safeEtabs[0].id }));
       if (safeDepts.length > 0) setPosteForm((prev) => ({ ...prev, departementId: prev.departementId || safeDepts[0].id }));
-    } catch (err) {
-      console.error("Erreur chargement paramètres:", err);
-      setEtablissements([]);
-      setDepartements([]);
-      setPostes([]);
-      setRubriques([]);
-      setBaremes([]);
+    } catch (err: any) {
+      console.warn("Erreur chargement paramètres:", err?.message || err);
+      setError(err?.message || "Serveur ou réseau indisponible.");
     } finally {
       setLoading(false);
     }
@@ -552,8 +573,15 @@ export const ParametresRhView: React.FC = () => {
     new Intl.NumberFormat("fr-FR", {
       style: "currency",
       currency: "XOF",
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
     }).format(val || 0);
+
+  const formatNumber = (val?: number | null) =>
+    new Intl.NumberFormat("fr-FR", {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+    }).format(Number(val) || 0);
 
   const safeEtablissements = Array.isArray(etablissements) ? etablissements : [];
   const safeDepartements = Array.isArray(departements) ? departements : [];
@@ -574,6 +602,18 @@ export const ParametresRhView: React.FC = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="flex items-center justify-between rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800 dark:border-warning-900/50 dark:bg-warning-950/50 dark:text-warning-300">
+          <span>{error}</span>
+          <button
+            onClick={loadData}
+            className="ml-4 font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+          >
+            Réactualiser
+          </button>
+        </div>
+      )}
+
       {/* Onglets */}
       <div className="border-b border-gray-200 dark:border-gray-800">
         <nav className="-mb-px flex space-x-8">
@@ -581,7 +621,7 @@ export const ParametresRhView: React.FC = () => {
             { id: "etablissements", label: "Établissements & Sites" },
             { id: "departements", label: "Départements & Services" },
             { id: "postes", label: "Postes & Emplois" },
-            { id: "baremes", label: "Barème ITS Bénin (CGI 2026)" },
+            { id: "baremes", label: "Barèmes Fiscaux (ITS)" },
             { id: "rubriques", label: "Rubriques de Paie" },
           ].map((tab) => (
             <button
@@ -943,62 +983,78 @@ export const ParametresRhView: React.FC = () => {
         </div>
       )}
 
-      {/* 4. BARÈMES ITS BÉNIN 2026 */}
+      {/* 4. BARÈMES ITS DYNAMIQUES */}
       {activeTab === "baremes" && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50/50 p-4 text-xs text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-300">
             <InfoIcon className="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
             <div>
-              <strong>Barème légal officiel :</strong> République du Bénin - Code Général des Impôts 2026 (Article 125). Le calcul s'applique de manière progressive par tranches sur le revenu net imposable.
+              <strong>Barème légal officiel :</strong> Les tranches et taux ci-dessous proviennent directement de la base de données (RhBaremeIts &amp; RhBaremeItsTranche) et s'appliquent de manière progressive sur le revenu net imposable.
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
-                <thead className="border-b border-gray-100 bg-gray-50/75 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
-                  <tr>
-                    <th className="px-6 py-4">Tranche</th>
-                    <th className="px-6 py-4">Tranche de Revenu Net Imposable (FCFA)</th>
-                    <th className="px-6 py-4 text-right">Taux Marginal ITS</th>
-                    <th className="px-6 py-4">Zone d'Application</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800 font-medium">
-                  <tr>
-                    <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">Tranche 1</td>
-                    <td className="px-6 py-4 font-mono">0 à 50 000 FCFA</td>
-                    <td className="px-6 py-4 text-right font-bold text-emerald-600">0 % (Exonéré)</td>
-                    <td className="px-6 py-4">Bénin (BJ)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">Tranche 2</td>
-                    <td className="px-6 py-4 font-mono">50 001 à 130 000 FCFA</td>
-                    <td className="px-6 py-4 text-right font-bold text-blue-600">10 %</td>
-                    <td className="px-6 py-4">Bénin (BJ)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">Tranche 3</td>
-                    <td className="px-6 py-4 font-mono">130 001 à 280 000 FCFA</td>
-                    <td className="px-6 py-4 text-right font-bold text-amber-600">15 %</td>
-                    <td className="px-6 py-4">Bénin (BJ)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">Tranche 4</td>
-                    <td className="px-6 py-4 font-mono">280 001 à 530 000 FCFA</td>
-                    <td className="px-6 py-4 text-right font-bold text-orange-600">20 %</td>
-                    <td className="px-6 py-4">Bénin (BJ)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">Tranche 5</td>
-                    <td className="px-6 py-4 font-mono">Au-delà de 530 000 FCFA</td>
-                    <td className="px-6 py-4 text-right font-bold text-red-600">30 %</td>
-                    <td className="px-6 py-4">Bénin (BJ)</td>
-                  </tr>
-                </tbody>
-              </table>
+          {baremes.length === 0 ? (
+            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+              Aucun barème d'impôt configuré en base de données.
             </div>
-          </div>
+          ) : (
+            baremes.map((b) => (
+              <div key={b.id} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {b.libelle}
+                    </h3>
+                    <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                      {b.paysCode}
+                    </span>
+                    <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                      {b.modeCalcul}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                      <thead className="border-b border-gray-100 bg-gray-50/75 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
+                        <tr>
+                          <th className="px-6 py-4">N° Tranche</th>
+                          <th className="px-6 py-4">Limite Inférieure</th>
+                          <th className="px-6 py-4">Limite Supérieure</th>
+                          <th className="px-6 py-4 text-right">Taux Marginal ITS</th>
+                          <th className="px-6 py-4 text-right">Déduction Fixe</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800 font-medium">
+                        {(b.tranches || []).map((t: any) => (
+                          <tr key={t.id || t.numeroTranche}>
+                            <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">
+                              Tranche {t.numeroTranche}
+                            </td>
+                            <td className="px-6 py-4 font-mono">
+                              {formatNumber(t.limiteInferieure)} FCFA
+                            </td>
+                            <td className="px-6 py-4 font-mono">
+                              {t.limiteSuperieure !== null && t.limiteSuperieure !== undefined
+                                ? `${formatNumber(t.limiteSuperieure)} FCFA`
+                                : 'Au-delà (Illimité)'}
+                            </td>
+                            <td className="px-6 py-4 text-right font-bold text-brand-600 dark:text-brand-400">
+                              {formatNumber(t.taux)} %
+                            </td>
+                            <td className="px-6 py-4 text-right font-mono text-gray-600 dark:text-gray-400">
+                              {formatNumber(t.montantDeductionFixe)} FCFA
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -1063,19 +1119,17 @@ export const ParametresRhView: React.FC = () => {
                           {r.libelle}
                         </td>
                         <td className="px-6 py-3 font-medium text-brand-600 dark:text-brand-400">
-                          {r.typeRubrique}
+                          {formatRubricType(r.typeRubrique)}
                         </td>
                         <td className="px-6 py-3">
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${r.sensDefaut === "GAIN"
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                              : r.sensDefaut === "RETENUE"
-                                ? "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
-                                : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                              }`}
-                          >
-                            {r.sensDefaut}
-                          </span>
+                          {(() => {
+                            const sensBadge = formatRubricSens(r.sensDefaut);
+                            return (
+                              <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${sensBadge.badgeClass}`}>
+                                {sensBadge.label}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-6 py-3">
                           {r.assujettiIts ? <span className="mr-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">ITS</span> : null}
@@ -1258,11 +1312,11 @@ export const ParametresRhView: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/30">
                     <span className="text-gray-500">Type de Rubrique</span>
-                    <p className="mt-1 font-semibold text-gray-900 dark:text-white">{detailsData.typeRubrique}</p>
+                    <p className="mt-1 font-semibold text-gray-900 dark:text-white">{formatRubricType(detailsData.typeRubrique)}</p>
                   </div>
                   <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/30">
                     <span className="text-gray-500">Sens par Défaut</span>
-                    <p className="mt-1 font-semibold text-gray-900 dark:text-white">{detailsData.sensDefaut}</p>
+                    <p className="mt-1 font-semibold text-gray-900 dark:text-white">{formatRubricSens(detailsData.sensDefaut).label}</p>
                   </div>
                   <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/30">
                     <span className="text-gray-500">Compte Charge SYSCOHADA</span>
@@ -1280,14 +1334,17 @@ export const ParametresRhView: React.FC = () => {
                 <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/30">
                   <span className="text-gray-500">Assujettissements fiscaux & sociaux</span>
                   <div className="mt-2 flex gap-3">
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${detailsData.assujettiIts ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-400 line-through"}`}>
-                      ITS {detailsData.assujettiIts ? "✓" : "✗"}
+                    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ${detailsData.assujettiIts ? "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300" : "bg-gray-100 text-gray-400 line-through dark:bg-gray-800"}`}>
+                      {detailsData.assujettiIts ? <CheckCircleIcon className="h-3 w-3 shrink-0" /> : <CloseIcon className="h-3 w-3 shrink-0" />}
+                      <span>ITS</span>
                     </span>
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${detailsData.assujettiCnss ? "bg-purple-100 text-purple-800" : "bg-gray-100 text-gray-400 line-through"}`}>
-                      CNSS {detailsData.assujettiCnss ? "✓" : "✗"}
+                    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ${detailsData.assujettiCnss ? "bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300" : "bg-gray-100 text-gray-400 line-through dark:bg-gray-800"}`}>
+                      {detailsData.assujettiCnss ? <CheckCircleIcon className="h-3 w-3 shrink-0" /> : <CloseIcon className="h-3 w-3 shrink-0" />}
+                      <span>CNSS</span>
                     </span>
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${detailsData.assujettiVps ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-400 line-through"}`}>
-                      VPS {detailsData.assujettiVps ? "✓" : "✗"}
+                    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ${detailsData.assujettiVps ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" : "bg-gray-100 text-gray-400 line-through dark:bg-gray-800"}`}>
+                      {detailsData.assujettiVps ? <CheckCircleIcon className="h-3 w-3 shrink-0" /> : <CloseIcon className="h-3 w-3 shrink-0" />}
+                      <span>VPS</span>
                     </span>
                   </div>
                 </div>

@@ -49,16 +49,22 @@ export const EmployeFormModal: React.FC<Props> = ({
 
   const fetchDependencies = async () => {
     try {
-      const [etabsRes, deptsRes, postsRes] = await Promise.all([
+      const [etabsRes, deptsRes, postsRes] = await Promise.allSettled([
         rhApi.listEtablissements(),
         rhApi.listDepartements(),
         rhApi.listPostes(),
       ]);
-      setEtablissements(Array.isArray(etabsRes) ? etabsRes : []);
-      setDepartements(Array.isArray(deptsRes) ? deptsRes : []);
-      setPostes(Array.isArray(postsRes) ? postsRes : []);
+      if (etabsRes.status === "fulfilled" && Array.isArray(etabsRes.value)) {
+        setEtablissements(etabsRes.value);
+      }
+      if (deptsRes.status === "fulfilled" && Array.isArray(deptsRes.value)) {
+        setDepartements(deptsRes.value);
+      }
+      if (postsRes.status === "fulfilled" && Array.isArray(postsRes.value)) {
+        setPostes(postsRes.value);
+      }
     } catch (err) {
-      console.error("Erreur chargement listes référentiels:", err);
+      console.warn("Erreur chargement listes référentiels:", err);
     }
   };
 

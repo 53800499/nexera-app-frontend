@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { rhApi } from "../services/rhApi.service";
-import type { RhEmploye, RhEtablissement, RhPoste } from "../types/rh.types";
+import type { RhEmploye, RhEtablissement, RhPoste, RhContrat } from "../types/rh.types";
 import { useActionFeedback, useToast } from "@/shared/components/feedback";
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
   onClose: () => void;
   onSuccess: () => void;
   initialEmployeId?: string;
+  initialContrat?: RhContrat | null;
 }
 
 export const ContratFormModal: React.FC<Props> = ({
@@ -18,9 +19,12 @@ export const ContratFormModal: React.FC<Props> = ({
   onClose,
   onSuccess,
   initialEmployeId,
+  initialContrat,
 }) => {
   const { runAction } = useActionFeedback();
   const toast = useToast();
+  const isEdit = Boolean(initialContrat);
+
   const [employes, setEmployes] = useState<RhEmploye[]>([]);
   const [etablissements, setEtablissements] = useState<RhEtablissement[]>([]);
   const [postes, setPostes] = useState<RhPoste[]>([]);
@@ -32,8 +36,12 @@ export const ContratFormModal: React.FC<Props> = ({
     typeContrat: "CDI",
     dateDebut: new Date().toISOString().split("T")[0],
     dateFinPrevue: "",
-    salaireBaseMensuel: 350000,
+    salaireBaseMensuel: 0,
     periodeEssaiMois: 3,
+    statut: "ACTIF",
+    dureeHebdoContrat: 40,
+    tauxRisqueAt: "" as number | string,
+    notes: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -41,36 +49,63 @@ export const ContratFormModal: React.FC<Props> = ({
 
   const fetchDependencies = async () => {
     try {
-      const [empsRes, etabsRes, postsRes] = await Promise.all([
+      const [empsRes, etabsRes, postsRes] = await Promise.allSettled([
         rhApi.listEmployes(),
         rhApi.listEtablissements(),
         rhApi.listPostes(),
       ]);
-      const emps = Array.isArray(empsRes) ? empsRes : ((empsRes as any)?.data || []);
-      const etabs = Array.isArray(etabsRes) ? etabsRes : ((etabsRes as any)?.data || []);
-      const psts = Array.isArray(postsRes) ? postsRes : ((postsRes as any)?.data || []);
+      const emps = empsRes.status === "fulfilled"
+        ? (Array.isArray(empsRes.value) ? empsRes.value : ((empsRes.value as any)?.data || []))
+        : [];
+      const etabs = etabsRes.status === "fulfilled"
+        ? (Array.isArray(etabsRes.value) ? etabsRes.value : ((etabsRes.value as any)?.data || []))
+        : [];
+      const psts = postsRes.status === "fulfilled"
+        ? (Array.isArray(postsRes.value) ? postsRes.value : ((postsRes.value as any)?.data || []))
+        : [];
       setEmployes(emps);
       setEtablissements(etabs);
       setPostes(psts);
-      setFormData((prev) => ({
-        ...prev,
-        employeId: initialEmployeId || prev.employeId || (emps[0]?.id ?? ""),
-        etablissementId: prev.etablissementId || (etabs[0]?.id ?? ""),
-        posteId: prev.posteId || (psts[0]?.id ?? ""),
-      }));
+
+      if (initialContrat) {
+        setFormData({
+          employeId: initialContrat.employeId || "",
+          etablissementId: initialContrat.etablissementId || (etabs[0]?.id ?? ""),
+          posteId: initialContrat.posteId || (psts[0]?.id ?? ""),
+          typeContrat: initialContrat.typeContrat || "CDI",
+          dateDebut: initialContrat.dateDebut ? initialContrat.dateDebut.split("T")[0] : "",
+          dateFinPrevue: initialContrat.dateFinPrevue ? initialContrat.dateFinPrevue.split("T")[0] : "",
+          salaireBaseMensuel: initialContrat.salaireBaseMensuel || 0,
+          periodeEssaiMois: 0,
+          statut: initialContrat.statut || "ACTIF",
+          dureeHebdoContrat: initialContrat.dureeHebdoContrat || 40,
+          tauxRisqueAt:
+            initialContrat.tauxRisqueAt !== undefined && initialContrat.tauxRisqueAt !== null
+              ? initialContrat.tauxRisqueAt
+              : "",
+          notes: initialContrat.notes || "",
+        });
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          employeId: initialEmployeId || prev.employeId || (emps[0]?.id ?? ""),
+          etablissementId: prev.etablissementId || (etabs[0]?.id ?? ""),
+          posteId: prev.posteId || (psts[0]?.id ?? ""),
+        }));
+      }
     } catch (err) {
-      console.error("Erreur chargement dépendances contrat:", err);
+      console.warn("Erreur chargement dépendances contrat:", err);
     }
   };
 
   useEffect(() => {
     if (isOpen) {
       fetchDependencies();
-      if (initialEmployeId) {
+      if (initialEmployeId && !initialContrat) {
         setFormData((prev) => ({ ...prev, employeId: initialEmployeId }));
       }
     }
-  }, [isOpen, initialEmployeId]);
+  }, [isOpen, initialEmployeId, initialContrat]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,27 +117,54 @@ export const ContratFormModal: React.FC<Props> = ({
     setLoading(true);
     try {
       await runAction({
-        loadingMessage: "Création du contrat de travail en cours...",
+        loadingMessage: isEdit
+          ? "Mise à jour du contrat de travail..."
+          : "Création du contrat de travail en cours...",
         success: {
-          title: "Contrat de travail créé",
-          message: `Le contrat ${formData.typeContrat} a été généré et rattaché au salarié.`,
+          title: isEdit ? "Contrat mis à jour" : "Contrat de travail créé",
+          message: isEdit
+            ? `Les modifications du contrat ${initialContrat?.numeroContrat} ont été enregistrées.`
+            : `Le contrat ${formData.typeContrat} a été généré et rattaché au salarié.`,
         },
         error: {
-          title: "Erreur de création",
-          message: "Impossible de créer le contrat de travail.",
+          title: isEdit ? "Erreur de mise à jour" : "Erreur de création",
         },
         action: async () => {
-          const payload = {
-            employeId: formData.employeId,
-            etablissementId: formData.etablissementId,
-            posteId: formData.posteId || undefined,
-            typeContrat: formData.typeContrat,
-            dateDebut: formData.dateDebut,
-            dateFinPrevue: formData.typeContrat !== "CDI" && formData.dateFinPrevue ? formData.dateFinPrevue : undefined,
-            salaireBaseMensuel: Number(formData.salaireBaseMensuel) || 0,
-            periodeEssaiMois: Number(formData.periodeEssaiMois) || 0,
-          };
-          await rhApi.createContrat(payload);
+          if (isEdit && initialContrat) {
+            await rhApi.updateContrat(initialContrat.id, {
+              statut: formData.statut as any,
+              dateFinPrevue: formData.dateFinPrevue || undefined,
+              salaireBaseMensuel: Number(formData.salaireBaseMensuel),
+              dureeHebdoContrat: Number(formData.dureeHebdoContrat),
+              tauxRisqueAt:
+                formData.tauxRisqueAt !== "" && formData.tauxRisqueAt !== null
+                  ? Number(formData.tauxRisqueAt)
+                  : undefined,
+              posteId: formData.posteId || undefined,
+              notes: formData.notes.trim() || undefined,
+            });
+          } else {
+            const payload = {
+              employeId: formData.employeId,
+              etablissementId: formData.etablissementId,
+              posteId: formData.posteId || undefined,
+              typeContrat: formData.typeContrat as any,
+              dateDebut: formData.dateDebut,
+              dateFinPrevue:
+                formData.typeContrat !== "CDI" && formData.dateFinPrevue
+                  ? formData.dateFinPrevue
+                  : undefined,
+              salaireBaseMensuel: Number(formData.salaireBaseMensuel) || 0,
+              dureeHebdoContrat: Number(formData.dureeHebdoContrat) || 40,
+              tauxRisqueAt:
+                formData.tauxRisqueAt !== "" && formData.tauxRisqueAt !== null
+                  ? Number(formData.tauxRisqueAt)
+                  : undefined,
+              periodeEssaiMois: Number(formData.periodeEssaiMois) || 0,
+              notes: formData.notes.trim() || undefined,
+            };
+            await rhApi.createContrat(payload);
+          }
           onSuccess();
           onClose();
         },
@@ -121,10 +183,14 @@ export const ContratFormModal: React.FC<Props> = ({
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="border-b border-gray-100 pb-4 dark:border-gray-800">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-            Nouveau Contrat de Travail
+            {isEdit
+              ? `Modifier le Contrat (${initialContrat?.numeroContrat})`
+              : "Nouveau Contrat de Travail"}
           </h2>
           <p className="text-xs text-gray-500">
-            Génération du numéro de contrat CTR-XXXXXX et intégration automatique à la paie
+            {isEdit
+              ? "Mise à jour des paramètres contractuels, de la rémunération ou du poste"
+              : "Génération du numéro de contrat CTR-XXXXXX et intégration automatique à la paie"}
           </p>
         </div>
 
@@ -262,6 +328,25 @@ export const ContratFormModal: React.FC<Props> = ({
               className="w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-brand-500 outline-hidden"
             />
           </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+              Taux de Risque AT/MP (%)
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={20}
+              step={0.1}
+              placeholder="Ex: 2.0 (laisser vide pour taux standard)"
+              value={formData.tauxRisqueAt}
+              onChange={(e) => setFormData({ ...formData, tauxRisqueAt: e.target.value })}
+              className="w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white font-mono focus:ring-2 focus:ring-brand-500 outline-hidden"
+            />
+            <p className="text-2xs text-gray-400 mt-1">
+              Cotisation patronale spécifique CNSS. Laisser vide pour hériter du poste ou du pays.
+            </p>
+          </div>
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
@@ -281,7 +366,15 @@ export const ContratFormModal: React.FC<Props> = ({
             {loading && (
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
             )}
-            <span>{loading ? "Création en cours..." : "Établir le Contrat"}</span>
+            <span>
+              {loading
+                ? isEdit
+                  ? "Enregistrement..."
+                  : "Création en cours..."
+                : isEdit
+                ? "Enregistrer les modifications"
+                : "Établir le Contrat"}
+            </span>
           </button>
         </div>
       </form>

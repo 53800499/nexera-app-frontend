@@ -474,12 +474,25 @@ export default function CreateStockEntryPage() {
                         const duplicateSerials = parsed.filter(
                           (sn, idx, arr) => arr.indexOf(sn) !== idx,
                         );
+
+                        const removeSingleSerial = (indexToRemove: number) => {
+                          const updated = parsed.filter((_, idx) => idx !== indexToRemove);
+                          updateLine(line.key, { serialNumbers: updated.join("\n") });
+                        };
+
+                        const addSingleSerial = (val: string) => {
+                          const trimmed = val.trim().toUpperCase();
+                          if (!trimmed) return;
+                          const current = [...parsed, trimmed];
+                          updateLine(line.key, { serialNumbers: current.join("\n") });
+                        };
+
                         return (
-                          <div className="space-y-2 md:col-span-2">
+                          <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50/50 p-3.5 md:col-span-2 dark:border-gray-800 dark:bg-gray-800/30">
                             <div className="flex items-center justify-between">
-                              <Label>Numéros de série réceptionnés</Label>
+                              <Label className="!mb-0">Numéros de série réceptionnés</Label>
                               <span
-                                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                                   parsed.length === expected
                                     ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                                     : parsed.length > expected
@@ -492,23 +505,68 @@ export default function CreateStockEntryPage() {
                                 {parsed.length > 1 ? "s" : ""}
                               </span>
                             </div>
-                            <textarea
-                              value={line.serialNumbers}
-                              onChange={(e) =>
-                                updateLine(line.key, {
-                                  serialNumbers: e.target.value,
-                                })
-                              }
-                              rows={3}
-                              required
-                              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-mono text-sm dark:border-gray-700 dark:bg-gray-900"
-                              placeholder={
-                                "Saisir ou scanner les numéros de série (un par ligne ou séparés par virgule)"
-                              }
-                            />
+
+                            {/* Liste des pastilles/chips déjà saisies */}
+                            {parsed.length > 0 ? (
+                              <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
+                                {parsed.map((sn, idx) => (
+                                  <span
+                                    key={`${sn}-${idx}`}
+                                    className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 font-mono text-xs font-medium text-primary dark:border-primary/40 dark:bg-primary/20"
+                                  >
+                                    {sn}
+                                    <button
+                                      type="button"
+                                      onClick={() => removeSingleSerial(idx)}
+                                      className="ml-0.5 text-primary/70 hover:text-rose-600 focus:outline-none"
+                                      title="Supprimer ce numéro"
+                                    >
+                                      ×
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            {/* Saisie rapide au scanner ou à la ligne */}
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="Scanner ou taper un numéro et appuyer sur Entrée..."
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    const input = e.currentTarget;
+                                    addSingleSerial(input.value);
+                                    input.value = "";
+                                  }
+                                }}
+                                className="h-10 flex-1 rounded-lg border border-gray-300 bg-white px-3 font-mono text-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900"
+                              />
+                            </div>
+
+                            {/* Zone texte multiligne pour copier-coller en masse */}
+                            <div>
+                              <Label className="!text-xs text-gray-500">
+                                Ou coller en masse (un par ligne ou séparés par virgule) :
+                              </Label>
+                              <textarea
+                                value={line.serialNumbers}
+                                onChange={(e) =>
+                                  updateLine(line.key, {
+                                    serialNumbers: e.target.value,
+                                  })
+                                }
+                                rows={2}
+                                required={validateNow}
+                                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 font-mono text-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900"
+                                placeholder="SN-001\nSN-002…"
+                              />
+                            </div>
+
                             {duplicateSerials.length > 0 ? (
-                              <p className="text-xs font-medium text-red-600 dark:text-red-400">
-                                Attention : le numéro de série « {duplicateSerials[0]} » est saisi plusieurs fois.
+                              <p className="text-xs font-medium text-rose-600 dark:text-rose-400">
+                                ⚠️ Attention : le numéro de série « {duplicateSerials[0]} » est saisi plusieurs fois.
                               </p>
                             ) : null}
                           </div>

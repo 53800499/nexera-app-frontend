@@ -9,6 +9,8 @@ export function formatPdfMoney(value: number, currency: string = DEFAULT_CURRENC
   const formatted = new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency,
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
   }).format(Number.isFinite(value) ? value : 0);
   // React PDF rend mal certains espaces insécables (ex: 1 234) sur quelques polices.
   // On force des espaces ASCII pour éviter les "/" à la place des séparateurs.

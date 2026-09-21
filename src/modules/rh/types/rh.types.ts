@@ -4,8 +4,9 @@ export type RhIdentityDocType = "CNI" | "PASSEPORT" | "CARTE_SEJOUR" | "CIP" | "
 export type RhEmploymentStatus = "ACTIF" | "EN_CONGE" | "SUSPENDU" | "DEMISSIONNE" | "LICENCIE" | "RETRAITE";
 export type RhEmployeeStatus = RhEmploymentStatus;
 export type RhContractType = "CDI" | "CDD" | "STAGE" | "APPRENTISSAGE" | "INTERIM" | "CONSULTANT";
-export type RhContractStatus = "BROUILLON" | "ACTIF" | "SUSPENDU" | "CLOTURE" | "RESILIE";
+export type RhContractStatus = "BROUILLON" | "ACTIF" | "SUSPENDU" | "CLOTURE" | "RESILIE" | "ROMPU" | "TERMINE";
 export type RhProbationOutcome = "EN_COURS" | "VALIDE" | "RENOUVELE" | "ROMPU";
+export type RhProbationStatus = RhProbationOutcome;
 export type RhTimeRecordStatus = "SAISI" | "VALIDE_MANAGER" | "VALIDE_RH" | "REJETE";
 export type RhAbsenceStatus = "SOUMIS" | "VALIDE_MANAGER" | "VALIDE_RH" | "REJETE" | "ANNULE";
 export type RhPayrollCycleStatus = "BROUILLON" | "OUVERT" | "CALCULE" | "VALIDE" | "CLOTURE" | "COMPTABILISE";
@@ -41,6 +42,7 @@ export interface RhEtablissement {
   tenantId: string;
   code: string;
   raisonSociale: string;
+  nom?: string;
   identifiantFiscal?: string;
   ifu?: string;
   numeroEmployeurSecuSociale?: string;
@@ -82,6 +84,7 @@ export interface RhPoste {
   niveauHierarchique?: number;
   salaireMinConseille?: number;
   salaireMaxConseille?: number;
+  tauxRisqueAt?: number | null;
   actif: boolean;
   departement?: RhDepartement;
 }
@@ -215,21 +218,38 @@ export interface RhContrat {
   etablissementId: string;
   posteId: string;
   conventionCollectiveId?: string;
+  categorieProfessionnelleId?: string;
   categorieProId?: string;
   numeroContrat: string;
   typeContrat: RhContractType;
+  dateSignature?: string;
   dateDebut: string;
   dateFinPrevue?: string;
   dateFinReelle?: string;
+  clauseExclusivite?: boolean;
+  clauseNonConcurrence?: boolean;
   salaireBaseMensuel: number;
-  devise: string;
+  devise?: string;
+  deviseCode?: string;
+  dureeHebdoContrat?: number;
+  tauxRisqueAt?: number | null;
+  fichierContratUrl?: string;
+  notes?: string;
   statut: RhContractStatus;
   motifFin?: string;
   employe?: RhEmploye;
   etablissement?: RhEtablissement;
   poste?: RhPoste;
+  conventionCollective?: any;
+  categorieProfessionnelle?: any;
+  periodeEssai?: RhPeriodeEssai | null;
   periodesEssai?: RhPeriodeEssai[];
   avenants?: RhAvenant[];
+  rupture?: RhRupture | null;
+  _count?: {
+    avenants?: number;
+    bulletinsPaie?: number;
+  };
 }
 
 export interface RhPeriodeEssai {
@@ -237,9 +257,14 @@ export interface RhPeriodeEssai {
   contratId: string;
   dateDebut: string;
   dateFin: string;
-  dureeMois: number;
+  dureeJoursOuvres?: number;
+  dureeMois?: number;
   estRenouvele: boolean;
-  statutIssue: RhProbationOutcome;
+  dateDebutRenouvellement?: string;
+  dateFinRenouvellement?: string;
+  statutIssue: RhProbationStatus | RhProbationOutcome;
+  dateNotificationRupture?: string;
+  motifRupture?: string;
   motifCommentaire?: string;
 }
 
@@ -247,11 +272,125 @@ export interface RhAvenant {
   id: string;
   contratId: string;
   numeroAvenant: string;
-  dateSignature: string;
+  dateNotification?: string;
+  dateSignature?: string;
   dateEffet: string;
-  objetModifie: string;
+  typeModification?: RhAmendmentType;
+  objetModifie?: string;
+  detailsModificationsJson?: any;
+  salaireBaseAvant?: number;
   ancienSalaireBase?: number;
+  salaireBaseApres?: number;
   nouveauSalaireBase?: number;
+  tempsTravailAvant?: number;
+  tempsTravailApres?: number;
+  fichierAvenantUrl?: string;
+  creeLe?: string;
+}
+
+export interface RhRupture {
+  id: string;
+  contratId: string;
+  typeRupture: RhTerminationType;
+  dateNotification: string;
+  dateEffet: string;
+  dureePreavisJours: number;
+  dispensePreavis: boolean;
+  montantIndemnitePreavis: number;
+  montantIndemniteLicenciement: number;
+  montantIndemniteCongesPayes: number;
+  montantDommagesInterets: number;
+  motifDetaille?: string;
+  creeLe?: string;
+}
+
+export type RhAmendmentType =
+  | "SALAIRE"
+  | "POSTE"
+  | "DUREE_TRAVAIL"
+  | "LIEU_TRAVAIL"
+  | "STATUT"
+  | "AUTRE";
+
+export type RhTerminationType =
+  | "DEMISSION"
+  | "LICENCIEMENT_MOTIF_PERSONNEL"
+  | "LICENCIEMENT_ECONOMIQUE"
+  | "LICENCIEMENT_FAUTE_GRAVE"
+  | "LICENCIEMENT_FAUTE_LOURDE"
+  | "RUPTURE_CONVENTIONNELLE"
+  | "FIN_CDD"
+  | "DECES"
+  | "DEPART_RETRAITE"
+  | "MISE_A_RETRAITE"
+  | "FORCE_MAJEURE";
+
+export interface CreateContratPayload {
+  employeId: string;
+  etablissementId: string;
+  posteId?: string;
+  numeroContrat?: string;
+  typeContrat: RhContractType;
+  dateSignature?: string;
+  dateDebut: string;
+  dateFinPrevue?: string;
+  clauseExclusivite?: boolean;
+  clauseNonConcurrence?: boolean;
+  salaireBaseMensuel: number;
+  deviseCode?: string;
+  dureeHebdoContrat?: number;
+  categorieProfessionnelleId?: string;
+  conventionCollectiveId?: string;
+  periodeEssaiMois?: number;
+  fichierContratUrl?: string;
+  notes?: string;
+}
+
+export interface UpdateContratPayload {
+  statut?: RhContractStatus;
+  dateFinPrevue?: string;
+  salaireBaseMensuel?: number;
+  dureeHebdoContrat?: number;
+  posteId?: string;
+  categorieProfessionnelleId?: string;
+  fichierContratUrl?: string;
+  notes?: string;
+}
+
+export interface CreateAvenantPayload {
+  numeroAvenant?: string;
+  dateNotification?: string;
+  dateEffet: string;
+  typeModification: RhAmendmentType;
+  salaireBaseApres?: number;
+  tempsTravailApres?: number;
+  detailsModificationsJson?: any;
+  fichierAvenantUrl?: string;
+}
+
+export interface RenouvelerEssaiPayload {
+  dateDebutRenouvellement: string;
+  dateFinRenouvellement: string;
+  motif?: string;
+}
+
+export interface IssueEssaiPayload {
+  statutIssue: RhProbationStatus;
+  dateNotificationRupture?: string;
+  motifRupture?: string;
+}
+
+export interface CreateRupturePayload {
+  typeRupture: RhTerminationType;
+  dateNotification: string;
+  dateEffet: string;
+  dureePreavisJours?: number;
+  dispensePreavis?: boolean;
+  montantIndemnitePreavis?: number;
+  montantIndemniteLicenciement?: number;
+  montantIndemniteCongesPayes?: number;
+  montantDommagesInterets?: number;
+  motifDetaille?: string;
 }
 
 export interface RhReleveTemps {
@@ -289,13 +428,34 @@ export interface RhAbsence {
 
 export interface RhSoldeConge {
   id: string;
+  tenantId?: string;
   employeId: string;
   anneeReference: number;
-  droitsAcquisJours: number;
-  joursPris: number;
+  soldeDebutAnnee?: number;
+  droitsAcquis: number;
+  droitsAcquisJours?: number; // Alias de compatibilité
+  droitsSupplementairesAnciennete?: number;
+  droitsSupplementairesEnfants?: number;
+  joursConsommes: number;
+  joursPris?: number; // Alias de compatibilité
   joursRestants: number;
+  soldeReporte?: number;
+  createdAt?: string;
+  updatedAt?: string;
   employe?: RhEmploye;
 }
+
+export interface AdjustSoldeCongePayload {
+  anneeReference: number;
+  soldeDebutAnnee?: number;
+  droitsAcquis?: number;
+  droitsSupplementairesAnciennete?: number;
+  droitsSupplementairesEnfants?: number;
+  joursConsommes?: number;
+  soldeReporte?: number;
+  motif?: string;
+}
+
 
 export interface RhRubriquePaie {
   id: string;
@@ -422,7 +582,8 @@ export interface RhSoldeToutCompte {
 
 export interface RhEcritureComptablePaie {
   id: string;
-  cyclePaieId: string;
+  cyclePaieId?: string;
+  stcId?: string;
   dateEcriture: string;
   journalCode: string;
   libellePiece: string;
@@ -431,13 +592,15 @@ export interface RhEcritureComptablePaie {
   estEquilibree: boolean;
   statut: string;
   etablissement?: RhEtablissement;
+  employe?: RhEmploye;
   lignes?: Array<{
-    id: string;
+    id?: string;
     numeroLigne: number;
     compteNumero: string;
     libelle: string;
     montantDebit: number;
     montantCredit: number;
+    rubriquePaieId?: string | null;
   }>;
 }
 

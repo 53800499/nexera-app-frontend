@@ -4,19 +4,27 @@ import React, { useEffect, useState } from "react";
 import { rhApi } from "../services/rhApi.service";
 import type { RhDeclarationSocialeFiscale } from "../types/rh.types";
 import { DocsIcon } from "@/icons";
+import { formatDeclarationType, formatDeclarationStatus } from "../utils/rhFormatters";
+import { ErrorState } from "@/shared/components/feedback";
 
 export const DeclarationsSocialesFiscalesView: React.FC = () => {
   const [declarations, setDeclarations] = useState<RhDeclarationSocialeFiscale[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [annee, setAnnee] = useState(2026);
 
   const fetchDeclarations = async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await rhApi.listDeclarations(undefined, annee);
       setDeclarations(Array.isArray(res) ? res : ((res as any)?.data || []));
-    } catch (err) {
-      console.error("Erreur déclarations:", err);
+    } catch (err: any) {
+      console.warn("Erreur déclarations:", err?.message || err);
+      setError(
+        err?.message ||
+          "Serveur ou réseau indisponible. Vérifiez la connexion au serveur API et réessayez.",
+      );
       setDeclarations([]);
     } finally {
       setLoading(false);
@@ -31,7 +39,8 @@ export const DeclarationsSocialesFiscalesView: React.FC = () => {
     new Intl.NumberFormat("fr-FR", {
       style: "currency",
       currency: "XOF",
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
     }).format(val || 0);
 
   const safeDeclarations = Array.isArray(declarations) ? declarations : [];
@@ -70,6 +79,18 @@ export const DeclarationsSocialesFiscalesView: React.FC = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="flex items-center justify-between rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800 dark:border-warning-900/50 dark:bg-warning-950/50 dark:text-warning-300">
+          <span>{error}</span>
+          <button
+            onClick={fetchDeclarations}
+            className="ml-4 font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+          >
+            Réactualiser
+          </button>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
@@ -93,6 +114,16 @@ export const DeclarationsSocialesFiscalesView: React.FC = () => {
                     <p className="mt-2 text-xs text-gray-400">Chargement des déclarations...</p>
                   </td>
                 </tr>
+              ) : error && safeDeclarations.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-6">
+                    <ErrorState
+                      title="Serveur ou réseau indisponible"
+                      message={error}
+                      onRetry={fetchDeclarations}
+                    />
+                  </td>
+                </tr>
               ) : safeDeclarations.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-gray-500">
@@ -114,7 +145,7 @@ export const DeclarationsSocialesFiscalesView: React.FC = () => {
                         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-50 text-xs font-bold text-brand-600 dark:bg-brand-950/50 dark:text-brand-400">
                           {d.typeDeclaration.startsWith("ITS") ? "ITS" : d.typeDeclaration.startsWith("VPS") ? "VPS" : "CNSS"}
                         </span>
-                        <span>{d.typeDeclaration}</span>
+                        <span>{formatDeclarationType(d.typeDeclaration)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">{d.etablissement?.raisonSociale}</td>
@@ -127,9 +158,14 @@ export const DeclarationsSocialesFiscalesView: React.FC = () => {
                       Avant le {d.dateLimiteLegale ? new Date(d.dateLimiteLegale).toLocaleDateString("fr-FR") : "-"}
                     </td>
                     <td className="px-6 py-4">
-                      <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
-                        {d.statut}
-                      </span>
+                      {(() => {
+                        const st = formatDeclarationStatus(d.statut);
+                        return (
+                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${st.badgeClass}`}>
+                            {st.label}
+                          </span>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))

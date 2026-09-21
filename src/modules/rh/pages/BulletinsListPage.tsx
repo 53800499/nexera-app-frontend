@@ -4,30 +4,41 @@ import React, { useEffect, useState } from "react";
 import { rhApi } from "../services/rhApi.service";
 import type { RhBulletinPaie } from "../types/rh.types";
 import { BulletinPaieDetailModal } from "../components/BulletinPaieDetailModal";
-import { formatCurrencyXOF, formatDateFR } from "../utils/rhFormatters";
+import { formatCurrencyXOF, formatDateFR, formatPayslipStatus } from "../utils/rhFormatters";
 import { useBulletinPdf } from "../pdf/useBulletinPdf";
-import { DownloadIcon, EyeIcon } from "@/icons";
+import { DownloadIcon, EyeIcon, FileIcon } from "@/icons";
+import { ErrorState } from "@/shared/components/feedback";
 
 export default function BulletinsListPage() {
   const [bulletins, setBulletins] = useState<RhBulletinPaie[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedBulletinId, setSelectedBulletinId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [annee, setAnnee] = useState(2026);
   const { downloadPdf, isExporting } = useBulletinPdf();
 
-  useEffect(() => {
+  const fetchBulletins = () => {
     setLoading(true);
+    setError(null);
     rhApi
       .listBulletins({ annee })
       .then((res) => {
         setBulletins(Array.isArray(res) ? res : ((res as any)?.data || []));
       })
       .catch((err) => {
-        console.error("Erreur chargement bulletins:", err);
+        console.warn("Erreur chargement bulletins:", err?.message || err);
+        setError(
+          err?.message ||
+            "Serveur ou réseau indisponible. Vérifiez la connexion au serveur API et réessayez.",
+        );
         setBulletins([]);
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchBulletins();
   }, [annee]);
 
   const safeBulletins = Array.isArray(bulletins) ? bulletins : [];
@@ -66,6 +77,18 @@ export default function BulletinsListPage() {
         </div>
       </div>
 
+      {error && (
+        <div className="flex items-center justify-between rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800 dark:border-warning-900/50 dark:bg-warning-950/50 dark:text-warning-300">
+          <span>{error}</span>
+          <button
+            onClick={fetchBulletins}
+            className="ml-4 font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+          >
+            Réactualiser
+          </button>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
@@ -89,11 +112,21 @@ export default function BulletinsListPage() {
                     <p className="mt-2 text-xs text-gray-400">Chargement des bulletins...</p>
                   </td>
                 </tr>
+              ) : error && safeBulletins.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-6">
+                    <ErrorState
+                      title="Serveur ou réseau indisponible"
+                      message={error}
+                      onRetry={fetchBulletins}
+                    />
+                  </td>
+                </tr>
               ) : safeBulletins.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-gray-500">
-                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 text-2xl dark:bg-gray-800">
-                      📄
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 text-gray-400 dark:bg-gray-800">
+                      <FileIcon className="h-6 w-6 shrink-0" />
                     </div>
                     <p className="font-semibold text-gray-700 dark:text-gray-300">Aucun bulletin généré pour {annee}</p>
                     <p className="mt-1 text-xs text-gray-400">Ouvrez un cycle de paie et lancez le calcul automatique.</p>
@@ -124,9 +157,14 @@ export default function BulletinsListPage() {
                       {formatCurrencyXOF(b.netAPayer)}
                     </td>
                     <td className="px-6 py-4">
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
-                        {b.statut}
-                      </span>
+                      {(() => {
+                        const statusBadge = formatPayslipStatus(b.statut);
+                        return (
+                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadge.badgeClass}`}>
+                            {statusBadge.label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">

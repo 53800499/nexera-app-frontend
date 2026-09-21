@@ -6,9 +6,10 @@ import { rhApi } from "../services/rhApi.service";
 import type { RhCyclePaie, RhRubriquePaie } from "../types/rh.types";
 import { BulletinPaieDetailModal } from "./BulletinPaieDetailModal";
 import { Modal } from "@/components/ui/modal";
-import { useActionFeedback, useToast } from "@/shared/components/feedback";
-import { BoltIcon, LockIcon, FileIcon, DocsIcon, DownloadIcon, EyeIcon } from "@/icons";
+import { useActionFeedback, useToast, ErrorState } from "@/shared/components/feedback";
+import { BoltIcon, LockIcon, FileIcon, DocsIcon, DownloadIcon, EyeIcon, CheckCircleIcon, CloseIcon } from "@/icons";
 import { useBulletinPdf } from "../pdf/useBulletinPdf";
+import { getPayrollCycleStatusBadge } from "../utils/rhFormatters";
 
 interface Props {
   cycleId: string;
@@ -21,6 +22,7 @@ export const CyclePaieDetailView: React.FC<Props> = ({ cycleId }) => {
   const [cycle, setCycle] = useState<RhCyclePaie | null>(null);
   const [rubriques, setRubriques] = useState<RhRubriquePaie[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [calculating, setCalculating] = useState(false);
   const [selectedBulletinId, setSelectedBulletinId] = useState<string | null>(null);
   const [isBulletinModalOpen, setIsBulletinModalOpen] = useState(false);
@@ -48,9 +50,10 @@ export const CyclePaieDetailView: React.FC<Props> = ({ cycleId }) => {
   const loadCycle = async () => {
     try {
       setLoading(true);
+      setError(null);
       const [res, rubs] = await Promise.all([
         rhApi.getCycleById(cycleId),
-        rhApi.listRubriques("BJ"),
+        rhApi.listRubriques("BJ").catch(() => []),
       ]);
       const rubsList = Array.isArray(rubs) ? rubs : ((rubs as any)?.data || []);
       setCycle(res);
@@ -63,8 +66,12 @@ export const CyclePaieDetailView: React.FC<Props> = ({ cycleId }) => {
       if (rubsList.length > 0) {
         setVarForm((prev) => ({ ...prev, rubriquePaieId: prev.rubriquePaieId || rubsList[0].id }));
       }
-    } catch (err) {
-      console.error("Erreur chargement cycle:", err);
+    } catch (err: any) {
+      console.warn("Erreur chargement cycle:", err?.message || err);
+      setError(
+        err?.message ||
+          "Serveur ou réseau indisponible. Vérifiez la connexion au serveur API et réessayez.",
+      );
     } finally {
       setLoading(false);
     }
@@ -228,13 +235,44 @@ export const CyclePaieDetailView: React.FC<Props> = ({ cycleId }) => {
     new Intl.NumberFormat("fr-FR", {
       style: "currency",
       currency: "XOF",
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
     }).format(val || 0);
 
-  if (loading || !cycle) {
+  const formatNumber = (val?: number | null) =>
+    new Intl.NumberFormat("fr-FR", {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+    }).format(Number(val) || 0);
+
+  if (loading && !cycle) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (error && !cycle) {
+    return (
+      <div className="py-8">
+        <ErrorState
+          title="Serveur ou réseau indisponible"
+          message={error}
+          onRetry={loadCycle}
+        />
+      </div>
+    );
+  }
+
+  if (!cycle) {
+    return (
+      <div className="py-8">
+        <ErrorState
+          title="Cycle de paie introuvable"
+          message="Impossible d'accéder aux informations de ce cycle de paie."
+          onRetry={loadCycle}
+        />
       </div>
     );
   }
@@ -248,6 +286,17 @@ export const CyclePaieDetailView: React.FC<Props> = ({ cycleId }) => {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="flex items-center justify-between rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800 dark:border-warning-900/50 dark:bg-warning-950/50 dark:text-warning-300">
+          <span>{error}</span>
+          <button
+            onClick={loadCycle}
+            className="ml-4 font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+          >
+            Réactualiser
+          </button>
+        </div>
+      )}
       {/* Header & Actions */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -258,16 +307,14 @@ export const CyclePaieDetailView: React.FC<Props> = ({ cycleId }) => {
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
             Cycle de Paie • {cycle.codeCycle}
-            <span
-              className={`rounded-full px-3 py-0.5 text-xs font-semibold ${cycle.statut === "VALIDE"
-                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-                : cycle.statut === "CALCULE"
-                  ? "bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300"
-                  : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
-                }`}
-            >
-              {cycle.statut}
-            </span>
+            {(() => {
+              const st = getPayrollCycleStatusBadge(cycle.statut);
+              return (
+                <span className={`rounded-full px-3 py-0.5 text-xs font-semibold ${st.badgeClass}`}>
+                  {st.label}
+                </span>
+              );
+            })()}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {cycle.etablissement?.raisonSociale} • Période du{" "}
@@ -531,12 +578,22 @@ export const CyclePaieDetailView: React.FC<Props> = ({ cycleId }) => {
                     </div>
                   </div>
                   <span
-                    className={`rounded-full px-3 py-0.5 text-xs font-bold ${ecr.estEquilibree
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-bold ${ecr.estEquilibree
                       ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
                       : "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300"
                       }`}
                   >
-                    {ecr.estEquilibree ? "Équilibrée ✓ (Débit = Crédit)" : "Déséquilibrée ✗"}
+                    {ecr.estEquilibree ? (
+                      <>
+                        <CheckCircleIcon className="h-3.5 w-3.5 shrink-0" />
+                        <span>Équilibrée (Débit = Crédit)</span>
+                      </>
+                    ) : (
+                      <>
+                        <CloseIcon className="h-3.5 w-3.5 shrink-0" />
+                        <span>Déséquilibrée</span>
+                      </>
+                    )}
                   </span>
                 </div>
 

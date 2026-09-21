@@ -340,5 +340,54 @@ export function canReconcileCorporateCards(user: any) {
   ]);
 }
 
+// ----------------------------------------------------
+// FISCALITÉ & DÉCLARATIONS (M7)
+// ----------------------------------------------------
 
+export function canReadFiscalite(user: any): boolean {
+  if (!user) return false;
+  if (
+    user.role === "admin" ||
+    user.role === "dirigeant" ||
+    user.role === "comptable" ||
+    user.role === "fiscaliste" ||
+    user.roles?.includes("ADMIN") ||
+    user.roles?.includes("CEO") ||
+    user.roles?.includes("COMPTABLE") ||
+    user.roles?.includes("FISCALISTE") ||
+    user.roles?.includes("CABINET_ADMIN") ||
+    user.roles?.includes("CABINET_COLLABORATEUR") ||
+    user.workspace === "entreprise" ||
+    user.workspace === "cabinet"
+  ) {
+    return true;
+  }
+  return hasAnyPermissionCode(user, [
+    "fiscalite.read",
+    "fiscalite.write",
+    "manage:fiscalite",
+    "tva.read",
+    "is.read",
+    "dashboard.read",
+  ]);
+}
 
+export function canManageFiscalite(user: any): boolean {
+  if (!user) return false;
+  if (
+    user.role === "admin" ||
+    user.role === "dirigeant" ||
+    user.roles?.includes("ADMIN") ||
+    user.roles?.includes("CEO") ||
+    user.roles?.includes("FISCALISTE") ||
+    user.roles?.includes("CABINET_ADMIN")
+  ) {
+    return true;
+  }
+  return hasAnyPermissionCode(user, [
+    "fiscalite.write",
+    "manage:fiscalite",
+    "tva.write",
+    "is.write",
+  ]);
+}

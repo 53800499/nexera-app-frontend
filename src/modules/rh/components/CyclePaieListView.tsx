@@ -5,8 +5,9 @@ import Link from "next/link";
 import { rhApi } from "../services/rhApi.service";
 import type { RhCyclePaie, RhEtablissement } from "../types/rh.types";
 import { Modal } from "@/components/ui/modal";
-import { useActionFeedback, useToast } from "@/shared/components/feedback";
+import { useActionFeedback, useToast, ErrorState } from "@/shared/components/feedback";
 import { PlusIcon, CalenderIcon } from "@/icons";
+import { getPayrollCycleStatusBadge } from "../utils/rhFormatters";
 
 export const CyclePaieListView: React.FC = () => {
   const { runAction } = useActionFeedback();
@@ -14,6 +15,7 @@ export const CyclePaieListView: React.FC = () => {
   const [cycles, setCycles] = useState<RhCyclePaie[]>([]);
   const [etablissements, setEtablissements] = useState<RhEtablissement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [annee, setAnnee] = useState(2026);
   const [isOpenModalOpen, setIsOpenModalOpen] = useState(false);
 
@@ -27,10 +29,15 @@ export const CyclePaieListView: React.FC = () => {
   const fetchCycles = async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await rhApi.listCycles(annee);
       setCycles(Array.isArray(res) ? res : ((res as any)?.data || []));
-    } catch (err) {
-      console.error("Erreur chargement cycles:", err);
+    } catch (err: any) {
+      console.warn("Erreur chargement cycles:", err?.message || err);
+      setError(
+        err?.message ||
+          "Serveur ou réseau indisponible. Vérifiez la connexion au serveur API et réessayez.",
+      );
       setCycles([]);
     } finally {
       setLoading(false);
@@ -46,7 +53,7 @@ export const CyclePaieListView: React.FC = () => {
         setOpenForm((prev) => ({ ...prev, etablissementId: prev.etablissementId || etabs[0].id }));
       }
     } catch (err) {
-      console.error(err);
+      console.warn("Erreur chargement établissements:", err);
     }
   };
 
@@ -139,12 +146,32 @@ export const CyclePaieListView: React.FC = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="flex items-center justify-between rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800 dark:border-warning-900/50 dark:bg-warning-950/50 dark:text-warning-300">
+          <span>{error}</span>
+          <button
+            onClick={fetchCycles}
+            className="ml-4 font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+          >
+            Réactualiser
+          </button>
+        </div>
+      )}
+
       {/* Grille des Cycles */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
         {loading ? (
           <div className="col-span-full py-12 text-center text-gray-500">
             <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
             <p className="mt-2 text-xs text-gray-400">Chargement des cycles de paie...</p>
+          </div>
+        ) : error && safeCycles.length === 0 ? (
+          <div className="col-span-full py-6">
+            <ErrorState
+              title="Serveur ou réseau indisponible"
+              message={error}
+              onRetry={fetchCycles}
+            />
           </div>
         ) : safeCycles.length === 0 ? (
           <div className="col-span-full py-12 text-center text-gray-500 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 shadow-xs">
@@ -172,17 +199,14 @@ export const CyclePaieListView: React.FC = () => {
                   <span className="font-mono text-sm font-bold text-gray-900 dark:text-white">
                     {cycle.codeCycle}
                   </span>
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      cycle.statut === "VALIDE" || cycle.statut === "CLOTURE"
-                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-                        : cycle.statut === "CALCULE"
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300"
-                        : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
-                    }`}
-                  >
-                    {cycle.statut}
-                  </span>
+                  {(() => {
+                    const st = getPayrollCycleStatusBadge(cycle.statut);
+                    return (
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${st.badgeClass}`}>
+                        {st.label}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 <div className="mt-4 space-y-2 text-sm">

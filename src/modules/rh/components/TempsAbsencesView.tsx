@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { rhApi } from "../services/rhApi.service";
 import type { RhAbsence, RhEmploye, RhReleveTemps, RhSoldeConge } from "../types/rh.types";
 import { Modal } from "@/components/ui/modal";
 import { useActionFeedback, useToast } from "@/shared/components/feedback";
-import { TimeIcon, CalenderIcon, PieChartIcon, PlusIcon, CheckCircleIcon, CloseIcon } from "@/icons";
+import { TimeIcon, CalenderIcon, PieChartIcon, PlusIcon, CheckCircleIcon, CloseIcon, PencilIcon } from "@/icons";
+import { AjusterSoldeCongeModal } from "./AjusterSoldeCongeModal";
+import { formatTimeRecordStatus, getAbsenceStatusBadge } from "../utils/rhFormatters";
 
 export const TempsAbsencesView: React.FC = () => {
   const { runAction } = useActionFeedback();
@@ -18,6 +20,13 @@ export const TempsAbsencesView: React.FC = () => {
   const [absenceTypes, setAbsenceTypes] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
+
+  // Soldes de congés state
+  const [selectedAnnee, setSelectedAnnee] = useState<number>(2026);
+  const [searchSoldes, setSearchSoldes] = useState("");
+  const [isAjusterModalOpen, setIsAjusterModalOpen] = useState(false);
+  const [soldeToAdjust, setSoldeToAdjust] = useState<RhSoldeConge | null>(null);
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   // Modals
   const [isReleveModalOpen, setIsReleveModalOpen] = useState(false);
@@ -44,13 +53,29 @@ export const TempsAbsencesView: React.FC = () => {
     motif: "",
   });
 
+  const [error, setError] = useState<string | null>(null);
+
   const loadData = async () => {
     try {
       setLoading(true);
-      const [empRes, absTypes] = await Promise.all([
+      setError(null);
+      const [empResSettled, absTypesSettled] = await Promise.allSettled([
         rhApi.listEmployes(),
-        rhApi.listTypesAbsence(),
+        rhApi.listTypesAbsence().catch(() => rhApi.listAbsenceTypes("BJ")),
       ]);
+      const empRes = empResSettled.status === "fulfilled" ? empResSettled.value : [];
+      const absTypes = absTypesSettled.status === "fulfilled" ? absTypesSettled.value : [];
+
+      if (empResSettled.status === "rejected") {
+        const msg = empResSettled.reason?.message || "Serveur ou réseau indisponible";
+        console.warn("Avertissement salariés temps/absences:", msg);
+        setError(
+          msg.includes("indisponible") || msg.includes("fetch")
+            ? "Serveur ou réseau indisponible. Impossible de récupérer les données complètes."
+            : msg,
+        );
+      }
+
       const safeEmps = Array.isArray(empRes) ? empRes : ((empRes as any)?.data || []);
       const safeAbsTypes = Array.isArray(absTypes) ? absTypes : ((absTypes as any)?.data || []);
       setEmployes(safeEmps);
@@ -65,17 +90,18 @@ export const TempsAbsencesView: React.FC = () => {
       }
 
       if (activeTab === "releves") {
-        const relRes = await rhApi.listRelevesTemps();
+        const relRes = await rhApi.listRelevesTemps().catch(() => []);
         setReleves(Array.isArray(relRes) ? relRes : ((relRes as any)?.data || []));
       } else if (activeTab === "absences") {
-        const absRes = await rhApi.listAbsences();
+        const absRes = await rhApi.listAbsences().catch(() => []);
         setAbsences(Array.isArray(absRes) ? absRes : ((absRes as any)?.data || []));
       } else if (activeTab === "soldes") {
-        const sldRes = await rhApi.listSoldesConges(2026);
+        const sldRes = await rhApi.listSoldesConges(selectedAnnee).catch(() => []);
         setSoldes(Array.isArray(sldRes) ? sldRes : ((sldRes as any)?.data || []));
       }
-    } catch (err) {
-      console.error("Erreur chargement données temps/absences:", err);
+    } catch (err: any) {
+      console.warn("Erreur chargement données temps/absences:", err?.message || err);
+      setError(err?.message || "Serveur ou réseau indisponible.");
       setEmployes([]);
       setAbsenceTypes([]);
       setReleves([]);
@@ -88,7 +114,7 @@ export const TempsAbsencesView: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [activeTab, isReleveModalOpen, isAbsenceModalOpen]);
+  }, [activeTab, isReleveModalOpen, isAbsenceModalOpen, selectedAnnee]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -180,7 +206,57 @@ export const TempsAbsencesView: React.FC = () => {
   const safeReleves = Array.isArray(releves) ? releves : [];
   const safeAbsences = Array.isArray(absences) ? absences : [];
   const safeSoldes = Array.isArray(soldes) ? soldes : [];
+
+  const handleRecalculerSoldes = async () => {
+    try {
+      setIsRecalculating(true);
+      const res = await rhApi.recalculerSoldesConges(selectedAnnee);
+      const safeList = Array.isArray(res) ? res : ((res as any)?.data || []);
+      setSoldes(safeList);
+      toast.success(
+        "Compteurs actualisés",
+        `Les droits et soldes de congés pour l'année ${selectedAnnee} ont été recalculés selon les règles légales (Art. 68 CCGT).`
+      );
+    } catch (err: any) {
+      console.warn("Erreur recalcul soldes conges:", err);
+      toast.error("Erreur", err.message || "Échec du recalcul des compteurs de congés.");
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
+  const handleOpenAjuster = (solde: RhSoldeConge) => {
+    setSoldeToAdjust(solde);
+    setIsAjusterModalOpen(true);
+  };
+
+  const filteredSoldes = useMemo(() => {
+    const list = Array.isArray(soldes) ? soldes : [];
+    if (!searchSoldes.trim()) return list;
+    const q = searchSoldes.toLowerCase();
+    return list.filter((s) => {
+      const nom = (s.employe?.nom || "").toLowerCase();
+      const prenoms = (s.employe?.prenoms || "").toLowerCase();
+      const mat = (s.employe?.matricule || "").toLowerCase();
+      return nom.includes(q) || prenoms.includes(q) || mat.includes(q);
+    });
+  }, [soldes, searchSoldes]);
+
+  const soldesKpis = useMemo(() => {
+    const list = Array.isArray(soldes) ? soldes : [];
+    const totalSalaries = list.length;
+    const totalAcquis = list.reduce((acc, s) => acc + (s.droitsAcquis ?? s.droitsAcquisJours ?? 0), 0);
+    const totalConsommes = list.reduce((acc, s) => acc + (s.joursConsommes ?? s.joursPris ?? 0), 0);
+    const totalRestants = list.reduce((acc, s) => acc + (s.joursRestants ?? 0), 0);
+    return { totalSalaries, totalAcquis, totalConsommes, totalRestants };
+  }, [soldes]);
   const safeAbsenceTypes = Array.isArray(absenceTypes) ? absenceTypes : [];
+
+  const formatNumber = (val?: number | null) =>
+    new Intl.NumberFormat("fr-FR", {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+    }).format(Number(val) || 0);
 
   return (
     <div className="space-y-6">
@@ -212,12 +288,24 @@ export const TempsAbsencesView: React.FC = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="flex items-center justify-between rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800 dark:border-warning-900/50 dark:bg-warning-950/50 dark:text-warning-300">
+          <span>{error}</span>
+          <button
+            onClick={loadData}
+            className="ml-4 font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+          >
+            Réactualiser
+          </button>
+        </div>
+      )}
+
       {/* Onglets */}
       <div className="flex border-b border-gray-200 dark:border-gray-800">
         {[
           { id: "releves", label: "Relevés d'Heures & Heures Sup" },
           { id: "absences", label: "Demandes de Congés & Absences" },
-          { id: "soldes", label: "Compteurs Soldes de Congés (2026)" },
+          { id: "soldes", label: `Compteurs Soldes de Congés (${selectedAnnee})` },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -282,16 +370,21 @@ export const TempsAbsencesView: React.FC = () => {
                       <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
                         {r.employe?.nom} {r.employe?.prenoms}
                       </td>
-                      <td className="px-6 py-4 font-mono">{r.heuresNormales} h</td>
-                      <td className="px-6 py-4 font-mono text-amber-600 font-bold">{r.heuresSup15 || 0} h</td>
-                      <td className="px-6 py-4 font-mono text-orange-600 font-bold">{r.heuresSup50 || 0} h</td>
+                      <td className="px-6 py-4 font-mono">{formatNumber(r.heuresNormales)} h</td>
+                      <td className="px-6 py-4 font-mono text-amber-600 font-bold">{formatNumber(r.heuresSup15)} h</td>
+                      <td className="px-6 py-4 font-mono text-orange-600 font-bold">{formatNumber(r.heuresSup50)} h</td>
                       <td className="px-6 py-4 font-mono text-purple-600 font-bold">
-                        {(r.heuresSupNuit || 0) + (r.heuresSupDimancheFerie || 0)} h
+                        {formatNumber((r.heuresSupNuit || 0) + (r.heuresSupDimancheFerie || 0))} h
                       </td>
                       <td className="px-6 py-4">
-                        <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
-                          {r.statutValidation}
-                        </span>
+                        {(() => {
+                          const st = formatTimeRecordStatus(r.statutValidation);
+                          return (
+                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${st.badgeClass}`}>
+                              {st.label}
+                            </span>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))
@@ -360,16 +453,14 @@ export const TempsAbsencesView: React.FC = () => {
                         {a.nombreJoursOuvrables} j
                       </td>
                       <td className="px-6 py-4">
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${a.statut === "VALIDE_RH"
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-                            : a.statut === "SOUMIS"
-                              ? "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
-                              : "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300"
-                            }`}
-                        >
-                          {a.statut}
-                        </span>
+                        {(() => {
+                          const absSt = getAbsenceStatusBadge(a.statut);
+                          return (
+                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${absSt.badgeClass}`}>
+                              {absSt.label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 text-right">
                         {a.statut === "SOUMIS" ? (
@@ -403,55 +494,197 @@ export const TempsAbsencesView: React.FC = () => {
       )}
 
       {activeTab === "soldes" && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
-              <thead className="border-b border-gray-100 bg-gray-50/75 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
-                <tr>
-                  <th className="px-6 py-4">Salarié</th>
-                  <th className="px-6 py-4">Année Référence</th>
-                  <th className="px-6 py-4">Droits Acquis (2j/mois)</th>
-                  <th className="px-6 py-4">Jours Consommés</th>
-                  <th className="px-6 py-4">Solde Restant Disponible</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {loading ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-gray-500">
-                      <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-                      <p className="mt-2 text-xs text-gray-400">Chargement des compteurs de congés...</p>
-                    </td>
-                  </tr>
-                ) : safeSoldes.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-gray-500">
-                      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800">
-                        <PieChartIcon className="h-6 w-6 shrink-0 text-gray-400" />
-                      </div>
-                      <p className="font-semibold text-gray-700 dark:text-gray-300">Aucun compteur de congés calculé pour 2026</p>
-                      <p className="mt-1 text-xs text-gray-400">Les compteurs se mettent à jour automatiquement lors des cycles de paie.</p>
-                    </td>
-                  </tr>
+        <div className="space-y-4">
+          {/* Barre d'outils et sélecteur d'année */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-xs dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex flex-wrap items-center gap-3">
+              <div>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1">
+                  Exercice / Année
+                </span>
+                <select
+                  value={selectedAnnee}
+                  onChange={(e) => setSelectedAnnee(Number(e.target.value))}
+                  className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-brand-500 outline-hidden"
+                >
+                  <option value={2024}>2024</option>
+                  <option value={2025}>2025</option>
+                  <option value={2026}>2026 (En cours)</option>
+                  <option value={2027}>2027</option>
+                </select>
+              </div>
+
+              <div className="flex-1 sm:w-64">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1">
+                  Rechercher un salarié
+                </span>
+                <input
+                  type="text"
+                  placeholder="Nom, prénom, matricule..."
+                  value={searchSoldes}
+                  onChange={(e) => setSearchSoldes(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-brand-500 outline-hidden"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRecalculerSoldes}
+                disabled={isRecalculating || loading}
+                className="inline-flex items-center gap-2 rounded-xl bg-brand-50 px-4 py-2 text-xs font-bold text-brand-700 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 dark:hover:bg-brand-900/80 transition-colors disabled:opacity-50"
+              >
+                {isRecalculating ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
                 ) : (
-                  safeSoldes.map((s) => (
-                    <tr key={s.id} className="hover:bg-gray-50/70 dark:hover:bg-gray-800/50 transition-colors">
-                      <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
-                        {s.employe?.nom} {s.employe?.prenoms} ({s.employe?.matricule})
-                      </td>
-                      <td className="px-6 py-4 font-mono">{s.anneeReference}</td>
-                      <td className="px-6 py-4 font-medium text-emerald-600 font-mono">{s.droitsAcquisJours} j</td>
-                      <td className="px-6 py-4 font-medium text-amber-600 font-mono">{s.joursPris} j</td>
-                      <td className="px-6 py-4">
-                        <span className="rounded-lg bg-brand-50 px-3 py-1 text-sm font-bold text-brand-700 dark:bg-brand-950/50 dark:text-brand-300 font-mono">
-                          {s.joursRestants} jours
-                        </span>
+                  <svg className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                )}
+                <span>Recalculer les droits légaux</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Cartes KPI */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-xs dark:border-gray-800 dark:bg-gray-900">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Salariés Suivis</span>
+              <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{soldesKpis.totalSalaries}</p>
+              <span className="text-[11px] text-gray-400">Collaborateurs actifs</span>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-xs dark:border-gray-800 dark:bg-gray-900">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Droits Acquis Cumulés</span>
+              <p className="mt-1 text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                {formatNumber(soldesKpis.totalAcquis)} j
+              </p>
+              <span className="text-[11px] text-gray-400">Base 2j / mois + majorations</span>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-xs dark:border-gray-800 dark:bg-gray-900">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Jours Consommés</span>
+              <p className="mt-1 text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">
+                {formatNumber(soldesKpis.totalConsommes)} j
+              </p>
+              <span className="text-[11px] text-gray-400">Absences validées en {selectedAnnee}</span>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-xs dark:border-gray-800 dark:bg-gray-900">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Solde Restant Disponible</span>
+              <p className="mt-1 text-2xl font-bold font-mono text-brand-600 dark:text-brand-400">
+                {formatNumber(soldesKpis.totalRestants)} jours
+              </p>
+              <span className="text-[11px] text-gray-400">Prêts à être posés</span>
+            </div>
+          </div>
+
+          {/* Tableau des compteurs */}
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                <thead className="border-b border-gray-100 bg-gray-50/75 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
+                  <tr>
+                    <th className="px-6 py-4">Salarié</th>
+                    <th className="px-6 py-4 text-center">Année</th>
+                    <th className="px-6 py-4 text-center">Droits Acquis (2j/mois)</th>
+                    <th className="px-6 py-4 text-center">Droits Suppl.</th>
+                    <th className="px-6 py-4 text-center">Report N-1</th>
+                    <th className="px-6 py-4 text-center">Consommés</th>
+                    <th className="px-6 py-4 text-center">Solde Restant Net</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-gray-500">
+                        <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                        <p className="mt-2 text-xs text-gray-400">Chargement et synchronisation des compteurs...</p>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : filteredSoldes.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-gray-500">
+                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800">
+                          <PieChartIcon className="h-6 w-6 shrink-0 text-gray-400" />
+                        </div>
+                        <p className="font-semibold text-gray-700 dark:text-gray-300">
+                          Aucun compteur trouvé pour l'exercice {selectedAnnee}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-400">
+                          Cliquez sur "Recalculer les droits légaux" pour générer les compteurs des salariés actifs.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredSoldes.map((s) => {
+                      const acquis = s.droitsAcquis ?? s.droitsAcquisJours ?? 0;
+                      const sup = (s.droitsSupplementairesAnciennete || 0) + (s.droitsSupplementairesEnfants || 0);
+                      const report = s.soldeReporte ?? 0;
+                      const consommes = s.joursConsommes ?? s.joursPris ?? 0;
+                      const restants = s.joursRestants ?? Math.max(0, acquis + sup + report - consommes);
+
+                      return (
+                        <tr key={s.id} className="hover:bg-gray-50/70 dark:hover:bg-gray-800/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="font-semibold text-gray-900 dark:text-white">
+                              {s.employe?.nom} {s.employe?.prenoms}
+                            </div>
+                            <div className="text-xs text-gray-400 font-mono">
+                              {s.employe?.matricule}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center font-mono font-medium">{s.anneeReference}</td>
+                          <td className="px-6 py-4 text-center font-medium text-emerald-600 font-mono">
+                            {formatNumber(acquis)} j
+                          </td>
+                          <td className="px-6 py-4 text-center font-mono">
+                            {sup > 0 ? (
+                              <span className="rounded-md bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                                +{formatNumber(sup)} j
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-center font-mono">
+                            {report > 0 ? (
+                              <span className="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                                +{formatNumber(report)} j
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">0 j</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-center font-medium text-amber-600 font-mono">
+                            {formatNumber(consommes)} j
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`inline-block rounded-lg px-3 py-1 text-sm font-bold font-mono ${
+                              restants > 0
+                                ? "bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300"
+                                : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                            }`}>
+                              {formatNumber(restants)} jours
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenAjuster(s)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors"
+                              title="Ajuster ou régulariser ce solde"
+                            >
+                              <PencilIcon className="h-3.5 w-3.5 text-gray-500" />
+                              <span>Ajuster</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -667,6 +900,20 @@ export const TempsAbsencesView: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Modale d'ajustement du solde de congés */}
+      <AjusterSoldeCongeModal
+        isOpen={isAjusterModalOpen}
+        onClose={() => {
+          setIsAjusterModalOpen(false);
+          setSoldeToAdjust(null);
+        }}
+        solde={soldeToAdjust}
+        onSuccess={() => {
+          loadData();
+        }}
+      />
     </div>
   );
 };
+

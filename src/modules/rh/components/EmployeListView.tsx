@@ -7,12 +7,14 @@ import { EmployeDetail360Modal } from "./EmployeDetail360Modal";
 import { EmployeFormModal } from "./EmployeFormModal";
 import { ContratFormModal } from "./ContratFormModal";
 import { GroupIcon, EyeIcon, PlusIcon, PencilIcon, TrashBinIcon, DocsIcon, LockIcon } from "@/icons";
-import { useActionFeedback } from "@/shared/components/feedback";
+import { useActionFeedback, ErrorState } from "@/shared/components/feedback";
+import { getEmployeeStatusBadge } from "../utils/rhFormatters";
 
 export const EmployeListView: React.FC = () => {
   const { runAction } = useActionFeedback();
   const [employes, setEmployes] = useState<RhEmploye[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
@@ -28,14 +30,19 @@ export const EmployeListView: React.FC = () => {
   const fetchEmployes = async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await rhApi.listEmployes({
         q: search || undefined,
         statutEmploi: statusFilter !== "ALL" ? statusFilter : undefined,
       });
       const items = Array.isArray(res) ? res : ((res as any)?.data || []);
       setEmployes(items);
-    } catch (err) {
-      console.error("Erreur chargement salariés:", err);
+    } catch (err: any) {
+      console.warn("Erreur chargement salariés:", err?.message || err);
+      setError(
+        err?.message ||
+          "Serveur ou réseau indisponible. Vérifiez la connexion au serveur API et réessayez.",
+      );
       setEmployes([]);
     } finally {
       setLoading(false);
@@ -143,6 +150,18 @@ export const EmployeListView: React.FC = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="flex items-center justify-between rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800 dark:border-warning-900/50 dark:bg-warning-950/50 dark:text-warning-300">
+          <span>{error}</span>
+          <button
+            onClick={fetchEmployes}
+            className="ml-4 font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+          >
+            Réactualiser
+          </button>
+        </div>
+      )}
+
       {/* Tableau des Employés */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900">
         <div className="overflow-x-auto">
@@ -163,6 +182,16 @@ export const EmployeListView: React.FC = () => {
                   <td colSpan={6} className="py-12 text-center text-gray-500">
                     <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
                     <p className="mt-2 text-xs text-gray-400">Chargement des salariés...</p>
+                  </td>
+                </tr>
+              ) : error && safeEmployes.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-6">
+                    <ErrorState
+                      title="Serveur ou réseau indisponible"
+                      message={error}
+                      onRetry={fetchEmployes}
+                    />
                   </td>
                 </tr>
               ) : safeEmployes.length === 0 ? (
@@ -236,16 +265,14 @@ export const EmployeListView: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${emp.statutEmploi === "ACTIF"
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-                            : emp.statutEmploi === "EN_CONGE"
-                              ? "bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300"
-                              : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
-                            }`}
-                        >
-                          {emp.statutEmploi || "ACTIF"}
-                        </span>
+                        {(() => {
+                          const st = getEmployeeStatusBadge(emp.statutEmploi);
+                          return (
+                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${st.badgeClass}`}>
+                              {st.label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end">

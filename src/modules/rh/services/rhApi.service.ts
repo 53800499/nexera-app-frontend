@@ -14,6 +14,7 @@ import type {
   RhReleveTemps,
   RhRubriquePaie,
   RhSoldeConge,
+  AdjustSoldeCongePayload,
   RhSoldeToutCompte,
   RhBulletinPaie,
 } from "../types/rh.types";
@@ -188,10 +189,11 @@ export const rhApi = {
   },
 
   // ---------------- CONTRATS ----------------
-  listContrats: async (params?: { employeId?: string; statut?: string; etablissementId?: string }) => {
+  listContrats: async (params?: { employeId?: string; statut?: string; typeContrat?: string; etablissementId?: string }) => {
     const query = new URLSearchParams();
     if (params?.employeId) query.append("employeId", params.employeId);
     if (params?.statut) query.append("statut", params.statut);
+    if (params?.typeContrat) query.append("typeContrat", params.typeContrat);
     if (params?.etablissementId) query.append("etablissementId", params.etablissementId);
     const qs = query.toString() ? `?${query.toString()}` : "";
     const res = await authorizedFetch<any>(`/rh/contrats${qs}`);
@@ -201,6 +203,31 @@ export const rhApi = {
     authorizedFetch<RhContrat>(`/rh/contrats/${id}`),
   createContrat: (payload: any) =>
     authorizedFetch<RhContrat>("/rh/contrats", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateContrat: (id: string, payload: any) =>
+    authorizedFetch<RhContrat>(`/rh/contrats/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  renouvelerEssai: (id: string, payload: any) =>
+    authorizedFetch<any>(`/rh/contrats/${id}/renouveler-essai`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  cloreEssai: (id: string, payload: any) =>
+    authorizedFetch<any>(`/rh/contrats/${id}/clore-essai`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  createAvenant: (id: string, payload: any) =>
+    authorizedFetch<any>(`/rh/contrats/${id}/avenants`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  createRupture: (id: string, payload: any) =>
+    authorizedFetch<any>(`/rh/contrats/${id}/rupture`, {
       method: "POST",
       body: JSON.stringify(payload),
     }),
@@ -253,6 +280,18 @@ export const rhApi = {
     const res = await authorizedFetch<any>(`/rh/temps-absences/soldes-conges?annee=${annee}${q}`);
     return normalizeArray<RhSoldeConge>(res);
   },
+  recalculerSoldesConges: async (annee = 2026, employeId?: string) => {
+    const res = await authorizedFetch<any>("/rh/temps-absences/soldes-conges/calculer", {
+      method: "POST",
+      body: JSON.stringify({ annee, employeId }),
+    });
+    return normalizeArray<RhSoldeConge>(res);
+  },
+  ajusterSoldeConge: (employeId: string, payload: AdjustSoldeCongePayload) =>
+    authorizedFetch<RhSoldeConge>(`/rh/temps-absences/soldes-conges/${employeId}/ajuster`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   listTypesAbsence: async () => {
     const res = await authorizedFetch<any>("/rh/temps-absences/types-absence");
     return normalizeArray<any>(res);
@@ -351,6 +390,12 @@ export const rhApi = {
     authorizedFetch<RhEcritureComptablePaie>(`/rh/interfaces/od-paie/${cycleId}`),
   generateOdPaie: (cycleId: string) =>
     authorizedFetch<RhEcritureComptablePaie>(`/rh/interfaces/od-paie/${cycleId}/generer`, {
+      method: "POST",
+    }),
+  getOdStc: (stcId: string) =>
+    authorizedFetch<RhEcritureComptablePaie>(`/rh/interfaces/od-stc/${stcId}`),
+  generateOdStc: (stcId: string) =>
+    authorizedFetch<RhEcritureComptablePaie>(`/rh/interfaces/od-stc/${stcId}/generer`, {
       method: "POST",
     }),
   listDeclarations: async (cyclePaieId?: string, annee?: number) => {

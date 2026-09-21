@@ -6,6 +6,8 @@ import { rhApi } from "../services/rhApi.service";
 import type { RhBulletinPaie } from "../types/rh.types";
 import { useBulletinPdf } from "../pdf/useBulletinPdf";
 import { DownloadIcon, EyeIcon } from "@/icons";
+import { formatPayslipStatus, formatPaymentMethod } from "../utils/rhFormatters";
+import { ErrorState } from "@/shared/components/feedback";
 
 interface Props {
   bulletinId: string | null;
@@ -20,16 +22,32 @@ export const BulletinPaieDetailModal: React.FC<Props> = ({
 }) => {
   const [bulletin, setBulletin] = useState<RhBulletinPaie | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { isExporting, downloadPdf, openPdf } = useBulletinPdf();
+
+  const loadBulletin = () => {
+    if (!bulletinId) return;
+    setLoading(true);
+    setError(null);
+    rhApi
+      .getBulletinById(bulletinId)
+      .then((res) => {
+        setBulletin(res);
+        setError(null);
+      })
+      .catch((err) => {
+        console.warn("Erreur chargement bulletin de paie:", err);
+        setError(err?.message || "Impossible de charger les données du bulletin de paie.");
+      })
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     if (bulletinId && isOpen) {
-      setLoading(true);
-      rhApi
-        .getBulletinById(bulletinId)
-        .then(setBulletin)
-        .catch(console.error)
-        .finally(() => setLoading(false));
+      loadBulletin();
+    } else {
+      setBulletin(null);
+      setError(null);
     }
   }, [bulletinId, isOpen]);
 
@@ -39,8 +57,15 @@ export const BulletinPaieDetailModal: React.FC<Props> = ({
     new Intl.NumberFormat("fr-FR", {
       style: "currency",
       currency: "XOF",
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
     }).format(val || 0);
+
+  const formatNumber = (val?: number | null) =>
+    new Intl.NumberFormat("fr-FR", {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+    }).format(Number(val) || 0);
 
   const etablissement = bulletin?.cyclePaie?.etablissement;
   const employe = bulletin?.employe;
@@ -65,11 +90,28 @@ export const BulletinPaieDetailModal: React.FC<Props> = ({
       showCloseButton={false}
       className="max-w-4xl p-6 print:p-0 print:max-w-none"
     >
-      {loading || !bulletin ? (
+      {loading ? (
         <div className="flex h-64 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
         </div>
-      ) : (
+      ) : error ? (
+        <div className="py-6 space-y-4">
+          <ErrorState
+            title="Erreur de chargement du bulletin"
+            message={error}
+            onRetry={loadBulletin}
+          />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-gray-300 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      ) : !bulletin ? null : (
         <div className="space-y-6 print:space-y-4 print:text-black">
           {/* Actions barre supérieure (masquée à l'impression) */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4 dark:border-gray-800 print:hidden">
@@ -78,9 +120,14 @@ export const BulletinPaieDetailModal: React.FC<Props> = ({
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                   Bulletin de Paie • {bulletin.numeroBulletin}
                 </h2>
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                  {bulletin.statut}
-                </span>
+                {(() => {
+                  const sBadge = formatPayslipStatus(bulletin.statut);
+                  return (
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${sBadge.badgeClass}`}>
+                      {sBadge.label}
+                    </span>
+                  );
+                })()}
               </div>
               <p className="text-xs text-gray-500 mt-0.5">
                 Période du {new Date(bulletin.dateDebutPeriode).toLocaleDateString("fr-FR")} au{" "}
@@ -171,7 +218,7 @@ export const BulletinPaieDetailModal: React.FC<Props> = ({
               <div>
                 <span className="text-gray-500">Mode de paiement : </span>
                 <strong className="text-gray-900 dark:text-white print:text-black">
-                  {bulletin.modePaiement}
+                  {formatPaymentMethod(bulletin.modePaiement)}
                 </strong>
               </div>
               <div>
@@ -204,10 +251,10 @@ export const BulletinPaieDetailModal: React.FC<Props> = ({
                         {ligne.libelleRubrique}
                       </td>
                       <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-400">
-                        {ligne.base ? ligne.base.toLocaleString("fr-FR") : ""}
+                        {ligne.base !== undefined && ligne.base !== null ? formatNumber(ligne.base) : ""}
                       </td>
                       <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-400">
-                        {ligne.taux ? `${ligne.taux} %` : ""}
+                        {ligne.taux !== undefined && ligne.taux !== null ? `${formatNumber(ligne.taux)}` : ""}
                       </td>
                       <td className="py-2 px-3 text-right font-mono font-semibold text-gray-900 dark:text-white print:text-black">
                         {ligne.montantGain > 0 ? formatCurrency(ligne.montantGain) : ""}

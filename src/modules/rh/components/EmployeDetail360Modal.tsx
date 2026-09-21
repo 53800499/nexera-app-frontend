@@ -16,6 +16,17 @@ import {
 } from "@/icons";
 import { useActionFeedback, useToast } from "@/shared/components/feedback";
 import { CreerCompteErpModal } from "./CreerCompteErpModal";
+import {
+  getEmployeeStatusBadge,
+  formatContractStatus,
+  formatContractType,
+  formatProbationStatus,
+  formatGender,
+  formatMaritalStatus,
+  formatPaymentMethod,
+  formatFamilyRelationship,
+  formatDocumentType,
+} from "../utils/rhFormatters";
 
 interface Props {
   employe: RhEmploye | null;
@@ -94,7 +105,7 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
         setEmploye(res);
       }
     } catch (err) {
-      console.error("Erreur actualisation fiche employé:", err);
+      console.warn("Erreur actualisation fiche employé:", err);
     } finally {
       setLoading(false);
     }
@@ -102,16 +113,22 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
 
   const loadDependencies = async () => {
     try {
-      const [etabsRes, deptsRes, postsRes] = await Promise.all([
+      const [etabsRes, deptsRes, postsRes] = await Promise.allSettled([
         rhApi.listEtablissements(),
         rhApi.listDepartements(),
         rhApi.listPostes(),
       ]);
-      setEtablissements(Array.isArray(etabsRes) ? etabsRes : []);
-      setDepartements(Array.isArray(deptsRes) ? deptsRes : []);
-      setPostes(Array.isArray(postsRes) ? postsRes : []);
+      if (etabsRes.status === "fulfilled" && Array.isArray(etabsRes.value)) {
+        setEtablissements(etabsRes.value);
+      }
+      if (deptsRes.status === "fulfilled" && Array.isArray(deptsRes.value)) {
+        setDepartements(deptsRes.value);
+      }
+      if (postsRes.status === "fulfilled" && Array.isArray(postsRes.value)) {
+        setPostes(postsRes.value);
+      }
     } catch (err) {
-      console.error("Erreur chargement dépendances:", err);
+      console.warn("Erreur chargement dépendances:", err);
     }
   };
 
@@ -134,8 +151,15 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
     new Intl.NumberFormat("fr-FR", {
       style: "currency",
       currency: "XOF",
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
     }).format(val || 0);
+
+  const formatNumber = (val?: number | null) =>
+    new Intl.NumberFormat("fr-FR", {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+    }).format(Number(val) || 0);
 
   const formatDate = (dateVal?: string | Date | null) => {
     if (!dateVal) return "-";
@@ -327,14 +351,14 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
                 <span className="rounded-md bg-brand-50 px-2 py-0.5 font-mono text-xs font-semibold text-brand-700 dark:bg-brand-950/50 dark:text-brand-300">
                   {employe.matricule}
                 </span>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${employe.statutEmploi === "ACTIF"
-                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-                    : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
-                    }`}
-                >
-                  {employe.statutEmploi || "ACTIF"}
-                </span>
+                {(() => {
+                  const badge = getEmployeeStatusBadge(employe.statutEmploi);
+                  return (
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${badge.badgeClass}`}>
+                      {badge.label}
+                    </span>
+                  );
+                })()}
                 {employe.utilisateur && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-2xs font-semibold text-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
                     <LockIcon className="h-3 w-3" />
@@ -407,8 +431,8 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
 
               <div className="space-y-3 rounded-xl bg-gray-50 p-4 dark:bg-gray-800/50">
                 <h3 className="font-semibold text-gray-900 dark:text-white">Coordonnées & État Personnel</h3>
-                <div className="flex justify-between"><span className="text-gray-500">Sexe :</span><span>{employe.sexe === "M" ? "Masculin" : "Féminin"}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Situation familiale :</span><span>{employe.situationFamiliale || "Célibataire"}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Sexe :</span><span>{formatGender(employe.sexe)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Situation familiale :</span><span>{formatMaritalStatus(employe.situationFamiliale)}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Enfants à charge :</span><span>{employe.nombreEnfantsCharge || 0}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Date de naissance :</span><span>{formatDate(employe.dateNaissance)}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Email Professionnel :</span><span>{employe.emailProfessionnel || "-"}</span></div>
@@ -426,7 +450,7 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-800">
                     <div>
                       <span className="font-bold text-gray-900 dark:text-white text-base">
-                        Contrat {contratActif.typeContrat}
+                        Contrat {formatContractType(contratActif.typeContrat)}
                       </span>
                       {contratActif.numeroContrat && (
                         <span className="ml-2 font-mono text-xs text-gray-500">
@@ -434,9 +458,14 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
                         </span>
                       )}
                     </div>
-                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
-                      {contratActif.statut}
-                    </span>
+                    {(() => {
+                      const cBadge = formatContractStatus(contratActif.statut);
+                      return (
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${cBadge.badgeClass}`}>
+                          {cBadge.label}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -455,12 +484,15 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
                   {contratActif.periodesEssai && contratActif.periodesEssai.length > 0 && (
                     <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
                       <h4 className="font-semibold text-xs text-gray-500 uppercase tracking-wider mb-2">Suivi Période d'Essai</h4>
-                      {contratActif.periodesEssai.map((p) => (
-                        <div key={p.id} className="flex justify-between text-xs py-1">
-                          <span>Du {formatDate(p.dateDebut)} au {formatDate(p.dateFin)} ({p.dureeMois} mois)</span>
-                          <span className="font-semibold">{p.statutIssue}</span>
-                        </div>
-                      ))}
+                      {contratActif.periodesEssai.map((p) => {
+                        const probBadge = formatProbationStatus(p.statutIssue);
+                        return (
+                          <div key={p.id} className="flex justify-between text-xs py-1">
+                            <span>Du {formatDate(p.dateDebut)} au {formatDate(p.dateFin)} ({p.dureeMois} mois)</span>
+                            <span className={`font-semibold rounded px-1.5 py-0.5 ${probBadge.badgeClass}`}>{probBadge.label}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -599,7 +631,7 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
                           ? `Banque : ${cb.banqueNom || "Virement Bancaire"}`
                           : cb.modePaiement === "MOBILE_MONEY"
                             ? `Mobile Money : ${cb.operateurMobileMoney || "MoMo"}`
-                            : cb.modePaiement}
+                            : formatPaymentMethod(cb.modePaiement)}
                       </span>
                       {cb.estComptePrincipal && (
                         <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
@@ -708,7 +740,7 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
                     <div>
                       <div className="font-semibold text-gray-900 dark:text-white">{p.nomPrenoms}</div>
                       <div className="text-xs text-gray-500">
-                        {p.lienParente} • Né(e) le {formatDate(p.dateNaissance)}
+                        {formatFamilyRelationship(p.lienParente)} • Né(e) le {formatDate(p.dateNaissance)}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -948,7 +980,7 @@ export const EmployeDetail360Modal: React.FC<Props> = ({
                       <DocsIcon className="h-5 w-5 shrink-0 text-gray-500" />
                       <div>
                         <div className="font-medium text-gray-900 dark:text-white">{doc.titre}</div>
-                        <div className="text-xs text-gray-500">{doc.typeDocument}</div>
+                        <div className="text-xs text-gray-500">{formatDocumentType(doc.typeDocument)}</div>
                       </div>
                     </div>
                     {doc.fichierUrl && (

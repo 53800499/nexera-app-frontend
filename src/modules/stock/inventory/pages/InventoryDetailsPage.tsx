@@ -22,6 +22,8 @@ import {
   INVENTORY_STATUS_LABELS,
   INVENTORY_TYPE_LABELS,
 } from "../utils/inventoryLabels";
+import { downloadPdfBlob } from "@/shared/pdf/pdfBlob";
+import { inventoryApi } from "../services/inventoryApi.service";
 
 type CountDraft = { lineId: string; qty: string };
 
@@ -39,6 +41,7 @@ export default function InventoryDetailsPage({
   const detailQuery = useInventory(sessionId, "detail");
   const sheetQuery = useInventory(sessionId, "sheet");
   const [significantOnly, setSignificantOnly] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const variancesQuery = useInventoryVariances(sessionId, significantOnly);
 
   const {
@@ -61,6 +64,28 @@ export default function InventoryDetailsPage({
     status === "analyzing" ||
     status === "validated" ||
     status === "closed";
+
+  const handleDownloadPdf = async (type: "report" | "sheet" = "report") => {
+    if (!session) return;
+    setIsDownloadingPdf(true);
+    await runAction({
+      loadingMessage:
+        type === "sheet"
+          ? "Génération de la feuille de comptage..."
+          : "Génération du rapport PDF d'inventaire...",
+      success: { title: "Document PDF téléchargé" },
+      error: { title: "Impossible de télécharger le PDF" },
+      action: async () => {
+        const blob = await inventoryApi.downloadPdf(sessionId, type);
+        const filename =
+          type === "sheet"
+            ? `feuille-comptage-${session.number}.pdf`
+            : `rapport-inventaire-${session.number}.pdf`;
+        downloadPdfBlob(blob, filename);
+      },
+    });
+    setIsDownloadingPdf(false);
+  };
 
   useEffect(() => {
     const lines = showSheet ? sheet?.lines : undefined;
@@ -140,9 +165,57 @@ export default function InventoryDetailsPage({
               {INVENTORY_STATUS_LABELS[session.status]}
             </p>
           </div>
-          {canManageStock ? (
-            <div className="flex flex-wrap gap-2">
-              {status === "draft" ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Boutons d'exportation PDF */}
+            {showSheet || status === "draft" ? (
+              <Button
+                variant="outline"
+                disabled={isBusy || isDownloadingPdf}
+                onClick={() => handleDownloadPdf("sheet")}
+                className="inline-flex items-center gap-1.5"
+              >
+                <svg
+                  className="h-4 w-4 text-gray-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                Feuille de comptage (PDF)
+              </Button>
+            ) : null}
+
+            <Button
+              variant="outline"
+              disabled={isBusy || isDownloadingPdf}
+              onClick={() => handleDownloadPdf("report")}
+              className="inline-flex items-center gap-1.5"
+            >
+              <svg
+                className="h-4 w-4 text-gray-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              Rapport d&apos;inventaire (PDF)
+            </Button>
+
+            {canManageStock ? (
+              <>
+                {status === "draft" ? (
                 <>
                   <Button
                     disabled={isBusy}
@@ -264,11 +337,12 @@ export default function InventoryDetailsPage({
                   Clôturer la session
                 </Button>
               ) : null}
-            </div>
+            </>
           ) : null}
         </div>
+      </div>
 
-        <div className="grid gap-4 rounded-xl border border-gray-200 p-4 text-sm dark:border-gray-800 md:grid-cols-2">
+      <div className="grid gap-4 rounded-xl border border-gray-200 p-4 text-sm dark:border-gray-800 md:grid-cols-2">
           <div>
             <p className="text-gray-500">Entrepôt</p>
             <p className="font-medium">
@@ -418,7 +492,7 @@ export default function InventoryDetailsPage({
                       Final
                     </th>
                     <th className="px-4 py-3 text-right font-medium text-gray-600">
-                      Écart qty
+                      Écart qté
                     </th>
                     <th className="px-4 py-3 text-right font-medium text-gray-600">
                       Écart valeur

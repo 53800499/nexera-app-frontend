@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeftIcon } from "@/icons";
@@ -52,25 +52,54 @@ function ExitLineFields({
   line,
   warehouseId,
   configuredArticles,
+  allLines,
   onChange,
   onRemove,
+  onValidationChange,
   canRemove,
   index,
 }: {
   line: LineDraft;
   warehouseId: string;
   configuredArticles: StockArticleRow[];
+  allLines: LineDraft[];
   onChange: (patch: Partial<LineDraft>) => void;
   onRemove: () => void;
+  onValidationChange: (key: string, error: string | null) => void;
   canRemove: boolean;
   index: number;
 }) {
-  const item = configuredArticles.find(
+  const article = configuredArticles.find(
     (a) => a.stockItem?.id === line.stockItemId,
-  )?.stockItem;
+  );
+  const item = article?.stockItem;
   const lotsQuery = useAvailableLots(line.stockItemId, warehouseId);
   const serialsQuery = useAvailableSerials(line.stockItemId, warehouseId);
   const isFifo = item?.valuationMethod === "fifo" && item?.trackLots;
+
+  const levels = lotsQuery.data?.levels ?? [];
+  const totalWarehouseAvailable = levels.reduce(
+    (sum, l) => sum + (Number(l.qtyAvailable) || 0),
+    0,
+  );
+  const selectedLotLevel = line.lotId
+    ? levels.find((l) => l.lotId === line.lotId)
+    : null;
+  const availableForLine = line.lotId
+    ? Number(selectedLotLevel?.qtyAvailable) || 0
+    : totalWarehouseAvailable;
+
+  // Calcul du cumul demandé sur les autres lignes pour le même article et même lot
+  const otherLinesRequested = allLines
+    .filter(
+      (l) =>
+        l.key !== line.key &&
+        l.stockItemId === line.stockItemId &&
+        (!line.lotId || l.lotId === line.lotId),
+    )
+    .reduce((sum, l) => sum + (Number(l.qty) || 0), 0);
+
+  const remainingForThisLine = Math.max(0, availableForLine - otherLinesRequested);
 
   const parsedSerials = line.serialNumbers
     .split(/[\n,;]+/)
@@ -79,6 +108,18 @@ function ExitLineFields({
 
   const availableList = serialsQuery.data?.serials ?? [];
   const targetQty = Math.round(Number(line.qty) || 0);
+  const enteredQty = Number(line.qty) || 0;
+
+  const isZeroStock =
+    Boolean(line.stockItemId && warehouseId) &&
+    !lotsQuery.isLoading &&
+    availableForLine <= 0;
+
+  const isOverStock =
+    Boolean(line.stockItemId && warehouseId) &&
+    !lotsQuery.isLoading &&
+    !item?.allowNegativeStock &&
+    enteredQty > remainingForThisLine;
 
   const duplicateSerials = parsedSerials.filter(
     (sn, idx, arr) => arr.indexOf(sn) !== idx,
@@ -90,6 +131,50 @@ function ExitLineFields({
           (sn) => !availableList.some((s) => s.serialNumber.toUpperCase() === sn),
         )
       : [];
+
+  // Emplacements disponibles dans les niveaux
+  const availableLocations = useMemo(() => {
+    const locMap = new Map<string, string>();
+    levels.forEach((l) => {
+      if (l.locationId && l.locationCode) {
+        locMap.set(l.locationId, l.locationCode);
+      }
+    });
+    return Array.from(locMap.entries()).map(([id, code]) => ({ id, code }));
+  }, [levels]);
+
+  // Validation en temps réel envoyée au parent
+  useEffect(() => {
+    let error: string | null = null;
+    if (!line.stockItemId) {
+      error = "Veuillez choisir un article";
+    } else if (enteredQty <= 0) {
+      error = "La quantité doit être supérieure à 0";
+    } else if (isZeroStock && !item?.allowNegativeStock) {
+      error = "Stock épuisé dans cet entrepôt";
+    } else if (isOverStock && !item?.allowNegativeStock) {
+      error = "Quantité supérieure au stock disponible";
+    } else if (item?.trackLots && !isFifo && !line.lotId) {
+      error = "Veuillez choisir un lot";
+    } else if (item?.trackSerials && parsedSerials.length !== targetQty) {
+      error = "Numéros de série non conformes à la quantité";
+    }
+    onValidationChange(line.key, error);
+  }, [
+    line.key,
+    line.stockItemId,
+    enteredQty,
+    isZeroStock,
+    isOverStock,
+    item?.allowNegativeStock,
+    item?.trackLots,
+    item?.trackSerials,
+    isFifo,
+    line.lotId,
+    parsedSerials.length,
+    targetQty,
+    onValidationChange,
+  ]);
 
   const toggleSerial = (sn: string) => {
     const upper = sn.trim().toUpperCase();
@@ -104,45 +189,151 @@ function ExitLineFields({
   };
 
   return (
-    <div className="space-y-3 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">Ligne {index + 1}</span>
+    <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/40">
+      <div className="flex items-center justify-between border-b border-gray-100 pb-2 dark:border-gray-800">
+        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          Ligne {index + 1}
+        </span>
         {canRemove ? (
-          <button type="button" className="text-xs text-red-600" onClick={onRemove}>
+          <button
+            type="button"
+            className="text-xs font-medium text-rose-600 hover:text-rose-700 dark:text-rose-400"
+            onClick={onRemove}
+          >
             Retirer
           </button>
         ) : null}
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
+
+      <div className="grid gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
           <Label>Article</Label>
           <select
             value={line.stockItemId}
             onChange={(e) =>
-              onChange({ stockItemId: e.target.value, lotId: "", serialNumbers: "" })
+              onChange({
+                stockItemId: e.target.value,
+                lotId: "",
+                locationId: "",
+                serialNumbers: "",
+              })
             }
             required
-            className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm dark:border-gray-700 dark:bg-gray-900"
+            className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           >
-            <option value="">— Choisir —</option>
+            <option value="">— Choisir un article —</option>
             {(configuredArticles ?? []).map((a) => (
               <option key={a.stockItem!.id} value={a.stockItem!.id}>
-                {a.reference} — {a.name} (disponible : {a.stockQuantity})
+                {a.reference} — {a.name}
               </option>
             ))}
           </select>
+
+          {/* Indicateur de stock en temps réel */}
+          {line.stockItemId ? (
+            !warehouseId ? (
+              <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                ⚠️ Sélectionnez un entrepôt source ci-dessus pour vérifier la disponibilité en stock.
+              </p>
+            ) : lotsQuery.isLoading ? (
+              <p className="mt-1.5 animate-pulse text-xs text-gray-500">
+                Vérification du stock disponible dans cet entrepôt...
+              </p>
+            ) : availableForLine > 0 ? (
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+                <div className="inline-flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span>
+                    Stock disponible dans cet entrepôt :{" "}
+                    <strong className="font-semibold text-emerald-900 dark:text-emerald-200">
+                      {availableForLine}
+                    </strong>{" "}
+                    {item?.storageUnit || "unité(s)"}
+                  </span>
+                </div>
+                {otherLinesRequested > 0 ? (
+                  <span className="text-gray-600 dark:text-gray-400">
+                    ({otherLinesRequested} réservé sur d&apos;autres lignes, restant pour cette ligne : {remainingForThisLine})
+                  </span>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50/80 p-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
+                <div className="flex items-center gap-2 font-semibold text-rose-900 dark:text-rose-200">
+                  <span>🚫 Aucun stock disponible dans cet entrepôt (0 {item?.storageUnit || "unité"}).</span>
+                </div>
+                {article && (article.stockQuantity ?? 0) > 0 ? (
+                  <p className="mt-1 text-rose-700/90 dark:text-rose-400">
+                    Le catalogue affiche {article.stockQuantity} unité(s) au global, mais ce stock est soit dans un autre entrepôt, soit non validé (brouillon).
+                  </p>
+                ) : null}
+                {item?.allowNegativeStock ? (
+                  <p className="mt-1 font-medium text-amber-700 dark:text-amber-300">
+                    ℹ️ Le stock négatif est autorisé pour cet article : la sortie reste possible.
+                  </p>
+                ) : null}
+              </div>
+            )
+          ) : null}
         </div>
+
         <div>
-          <Label>Quantité</Label>
+          <div className="mb-1 flex items-center justify-between">
+            <Label>Quantité</Label>
+            {line.stockItemId && warehouseId && availableForLine > 0 ? (
+              <button
+                type="button"
+                onClick={() => onChange({ qty: String(remainingForThisLine) })}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Max ({remainingForThisLine})
+              </button>
+            ) : null}
+          </div>
           <Input
             type="number"
             min="0.0001"
+            max={!item?.allowNegativeStock && availableForLine > 0 ? remainingForThisLine : undefined}
             step="any"
             value={line.qty}
             onChange={(e) => onChange({ qty: e.target.value })}
             required
+            className={
+              isOverStock || (isZeroStock && !item?.allowNegativeStock)
+                ? "!border-rose-500 !bg-rose-50/30 !focus:border-rose-500 !focus:ring-rose-500/20 dark:!bg-rose-950/10"
+                : ""
+            }
           />
+
+          {/* Validation automatique en direct sous le champ Quantité */}
+          {enteredQty <= 0 && line.qty.trim() !== "" ? (
+            <p className="mt-1 text-xs font-medium text-rose-600 dark:text-rose-400">
+              La quantité doit être supérieure à 0.
+            </p>
+          ) : isZeroStock && !item?.allowNegativeStock ? (
+            <p className="mt-1 text-xs font-medium text-rose-600 dark:text-rose-400">
+              Sortie impossible : 0 unité disponible dans cet entrepôt.
+            </p>
+          ) : isOverStock ? (
+            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1 text-xs text-rose-600 dark:text-rose-400">
+              <span className="font-medium">
+                Quantité insuffisante : demandé {enteredQty}, mais seulement {remainingForThisLine} {item?.storageUnit || "unité(s)"} disponible(s).
+              </span>
+              <button
+                type="button"
+                onClick={() => onChange({ qty: String(remainingForThisLine) })}
+                className="font-semibold underline hover:text-rose-800"
+              >
+                Ajuster à {remainingForThisLine}
+              </button>
+            </div>
+          ) : item?.allowNegativeStock && enteredQty > availableForLine ? (
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+              Stock négatif : le stock passera de {availableForLine} à {availableForLine - enteredQty}.
+            </p>
+          ) : null}
         </div>
+
         {item?.trackLots ? (
           <div>
             <Label>
@@ -152,16 +343,16 @@ function ExitLineFields({
               value={line.lotId}
               onChange={(e) => onChange({ lotId: e.target.value })}
               required={!isFifo}
-              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm dark:border-gray-700 dark:bg-gray-900"
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             >
               <option value="">
-                {isFifo ? "— FIFO automatique (plus ancien d'abord) —" : "— Choisir —"}
+                {isFifo ? "— FIFO automatique (plus ancien d'abord) —" : "— Choisir un lot —"}
               </option>
               {(lotsQuery.data?.levels ?? [])
                 .filter((l) => l.lotId)
                 .map((l) => (
                   <option key={l.levelId} value={l.lotId!}>
-                    {l.lotNumber} — dispo {l.qtyAvailable}
+                    Lot {l.lotNumber} — dispo {l.qtyAvailable} {item?.storageUnit || "unités"}
                     {l.locationCode ? ` @ ${l.locationCode}` : ""}
                   </option>
                 ))}
@@ -172,13 +363,30 @@ function ExitLineFields({
               </p>
             ) : null}
           </div>
+        ) : availableLocations.length > 1 ? (
+          <div>
+            <Label>Emplacement (optionnel)</Label>
+            <select
+              value={line.locationId}
+              onChange={(e) => onChange({ locationId: e.target.value })}
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            >
+              <option value="">— Automatique / Tous —</option>
+              {availableLocations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.code}
+                </option>
+              ))}
+            </select>
+          </div>
         ) : null}
+
         {item?.trackSerials ? (
           <div className="space-y-2 md:col-span-2">
             <div className="flex items-center justify-between">
               <Label>Numéros de série à sortir</Label>
               <span
-                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                   parsedSerials.length === targetQty
                     ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                     : parsedSerials.length > targetQty
@@ -271,6 +479,18 @@ export default function CreateStockExitPage() {
   const [notes, setNotes] = useState("");
   const [validateNow, setValidateNow] = useState(true);
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+  const [lineErrors, setLineErrors] = useState<Record<string, string | null>>({});
+
+  // Présélection automatique de l'entrepôt par défaut
+  useEffect(() => {
+    if (!warehouseId && warehousesQuery.data?.length) {
+      const defaultWh =
+        warehousesQuery.data.find((w) => w.isDefault) ?? warehousesQuery.data[0];
+      if (defaultWh) {
+        setWarehouseId(defaultWh.id);
+      }
+    }
+  }, [warehouseId, warehousesQuery.data]);
 
   const configuredArticles = useMemo(
     () =>
@@ -286,8 +506,36 @@ export default function CreateStockExitPage() {
     );
   };
 
+  const handleValidationChange = (key: string, error: string | null) => {
+    setLineErrors((prev) => {
+      if (prev[key] === error) return prev;
+      return { ...prev, [key]: error };
+    });
+  };
+
+  const removeLine = (key: string) => {
+    setLines((prev) => prev.filter((l) => l.key !== key));
+    setLineErrors((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const activeErrors = useMemo(
+    () =>
+      Object.entries(lineErrors)
+        .filter(([, err]) => Boolean(err))
+        .map(([key, err]) => ({ key, err: err! })),
+    [lineErrors],
+  );
+
+  const hasBlockingError = !warehouseId || activeErrors.length > 0;
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (hasBlockingError) return;
+
     const payload: CreateStockExitPayload = {
       movementType,
       warehouseId,
@@ -334,7 +582,7 @@ export default function CreateStockExitPage() {
       <div className="space-y-4">
         <Link
           href="/stock/mouvements"
-          className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
+          className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
         >
           <ChevronLeftIcon />
           Retour aux mouvements
@@ -342,24 +590,24 @@ export default function CreateStockExitPage() {
 
         <div>
           <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-            Nouvelle sortie
+            Nouvelle sortie de stock
           </h1>
           <p className="text-sm text-gray-500">
-            Consommation, perte, retour fournisseur ou ajustement (UC-S04).
+            Consommation, perte, retour fournisseur ou ajustement avec vérification en temps réel du stock disponible (UC-S04).
           </p>
         </div>
 
-        {isLoading && <LoadingBlock label="Chargement..." />}
+        {isLoading && <LoadingBlock label="Chargement des données..." />}
         {(articlesQuery.isError || warehousesQuery.isError) && (
           <ErrorState
             title="Données indisponibles"
-            message="Impossible de charger articles ou entrepôts."
+            message="Impossible de charger les articles ou les entrepôts."
           />
         )}
 
         {!isLoading && configuredArticles.length > 0 ? (
           <form onSubmit={handleSubmit} className="space-y-6">
-            <section className="grid gap-4 rounded-xl border border-gray-200 p-4 md:grid-cols-2 dark:border-gray-800">
+            <section className="grid gap-4 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-2 dark:border-gray-800 dark:bg-gray-900/40">
               <div>
                 <Label>Type de sortie</Label>
                 <select
@@ -367,7 +615,7 @@ export default function CreateStockExitPage() {
                   onChange={(e) =>
                     setMovementType(e.target.value as StockExitType)
                   }
-                  className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm dark:border-gray-700 dark:bg-gray-900"
+                  className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
                 >
                   {Object.entries(STOCK_EXIT_TYPE_LABELS)
                     .filter(([code]) => code !== "OUT_SALE")
@@ -378,8 +626,7 @@ export default function CreateStockExitPage() {
                     ))}
                 </select>
                 <p className="mt-1 text-xs text-gray-400">
-                  Les sorties vente (OUT_SALE) sont créées automatiquement à
-                  l&apos;émission d&apos;une facture.
+                  Les sorties vente (OUT_SALE) sont générées automatiquement à l&apos;émission des factures.
                 </p>
               </div>
               <div>
@@ -388,12 +635,12 @@ export default function CreateStockExitPage() {
                   value={warehouseId}
                   onChange={(e) => setWarehouseId(e.target.value)}
                   required
-                  className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm dark:border-gray-700 dark:bg-gray-900"
+                  className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
                 >
-                  <option value="">— Choisir —</option>
+                  <option value="">— Choisir un entrepôt —</option>
                   {(warehousesQuery.data ?? []).map((w) => (
                     <option key={w.id} value={w.id}>
-                      {w.code} — {w.name}
+                      {w.code} — {w.name} {w.isDefault ? "(par défaut)" : ""}
                     </option>
                   ))}
                 </select>
@@ -411,6 +658,7 @@ export default function CreateStockExitPage() {
                 <Label>Référence</Label>
                 <Input
                   value={reference}
+                  placeholder="Ex: OS-2026-001"
                   onChange={(e) => setReference(e.target.value)}
                 />
               </div>
@@ -421,18 +669,18 @@ export default function CreateStockExitPage() {
                     value={costCenter}
                     onChange={(e) => setCostCenter(e.target.value)}
                     required
-                    placeholder="FG-ENTRETIEN"
+                    placeholder="Ex: CHANTIER-NORD, ATELIER-PROD"
                   />
                 </div>
               ) : null}
               {needsReason ? (
                 <div className="md:col-span-2">
-                  <Label>Motif (obligatoire)</Label>
+                  <Label>Motif détaillé</Label>
                   <Input
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     required
-                    placeholder="Casse / écart inventaire…"
+                    placeholder="Ex: Casse matériel lors du transport, écart d'inventaire"
                   />
                 </div>
               ) : null}
@@ -442,24 +690,31 @@ export default function CreateStockExitPage() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                  placeholder="Remarques éventuelles..."
                 />
               </div>
             </section>
 
             <section className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-                  Lignes
-                </h2>
+                <div>
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
+                    Lignes de sortie
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    Chaque ligne vérifie automatiquement la disponibilité en stock dans l&apos;entrepôt source.
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => setLines((prev) => [...prev, emptyLine()])}
-                  className="text-sm font-medium text-brand-600"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
                 >
                   + Ajouter une ligne
                 </button>
               </div>
+
               {lines.map((line, index) => (
                 <ExitLineFields
                   key={line.key}
@@ -467,26 +722,54 @@ export default function CreateStockExitPage() {
                   index={index}
                   warehouseId={warehouseId}
                   configuredArticles={configuredArticles}
+                  allLines={lines}
                   canRemove={lines.length > 1}
                   onChange={(patch) => updateLine(line.key, patch)}
-                  onRemove={() =>
-                    setLines((prev) => prev.filter((l) => l.key !== line.key))
-                  }
+                  onRemove={() => removeLine(line.key)}
+                  onValidationChange={handleValidationChange}
                 />
               ))}
             </section>
 
-            <label className="inline-flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={validateNow}
-                onChange={(e) => setValidateNow(e.target.checked)}
-              />
-              Valider immédiatement (si perte &gt; seuil : brouillon forcé)
-            </label>
+            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900/40">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={validateNow}
+                  onChange={(e) => setValidateNow(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <span>
+                  Valider immédiatement le mouvement (met à jour le stock en direct ; si perte &gt; 10 000 FCFA : soumis à validation)
+                </span>
+              </label>
+            </div>
 
-            <div className="flex justify-end">
-              <Button disabled={isBusy || !warehouseId}>
+            {/* Alerte globale de blocage si des erreurs de validation existent */}
+            {hasBlockingError ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
+                <p className="font-semibold">Impossible d&apos;enregistrer la sortie :</p>
+                <ul className="mt-1 list-inside list-disc space-y-0.5">
+                  {!warehouseId ? (
+                    <li>Veuillez sélectionner un entrepôt source.</li>
+                  ) : null}
+                  {activeErrors.map(({ key, err }) => {
+                    const idx = lines.findIndex((l) => l.key === key);
+                    return (
+                      <li key={key}>
+                        Ligne {idx + 1} : {err}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
+
+            <div className="flex justify-end gap-3">
+              <Button
+                disabled={isBusy || hasBlockingError}
+                className={hasBlockingError ? "opacity-50 cursor-not-allowed" : ""}
+              >
                 {isBusy ? "Enregistrement..." : "Enregistrer la sortie"}
               </Button>
             </div>

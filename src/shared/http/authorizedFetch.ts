@@ -31,10 +31,30 @@ export async function authorizedFetch<T>(
   const wireHeaders = { ...headers };
   delete wireHeaders["x-auth-retried"];
 
-  const response = await fetchWithOfflineGuard(`${env.apiBaseUrl}${path}`, {
-    ...options,
-    headers: wireHeaders,
-  });
+  let response: Response;
+  try {
+    response = await fetchWithOfflineGuard(`${env.apiBaseUrl}${path}`, {
+      ...options,
+      headers: wireHeaders,
+    });
+  } catch (err) {
+    if (
+      env.apiBaseUrl !== "/api/backend" &&
+      typeof window !== "undefined" &&
+      err instanceof OfflineError
+    ) {
+      try {
+        response = await fetchWithOfflineGuard(`/api/backend${path}`, {
+          ...options,
+          headers: wireHeaders,
+        });
+      } catch {
+        throw err;
+      }
+    } else {
+      throw err;
+    }
+  }
 
   if (response.status === 401 && path !== "/auth/refresh" && !alreadyRetried) {
     const refreshed = await refreshAccessToken();

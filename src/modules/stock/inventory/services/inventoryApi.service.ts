@@ -1,4 +1,8 @@
+import { env } from "@/shared/config/env";
 import { authorizedFetch } from "@/shared/http/authorizedFetch";
+import { fetchWithOfflineGuard } from "@/shared/http/fetchWithOfflineGuard";
+import { refreshAccessToken } from "@/shared/http/refreshAccessToken";
+import { tokenStorage } from "@/modules/auth/services/tokenStorage.service";
 import type {
   CreateInventorySessionPayload,
   InventorySession,
@@ -6,7 +10,37 @@ import type {
   SubmitInventoryCountsPayload,
 } from "../types/inventory.types";
 
+function authHeaders(): Record<string, string> {
+  const token = tokenStorage.getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export const inventoryApi = {
+  downloadPdf: async (
+    id: string,
+    type: "report" | "sheet" = "report",
+  ): Promise<Blob> => {
+    const url = `${env.apiBaseUrl}/stock/inventories/${id}/pdf?type=${type}`;
+    let res = await fetchWithOfflineGuard(url, {
+      headers: authHeaders(),
+    });
+    if (res.status === 401) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        res = await fetchWithOfflineGuard(url, {
+          headers: authHeaders(),
+        });
+      }
+    }
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
+      const message =
+        errBody?.message ||
+        `Erreur serveur (${res.status}) lors de la génération du document PDF`;
+      throw new Error(message);
+    }
+    return res.blob();
+  },
   list: () => authorizedFetch<InventorySession[]>("/stock/inventories"),
 
   get: (id: string) =>

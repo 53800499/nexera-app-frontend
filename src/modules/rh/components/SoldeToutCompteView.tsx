@@ -4,8 +4,9 @@ import React, { useEffect, useState } from "react";
 import { rhApi } from "../services/rhApi.service";
 import type { RhEmploye, RhSoldeToutCompte } from "../types/rh.types";
 import { Modal } from "@/components/ui/modal";
-import { useActionFeedback, useToast } from "@/shared/components/feedback";
+import { useActionFeedback, useToast, ErrorState } from "@/shared/components/feedback";
 import { DocsIcon, CheckCircleIcon, PencilIcon, PlusIcon } from "@/icons";
+import { formatStcSignatureStatus } from "../utils/rhFormatters";
 
 export const SoldeToutCompteView: React.FC = () => {
   const { runAction } = useActionFeedback();
@@ -13,25 +14,39 @@ export const SoldeToutCompteView: React.FC = () => {
   const [soldes, setSoldes] = useState<RhSoldeToutCompte[]>([]);
   const [employes, setEmployes] = useState<RhEmploye[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const [form, setForm] = useState({
     employeId: "",
     dateEtablissement: new Date().toISOString().split("T")[0],
-    montantDernierSalaireNet: 250000,
-    montantIndemnitePreavisNet: 250000,
-    montantIndemniteLicenciementNet: 450000,
-    montantIndemniteCongesPayesNet: 120000,
+    montantDernierSalaireNet: 0,
+    montantIndemnitePreavisNet: 0,
+    montantIndemniteLicenciementNet: 0,
+    montantIndemniteCongesPayesNet: 0,
     montantRetenuesDiverses: 0,
   });
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [res, emps] = await Promise.all([
+      setError(null);
+      const [resSettled, empsSettled] = await Promise.allSettled([
         rhApi.listSoldesToutCompte(),
         rhApi.listEmployes(),
       ]);
+      const res = resSettled.status === "fulfilled" ? resSettled.value : [];
+      const emps = empsSettled.status === "fulfilled" ? empsSettled.value : [];
+
+      if (resSettled.status === "rejected" || empsSettled.status === "rejected") {
+        const firstRejection = (resSettled.status === "rejected" ? resSettled : empsSettled) as PromiseRejectedResult;
+        console.warn("Avertissement STC:", firstRejection.reason?.message || firstRejection.reason);
+        setError(
+          firstRejection.reason?.message ||
+            "Serveur ou réseau indisponible. Impossible de récupérer tous les éléments.",
+        );
+      }
+
       const safeSoldesList = Array.isArray(res) ? res : ((res as any)?.data || []);
       const safeEmpsList = Array.isArray(emps) ? emps : ((emps as any)?.data || []);
       setSoldes(safeSoldesList);
@@ -39,8 +54,9 @@ export const SoldeToutCompteView: React.FC = () => {
       if (safeEmpsList.length > 0) {
         setForm((prev) => ({ ...prev, employeId: prev.employeId || safeEmpsList[0].id }));
       }
-    } catch (err) {
-      console.error("Erreur STC:", err);
+    } catch (err: any) {
+      console.warn("Erreur STC:", err?.message || err);
+      setError(err?.message || "Serveur ou réseau indisponible.");
       setSoldes([]);
       setEmployes([]);
     } finally {
@@ -120,8 +136,15 @@ export const SoldeToutCompteView: React.FC = () => {
     new Intl.NumberFormat("fr-FR", {
       style: "currency",
       currency: "XOF",
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
     }).format(val || 0);
+
+  const formatNumber = (val?: number | null) =>
+    new Intl.NumberFormat("fr-FR", {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+    }).format(Number(val) || 0);
 
   const safeSoldes = Array.isArray(soldes) ? soldes : [];
   const safeEmployes = Array.isArray(employes) ? employes : [];
@@ -157,6 +180,18 @@ export const SoldeToutCompteView: React.FC = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="flex items-center justify-between rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800 dark:border-warning-900/50 dark:bg-warning-950/50 dark:text-warning-300">
+          <span>{error}</span>
+          <button
+            onClick={loadData}
+            className="ml-4 font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+          >
+            Réactualiser
+          </button>
+        </div>
+      )}
+
       {/* Tableau des Soldes de Tout Compte */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900">
         <div className="overflow-x-auto">
@@ -179,6 +214,16 @@ export const SoldeToutCompteView: React.FC = () => {
                   <td colSpan={8} className="py-12 text-center text-gray-500">
                     <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
                     <p className="mt-2 text-xs text-gray-400">Chargement des soldes de tout compte...</p>
+                  </td>
+                </tr>
+              ) : error && safeSoldes.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-6">
+                    <ErrorState
+                      title="Serveur ou réseau indisponible"
+                      message={error}
+                      onRetry={loadData}
+                    />
                   </td>
                 </tr>
               ) : safeSoldes.length === 0 ? (
@@ -223,30 +268,40 @@ export const SoldeToutCompteView: React.FC = () => {
                       {formatCurrency(s.montantTotalNet)}
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.statutSignature === "SIGNE_SANS_RESERVE"
-                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-                          : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
-                          }`}
-                      >
-                        {s.statutSignature}
-                      </span>
+                      {(() => {
+                        const sigInfo = formatStcSignatureStatus(s.statutSignature);
+                        return (
+                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${sigInfo.badgeClass}`}>
+                            {sigInfo.label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {s.statutSignature !== "SIGNE_SANS_RESERVE" ? (
-                        <button
-                          onClick={() => handleSign(s.id)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-colors"
+                      <div className="flex items-center justify-end gap-2">
+                        <a
+                          href={`/rh/comptabilite?tab=stc&stcId=${s.id}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 transition-colors shadow-2xs"
+                          title="Consulter l'écriture OD SYSCOHADA du solde de tout compte"
                         >
-                          <PencilIcon className="h-3.5 w-3.5 shrink-0" />
-                          <span>Signer Sans Réserve</span>
-                        </button>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold">
-                          <CheckCircleIcon className="h-6 w-6 shrink-0" />
-                          <span>Clôturé</span>
-                        </span>
-                      )}
+                          <DocsIcon className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                          <span>OD STC</span>
+                        </a>
+                        {s.statutSignature !== "SIGNE_SANS_RESERVE" ? (
+                          <button
+                            onClick={() => handleSign(s.id)}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-colors"
+                          >
+                            <PencilIcon className="h-3.5 w-3.5 shrink-0" />
+                            <span>Signer</span>
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold">
+                            <CheckCircleIcon className="h-4 w-4 shrink-0" />
+                            <span>Clôturé</span>
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

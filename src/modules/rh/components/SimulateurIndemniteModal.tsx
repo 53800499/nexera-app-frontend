@@ -14,15 +14,18 @@ export const SimulateurIndemniteModal: React.FC<Props> = ({ isOpen, onClose }) =
   const [salaireMoyen, setSalaireMoyen] = useState<number>(350000);
   const [simulation, setSimulation] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSimulate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setLoading(true);
+      setError(null);
       const res = await rhApi.simulateSeverance(anciennete, salaireMoyen);
       setSimulation(res);
-    } catch (err) {
-      console.error("Erreur simulation indemnité:", err);
+    } catch (err: any) {
+      console.warn("Erreur simulation indemnité:", err);
+      setError(err?.message || "Impossible d'effectuer la simulation d'indemnité.");
     } finally {
       setLoading(false);
     }
@@ -32,7 +35,8 @@ export const SimulateurIndemniteModal: React.FC<Props> = ({ isOpen, onClose }) =
     new Intl.NumberFormat("fr-FR", {
       style: "currency",
       currency: "XOF",
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
     }).format(val || 0);
 
   return (
@@ -46,6 +50,12 @@ export const SimulateurIndemniteModal: React.FC<Props> = ({ isOpen, onClose }) =
             Calcul légal par tranches d'ancienneté (30 % pour 1-5 ans, 35 % pour 6-10 ans, 40 % au-delà)
           </p>
         </div>
+
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSimulate} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>

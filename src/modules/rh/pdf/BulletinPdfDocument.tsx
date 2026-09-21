@@ -387,7 +387,9 @@ export const BulletinPdfDocument: React.FC<BulletinPdfDocumentProps> = ({
                   {ligne.base ? formatPdfMoney(ligne.base, currency) : "—"}
                 </Text>
                 <Text style={styles.colTaux}>
-                  {ligne.taux ? `${ligne.taux} %` : "—"}
+                  {ligne.taux !== undefined && ligne.taux !== null
+                    ? `${Number(ligne.taux).toLocaleString("fr-FR", { maximumFractionDigits: 2, minimumFractionDigits: 0 })} %`
+                    : "—"}
                 </Text>
                 <Text style={styles.colGain}>
                   {ligne.montantGain > 0

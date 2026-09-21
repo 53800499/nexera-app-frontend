@@ -42,11 +42,32 @@ export async function apiClient<T>(
     }
   }
 
-  const response = await fetchWithOfflineGuard(`${env.apiBaseUrl}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetchWithOfflineGuard(`${env.apiBaseUrl}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (err) {
+    if (
+      env.apiBaseUrl !== "/api/backend" &&
+      typeof window !== "undefined" &&
+      err instanceof OfflineError
+    ) {
+      try {
+        response = await fetchWithOfflineGuard(`/api/backend${path}`, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+        });
+      } catch {
+        throw err;
+      }
+    } else {
+      throw err;
+    }
+  }
 
   if (
     response.status === 401 &&
