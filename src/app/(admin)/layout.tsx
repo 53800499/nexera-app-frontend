@@ -11,6 +11,7 @@ import { QuotationsOfflineProvider } from "@/modules/devis/offline/components/Qu
 import { OrdersOfflineProvider } from "@/modules/commandes/offline/components/OrdersOfflineProvider";
 import { InvoicesOfflineProvider } from "@/modules/factures/offline/components/InvoicesOfflineProvider";
 import { StockOfflineProvider } from "@/modules/stock/offline/components/StockOfflineProvider";
+import { HelpDrawerProvider, ContextualHelpDrawer } from "@/modules/help-center";
 import React from "react";
 
 export default function AdminLayout({
@@ -28,28 +29,31 @@ export default function AdminLayout({
 
   return (
     <RequireEntrepriseWorkspace>
-      <div className="min-h-screen xl:flex">
-        <AppSidebar />
-        <Backdrop />
-        <div
-          className={`flex-1 transition-all  duration-300 ease-in-out ${mainContentMargin}`}
-        >
-          <AppHeader />
-          <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
-            <CrmOfflineProvider>
-              <QuotationsOfflineProvider>
-                <OrdersOfflineProvider>
-                  <InvoicesOfflineProvider>
-                    <StockOfflineProvider>
-                      <ErrorBoundary>{children}</ErrorBoundary>
-                    </StockOfflineProvider>
-                  </InvoicesOfflineProvider>
-                </OrdersOfflineProvider>
-              </QuotationsOfflineProvider>
-            </CrmOfflineProvider>
+      <HelpDrawerProvider>
+        <div className="min-h-screen xl:flex">
+          <AppSidebar />
+          <Backdrop />
+          <div
+            className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}
+          >
+            <AppHeader />
+            <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
+              <CrmOfflineProvider>
+                <QuotationsOfflineProvider>
+                  <OrdersOfflineProvider>
+                    <InvoicesOfflineProvider>
+                      <StockOfflineProvider>
+                        <ErrorBoundary>{children}</ErrorBoundary>
+                      </StockOfflineProvider>
+                    </InvoicesOfflineProvider>
+                  </OrdersOfflineProvider>
+                </QuotationsOfflineProvider>
+              </CrmOfflineProvider>
+            </div>
           </div>
         </div>
-      </div>
+        <ContextualHelpDrawer />
+      </HelpDrawerProvider>
     </RequireEntrepriseWorkspace>
   );
 }

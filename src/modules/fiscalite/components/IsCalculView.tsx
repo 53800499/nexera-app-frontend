@@ -4,14 +4,27 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { fiscaliteApi } from "../services/fiscaliteApi.service";
 import type { TaxContribuable, TaxExerciceFiscal } from "../types/fiscalite.types";
+import { CalculatorIcon, SyncIcon } from "./FiscaliteIcons";
+import { ChevronLeftIcon, PlusIcon, CheckCircleIcon, DocsIcon } from "@/icons";
+import { useActionFeedback, useToast } from "@/shared/components/feedback";
+import { useFiscalitePdf } from "../pdf";
+import { FormErrorAlert, useFormError } from "./FormErrorAlert";
 
 export const IsCalculView: React.FC = () => {
+  const { confirm, showResult } = useActionFeedback();
+  const toast = useToast();
+  const { isExporting, exportIs } = useFiscalitePdf();
+
   const [contribuable, setContribuable] = useState<TaxContribuable | null>(null);
   const [exercices, setExercices] = useState<TaxExerciceFiscal[]>([]);
   const [selectedEx, setSelectedEx] = useState<TaxExerciceFiscal | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Gestion des erreurs de formulaire
+  const { error: exerciceError, captureError: captureExerciceError, clearError: clearExerciceError } = useFormError();
+  const { error: retraitementError, captureError: captureRetraitementError, clearError: clearRetraitementError } = useFormError();
 
   // Formulaire création exercice
   const [newDateDebut, setNewDateDebut] = useState("2026-01-01");
@@ -70,6 +83,7 @@ export const IsCalculView: React.FC = () => {
   const handleCreateExercice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contribuable) return;
+    clearExerciceError();
     setActionLoading(true);
     try {
       await fiscaliteApi.createExerciceIs({
@@ -78,9 +92,10 @@ export const IsCalculView: React.FC = () => {
         dateFin: newDateFin,
       });
       setIsCreating(false);
+      toast.success("Exercice fiscal créé", "L'exercice fiscal a été initialisé avec succès.");
       await loadData();
     } catch (err: any) {
-      alert(err.message || "Erreur création exercice");
+      captureExerciceError(err);
     } finally {
       setActionLoading(false);
     }
@@ -89,6 +104,7 @@ export const IsCalculView: React.FC = () => {
   const handleAddRetraitement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEx) return;
+    clearRetraitementError();
     setActionLoading(true);
     try {
       await fiscaliteApi.addRetraitement(selectedEx.id, {
@@ -98,21 +114,30 @@ export const IsCalculView: React.FC = () => {
         baseLegale: retraitementBaseLegale,
       });
       setShowAddRetraitement(false);
+      toast.success("Retraitement ajouté", "L'ajustement fiscal a été enregistré.");
       await handleSelectExercice(selectedEx.id);
     } catch (err: any) {
-      alert(err.message || "Erreur ajout retraitement");
+      captureRetraitementError(err);
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDeleteRetraitement = async (id: string) => {
-    if (!confirm("Supprimer ce retraitement fiscal ?")) return;
+    const confirmed = await confirm({
+      title: "Supprimer ce retraitement fiscal ?",
+      message: "Cette opération supprimera définitivement cet ajustement fiscal et recalculera l'assiette imposable.",
+      confirmLabel: "Supprimer le retraitement",
+      cancelLabel: "Conserver",
+      variant: "danger",
+    });
+    if (!confirmed) return;
     try {
       await fiscaliteApi.deleteRetraitement(id);
+      toast.success("Retraitement supprimé", "L'ajustement a été retiré de l'exercice fiscal.");
       if (selectedEx) await handleSelectExercice(selectedEx.id);
     } catch (err: any) {
-      alert(err.message || "Erreur suppression retraitement");
+      toast.error("Erreur suppression", err.message || "Impossible de supprimer le retraitement");
     }
   };
 
@@ -124,10 +149,11 @@ export const IsCalculView: React.FC = () => {
         resultatComptableNet: Number(resComptable),
         produitsEncaissables: Number(produitsEncaissables),
       });
+      toast.success("Calcul actualisé", "Le résultat fiscal et l'impôt sur les sociétés ont été calculés avec succès.");
       await handleSelectExercice(selectedEx.id);
       await loadData();
     } catch (err: any) {
-      alert(err.message || "Erreur calcul IS");
+      toast.error("Erreur calcul IS", err.message || "Impossible d'exécuter le calcul d'IS");
     } finally {
       setActionLoading(false);
     }
@@ -135,34 +161,57 @@ export const IsCalculView: React.FC = () => {
 
   const handleValiderTransmissionM3 = async () => {
     if (!selectedEx) return;
-    if (
-      !confirm(
-        "Confirmer la validation définitive du calcul d'IS et la transmission de l'OD comptable vers M3 (Débit 695 / Crédit 444) ?"
-      )
-    )
-      return;
+    const confirmed = await confirm({
+      title: "Valider le calcul et transmettre l'OD à M3 ?",
+      message:
+        "Cette action fige le calcul d'IS pour l'exercice et génère l'écriture comptable OD (Débit 695 / Crédit 444) dans le grand livre.",
+      confirmLabel: "Valider & Transmettre à M3",
+      cancelLabel: "Annuler",
+      variant: "warning",
+    });
+    if (!confirmed) return;
+
     setActionLoading(true);
     try {
       const res = await fiscaliteApi.validerIsTransmissionM3(selectedEx.id);
-      alert(res.message || "Calcul validé et écriture transmise à M3 avec succès.");
+      await showResult({
+        variant: "success",
+        title: "Validation & Transmission M3",
+        message: res.message || "L'IS est validé définitivement. L'écriture OD (695 / 444) a été enregistrée dans M3.",
+        closeLabel: "Parfait",
+      });
       await handleSelectExercice(selectedEx.id);
       await loadData();
     } catch (err: any) {
-      alert(err.message || "Erreur validation transmission M3");
+      toast.error("Erreur de transmission", err.message || "Erreur validation transmission M3");
     } finally {
       setActionLoading(false);
     }
   };
 
   const handlePayerAcompte = async (acompteId: string, montant: number) => {
-    if (!confirm(`Enregistrer le règlement de cet acompte (${formatCurrency(montant)}) auprès de la DGI ?`)) return;
+    const confirmed = await confirm({
+      title: "Enregistrer le règlement d'acompte ?",
+      message: `Confirmez-vous le paiement effectif de cet acompte (${formatCurrency(montant)}) auprès de la DGI / Trésor Public ?`,
+      confirmLabel: "Confirmer le paiement",
+      cancelLabel: "Annuler",
+      variant: "default",
+    });
+    if (!confirmed) return;
+
     setActionLoading(true);
     try {
       await fiscaliteApi.payerAcompteIs(acompteId, montant);
+      await showResult({
+        variant: "success",
+        title: "Règlement d'acompte enregistré",
+        message: "Le paiement de l'acompte provisionnel d'IS a été validé et enregistré auprès de la DGI.",
+        closeLabel: "OK",
+      });
       if (selectedEx) await handleSelectExercice(selectedEx.id);
       await loadData();
     } catch (err: any) {
-      alert(err.message || "Erreur enregistrement acompte");
+      toast.error("Erreur acompte", err.message || "Erreur enregistrement acompte");
     } finally {
       setActionLoading(false);
     }
@@ -185,8 +234,8 @@ export const IsCalculView: React.FC = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 dark:border-gray-800 pb-5">
         <div>
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 font-bold text-lg">
-              IS
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 font-bold">
+              <CalculatorIcon className="h-5 w-5" />
             </span>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               Impôt sur les Sociétés (IS) &amp; Acomptes
@@ -197,17 +246,12 @@ export const IsCalculView: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/fiscalite"
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-          >
-            ← Tableau de Bord
-          </Link>
           <button
             onClick={() => setIsCreating(true)}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 shadow-sm transition"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 shadow-sm transition"
           >
-            + Nouvel Exercice Fiscal
+            <PlusIcon className="h-4 w-4 shrink-0" />
+            <span>Nouvel Exercice Fiscal</span>
           </button>
         </div>
       </div>
@@ -249,24 +293,22 @@ export const IsCalculView: React.FC = () => {
                   <div
                     key={ex.id}
                     onClick={() => handleSelectExercice(ex.id)}
-                    className={`cursor-pointer rounded-xl border p-4 transition ${
-                      isSelected
+                    className={`cursor-pointer rounded-xl border p-4 transition ${isSelected
                         ? "border-amber-500 bg-amber-50/40 shadow-sm dark:border-amber-500 dark:bg-amber-950/20"
                         : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-800 dark:bg-gray-800/80"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-gray-900 dark:text-white text-base">
                         Exercice {annee}
                       </span>
                       <span
-                        className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
-                          ex.statut === "CLOTURE"
+                        className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${ex.statut === "CLOTURE"
                             ? "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300"
                             : ex.statut === "OUVERT"
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-                            : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
-                        }`}
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                              : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                          }`}
                       >
                         {ex.statut}
                       </span>
@@ -301,32 +343,67 @@ export const IsCalculView: React.FC = () => {
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                       Calcul &amp; Retraitements Fiscaux — Exercice {new Date(selectedEx.dateDebut).getFullYear()}
                     </h2>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      Statut du calcul :{" "}
-                      <span className="font-semibold text-amber-700 dark:text-amber-400">
-                        {calc?.statutCalcul || "NON_CALCULE"}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Statut du calcul :</span>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                          calc?.statut === "VALIDE" || calc?.statut === "TRANSMIS_M3"
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                            : calc?.statut === "BROUILLON"
+                            ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                            : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        {calc?.statut || "NON_CALCULE"}
                       </span>
-                    </p>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={handleCalculerIs}
                       disabled={actionLoading}
-                      className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white hover:bg-amber-700 transition shadow-sm"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white hover:bg-amber-700 transition shadow-sm"
                     >
-                      ⚡ Recalculer l&apos;IS
+                      <SyncIcon className={`h-3.5 w-3.5 shrink-0 ${actionLoading ? "animate-spin" : ""}`} />
+                      <span>{calc ? "Recalculer l'IS" : "Calculer l'IS"}</span>
                     </button>
 
-                    {calc && calc.statutCalcul !== "VALIDE_DEFINITIF" && (
+                    {calc && calc.statut !== "VALIDE" && calc.statut !== "TRANSMIS_M3" ? (
                       <button
                         onClick={handleValiderTransmissionM3}
                         disabled={actionLoading}
-                        className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700 transition shadow-sm"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700 transition shadow-sm"
                       >
-                        ✓ Valider &amp; Transmettre à M3 (695 / 444)
+                        <CheckCircleIcon className="h-3.5 w-3.5 shrink-0" />
+                        <span>Valider &amp; Transmettre à M3 (695 / 444)</span>
                       </button>
-                    )}
+                    ) : calc ? (
+                      <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60">
+                        <CheckCircleIcon className="h-3.5 w-3.5" />
+                        <span>Validé &amp; Transmis M3</span>
+                      </span>
+                    ) : null}
+
+                    <button
+                      type="button"
+                      onClick={() => exportIs(selectedEx, contribuable, "download")}
+                      disabled={isExporting}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
+                      title="Télécharger le bordereau de calcul IS officiel en PDF"
+                    >
+                      <DocsIcon className="h-3.5 w-3.5 text-amber-600" />
+                      <span>{isExporting ? "Export..." : "Bordereau IS (PDF)"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => exportIs(selectedEx, contribuable, "preview")}
+                      disabled={isExporting}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
+                      title="Aperçu du bordereau IS dans un nouvel onglet"
+                    >
+                      <span>Aperçu</span>
+                    </button>
                   </div>
                 </div>
 
@@ -365,7 +442,7 @@ export const IsCalculView: React.FC = () => {
                         {formatCurrency(calc.resultatFiscal)}
                       </p>
                       <span className="text-[10px] text-gray-500">
-                        {calc.tauxApplicable}% appliqué
+                        {calc.tauxIsApplique ?? calc.tauxApplicable ?? 30}% appliqué
                       </span>
                     </div>
 
@@ -436,11 +513,10 @@ export const IsCalculView: React.FC = () => {
                             <tr key={r.id}>
                               <td className="px-3 py-2">
                                 <span
-                                  className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                                    r.sens === "REINTEGRATION"
+                                  className={`px-2 py-0.5 rounded text-[11px] font-bold ${r.sens === "REINTEGRATION"
                                       ? "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
                                       : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-                                  }`}
+                                    }`}
                                 >
                                   {r.sens === "REINTEGRATION" ? "+ Réintégration" : "- Déduction"}
                                 </span>
@@ -496,11 +572,10 @@ export const IsCalculView: React.FC = () => {
                                 {ac.numeroAcompte === 3 && "3e Acompte (10 Octobre)"}
                               </span>
                               <span
-                                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                                  isPaye
+                                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${isPaye
                                     ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
                                     : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                                }`}
+                                  }`}
                               >
                                 {ac.statut}
                               </span>
@@ -542,7 +617,7 @@ export const IsCalculView: React.FC = () => {
       {/* Modal Nouvel Exercice */}
       {isCreating && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
               Créer un nouvel exercice fiscal
             </h3>
@@ -573,10 +648,13 @@ export const IsCalculView: React.FC = () => {
                 />
               </div>
 
+              {/* Alerte d'erreur instructive */}
+              <FormErrorAlert error={exerciceError} onClose={clearExerciceError} />
+
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
                 <button
                   type="button"
-                  onClick={() => setIsCreating(false)}
+                  onClick={() => { setIsCreating(false); clearExerciceError(); }}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300"
                 >
                   Annuler
@@ -584,9 +662,9 @@ export const IsCalculView: React.FC = () => {
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white hover:bg-amber-700 shadow-sm"
+                  className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white hover:bg-amber-700 shadow-sm disabled:opacity-60"
                 >
-                  Ouvrir l&apos;Exercice
+                  {actionLoading ? "Création..." : "Ouvrir l’Exercice"}
                 </button>
               </div>
             </form>
@@ -597,7 +675,7 @@ export const IsCalculView: React.FC = () => {
       {/* Modal Ajout Retraitement */}
       {showAddRetraitement && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
               Ajouter un retraitement fiscal
             </h3>
@@ -657,10 +735,13 @@ export const IsCalculView: React.FC = () => {
                 />
               </div>
 
+              {/* Alerte d'erreur instructive */}
+              <FormErrorAlert error={retraitementError} onClose={clearRetraitementError} />
+
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
                 <button
                   type="button"
-                  onClick={() => setShowAddRetraitement(false)}
+                  onClick={() => { setShowAddRetraitement(false); clearRetraitementError(); }}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300"
                 >
                   Annuler
@@ -668,9 +749,9 @@ export const IsCalculView: React.FC = () => {
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white hover:bg-amber-700 shadow-sm"
+                  className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white hover:bg-amber-700 shadow-sm disabled:opacity-60"
                 >
-                  Enregistrer
+                  {actionLoading ? "Enregistrement..." : "Enregistrer"}
                 </button>
               </div>
             </form>

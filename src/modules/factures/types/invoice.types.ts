@@ -240,6 +240,7 @@ export type MecefConfig = {
   mecefEnvironment: MecefEnvironment;
   mecefAutoNormalize: boolean;
   isConfigured: boolean;
+  emitterIfu?: string | null;
   apiUrl?: string | null;
   nim?: string | null;
   environment?: MecefEnvironment;
@@ -254,6 +255,7 @@ export type UpdateMecefConfigPayload = {
   mecefNim?: string;
   mecefEnvironment?: MecefEnvironment;
   mecefAutoNormalize?: boolean;
+  emitterIfu?: string;
   apiUrl?: string;
   apiKey?: string;
   nim?: string;

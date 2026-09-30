@@ -4,11 +4,22 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { fiscaliteApi } from "../services/fiscaliteApi.service";
 import type { TaxContribuable, TaxEcheance } from "../types/fiscalite.types";
+import { CalendarIcon, SyncIcon } from "./FiscaliteIcons";
+import { ChevronLeftIcon, CheckCircleIcon, DocsIcon } from "@/icons";
+import { useActionFeedback, useToast } from "@/shared/components/feedback";
+import { useFiscalitePdf } from "../pdf";
+import { FormErrorAlert, useFormError } from "./FormErrorAlert";
 
 export const CalendrierFiscalView: React.FC = () => {
+  const { confirm, showResult } = useActionFeedback();
+  const toast = useToast();
+  const { isExporting, exportCalendrier } = useFiscalitePdf();
+  const { error: calError, captureError: captureCalError, clearError: clearCalError } = useFormError();
+
   const [contribuable, setContribuable] = useState<TaxContribuable | null>(null);
   const [echeances, setEcheances] = useState<TaxEcheance[]>([]);
   const [filterStatut, setFilterStatut] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -35,24 +46,54 @@ export const CalendrierFiscalView: React.FC = () => {
   const handleSyncEcheances = async () => {
     if (!contribuable) return;
     setActionLoading(true);
+    clearCalError();
     try {
       await fiscaliteApi.synchroniserEcheances(contribuable.id);
       await loadData();
+      await showResult({
+        variant: "success",
+        title: "Calendrier Fiscal Synchronisé ✓",
+        message: "Toutes les obligations légales et déclaratives (TVA, acomptes IS, patentes, retenues AIB) ont été recalculées et synchronisées selon le régime fiscal et le profil de l'entreprise.",
+        closeLabel: "Consulter l'Échéancier",
+      });
     } catch (err: any) {
-      alert(err.message || "Erreur de synchronisation du calendrier");
+      captureCalError(err);
+      toast.error(
+        "Erreur de synchronisation",
+        err.message || "Impossible de synchroniser le calendrier fiscal."
+      );
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleMarquerPayee = async (id: string) => {
-    if (!confirm("Marquer cette échéance comme réglée auprès de la DGI ?")) return;
+    const confirmed = await confirm({
+      title: "Marquer l'échéance comme réglée",
+      message:
+        "Confirmez-vous le paiement effectif de cette obligation fiscale auprès de la DGI / Trésor Public ?",
+      confirmLabel: "Confirmer le paiement",
+      variant: "default",
+    });
+    if (!confirmed) return;
+
     setActionLoading(true);
+    clearCalError();
     try {
       await fiscaliteApi.marquerEcheancePayee(id);
       await loadData();
+      await showResult({
+        variant: "success",
+        title: "Échéance Acquittée ✓",
+        message: "Le paiement de cette obligation fiscale a été enregistré. L'échéance est marquée PAYEE dans votre calendrier fiscal.",
+        closeLabel: "OK",
+      });
     } catch (err: any) {
-      alert(err.message || "Erreur enregistrement paiement");
+      captureCalError(err);
+      toast.error(
+        "Erreur d'enregistrement",
+        err.message || "Impossible d'enregistrer le paiement de l'échéance."
+      );
     } finally {
       setActionLoading(false);
     }
@@ -66,8 +107,15 @@ export const CalendrierFiscalView: React.FC = () => {
     }).format(val || 0);
 
   const filtered = echeances.filter((e) => {
-    if (filterStatut === "ALL") return true;
-    return e.statut === filterStatut;
+    if (filterStatut !== "ALL" && e.statut !== filterStatut) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchLib = (e.taxType?.libelle || "").toLowerCase().includes(q);
+      const matchCode = (e.taxType?.code || "").toLowerCase().includes(q);
+      const matchPeriode = (e.periodeOuExercice || "").toLowerCase().includes(q);
+      if (!matchLib && !matchCode && !matchPeriode) return false;
+    }
+    return true;
   });
 
   const countEnRetard = echeances.filter((e) => e.statut === "EN_RETARD").length;
@@ -79,8 +127,8 @@ export const CalendrierFiscalView: React.FC = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 dark:border-gray-800 pb-5">
         <div>
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 font-bold text-lg">
-              📅
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 font-bold">
+              <CalendarIcon className="h-5 w-5" />
             </span>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               Calendrier Fiscal Consolidé &amp; Alertes
@@ -90,22 +138,28 @@ export const CalendrierFiscalView: React.FC = () => {
             Suivi des obligations fiscales et sociales au Bénin (CGI 2026) • Alertes J-30, J-15, J-7 et J-3 avant forclusion.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/fiscalite"
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => exportCalendrier(echeances, contribuable, "download")}
+            disabled={isExporting || echeances.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
           >
-            ← Tableau de Bord
-          </Link>
+            <DocsIcon className="h-4 w-4 text-amber-600" />
+            <span>{isExporting ? "Exportation..." : "Échéancier (PDF)"}</span>
+          </button>
           <button
             onClick={handleSyncEcheances}
             disabled={actionLoading}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 shadow-sm transition"
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 shadow-sm transition"
           >
-            🔄 Synchroniser les Échéances
+            <SyncIcon className={`h-4 w-4 shrink-0 ${actionLoading ? "animate-spin" : ""}`} />
+            <span>Synchroniser les Échéances</span>
           </button>
         </div>
       </div>
+
+      <FormErrorAlert error={calError} onClose={clearCalError} />
 
       {/* Cartes KPI Échéances */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -146,7 +200,7 @@ export const CalendrierFiscalView: React.FC = () => {
         </div>
       </div>
 
-      {/* Barre de Filtres */}
+      {/* Barre de Filtres & Recherche */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-4">
         <div className="flex flex-wrap items-center gap-2">
           {["ALL", "A_DECLARER", "A_PAYER", "EN_RETARD", "PAYEE"].map((st) => (
@@ -166,6 +220,26 @@ export const CalendrierFiscalView: React.FC = () => {
               {st === "PAYEE" && "Payées"}
             </button>
           ))}
+        </div>
+
+        {/* Barre de recherche */}
+        <div className="flex items-center gap-2 w-full sm:w-72">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Rechercher une taxe ou obligation..."
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs placeholder-gray-400 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 shrink-0"
+            >
+              Effacer
+            </button>
+          )}
         </div>
       </div>
 

@@ -11,6 +11,7 @@ import type {
 import { formatRubricType, formatRubricSens } from "../utils/rhFormatters";
 import { Modal } from "@/components/ui/modal";
 import { useActionFeedback, useToast } from "@/shared/components/feedback";
+import { BaremesFiscauxParamView } from "./BaremesFiscauxParamView";
 import {
   EyeIcon,
   PencilIcon,
@@ -621,7 +622,7 @@ export const ParametresRhView: React.FC = () => {
             { id: "etablissements", label: "Établissements & Sites" },
             { id: "departements", label: "Départements & Services" },
             { id: "postes", label: "Postes & Emplois" },
-            { id: "baremes", label: "Barèmes Fiscaux (ITS)" },
+            { id: "baremes", label: "Barèmes Fiscaux & Cotisations" },
             { id: "rubriques", label: "Rubriques de Paie" },
           ].map((tab) => (
             <button
@@ -983,79 +984,9 @@ export const ParametresRhView: React.FC = () => {
         </div>
       )}
 
-      {/* 4. BARÈMES ITS DYNAMIQUES */}
+      {/* 4. GESTION COMPLÈTE DES BARÈMES FISCAUX & COTISATIONS */}
       {activeTab === "baremes" && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50/50 p-4 text-xs text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-300">
-            <InfoIcon className="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
-            <div>
-              <strong>Barème légal officiel :</strong> Les tranches et taux ci-dessous proviennent directement de la base de données (RhBaremeIts &amp; RhBaremeItsTranche) et s'appliquent de manière progressive sur le revenu net imposable.
-            </div>
-          </div>
-
-          {baremes.length === 0 ? (
-            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
-              Aucun barème d'impôt configuré en base de données.
-            </div>
-          ) : (
-            baremes.map((b) => (
-              <div key={b.id} className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                      {b.libelle}
-                    </h3>
-                    <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-                      {b.paysCode}
-                    </span>
-                    <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                      {b.modeCalcul}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
-                      <thead className="border-b border-gray-100 bg-gray-50/75 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
-                        <tr>
-                          <th className="px-6 py-4">N° Tranche</th>
-                          <th className="px-6 py-4">Limite Inférieure</th>
-                          <th className="px-6 py-4">Limite Supérieure</th>
-                          <th className="px-6 py-4 text-right">Taux Marginal ITS</th>
-                          <th className="px-6 py-4 text-right">Déduction Fixe</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800 font-medium">
-                        {(b.tranches || []).map((t: any) => (
-                          <tr key={t.id || t.numeroTranche}>
-                            <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">
-                              Tranche {t.numeroTranche}
-                            </td>
-                            <td className="px-6 py-4 font-mono">
-                              {formatNumber(t.limiteInferieure)} FCFA
-                            </td>
-                            <td className="px-6 py-4 font-mono">
-                              {t.limiteSuperieure !== null && t.limiteSuperieure !== undefined
-                                ? `${formatNumber(t.limiteSuperieure)} FCFA`
-                                : 'Au-delà (Illimité)'}
-                            </td>
-                            <td className="px-6 py-4 text-right font-bold text-brand-600 dark:text-brand-400">
-                              {formatNumber(t.taux)} %
-                            </td>
-                            <td className="px-6 py-4 text-right font-mono text-gray-600 dark:text-gray-400">
-                              {formatNumber(t.montantDeductionFixe)} FCFA
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        <BaremesFiscauxParamView onRefreshParent={loadData} />
       )}
 
       {/* 5. RUBRIQUES DE PAIE */}

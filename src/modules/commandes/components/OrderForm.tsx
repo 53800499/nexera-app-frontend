@@ -159,8 +159,25 @@ function ItemPicker({ onSelect }: { onSelect: (item: CatalogItem) => void }) {
                 <div className="font-medium">
                   {item.reference} — {item.name}
                 </div>
-                <div className="text-xs text-gray-500">
-                  {formatMoney(item.priceHt, DEFAULT_CURRENCY)} HT
+                <div className="flex items-center justify-between text-xs mt-0.5">
+                  <span className="text-gray-500">
+                    {formatMoney(item.priceHt, DEFAULT_CURRENCY)} HT
+                  </span>
+                  {item.itemType === "product" ? (
+                    <span
+                      className={`font-medium ${
+                        (item.stockQuantity ?? 0) > 0
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-rose-500 font-semibold"
+                      }`}
+                    >
+                      {(item.stockQuantity ?? 0) > 0
+                        ? `Stock: ${item.stockQuantity} ${item.unit}`
+                        : `Rupture (${item.stockQuantity ?? 0})`}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 italic">Service</span>
+                  )}
                 </div>
               </button>
             </li>

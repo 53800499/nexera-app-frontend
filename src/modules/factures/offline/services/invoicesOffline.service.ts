@@ -1,5 +1,5 @@
 import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
-import { isOfflineError } from "@/shared/core/OfflineError";
+import { OfflineError, isOfflineError } from "@/shared/core/OfflineError";
 import { isBrowserOnline } from "@/shared/hooks/useNetworkStatus";
 import { withTimeout } from "@/shared/lib/withTimeout";
 import { crmOfflineRepository } from "@/modules/crm/offline/services/crmOfflineRepository";
@@ -199,8 +199,8 @@ async function readWithOfflineFallback<T>(
 }
 
 function assertOnlineForAction() {
-  if (isOfflineMode()) {
-    throw new Error(OFFLINE_ACTION_ERROR);
+  if (!isBrowserOnline()) {
+    throw new OfflineError(OFFLINE_ACTION_ERROR);
   }
 }
 
@@ -324,6 +324,7 @@ export const invoicesOfflineService = {
     assertOnlineForAction();
     const invoice = await invoicesApi.issue(id);
     await invoicesOfflineRepository.upsertInvoice(invoice, "synced");
+    clearInvoicesOfflineIfOnline();
     return invoice;
   },
 
@@ -331,6 +332,7 @@ export const invoicesOfflineService = {
     assertOnlineForAction();
     const invoice = await invoicesApi.send(id, payload);
     await invoicesOfflineRepository.upsertInvoice(invoice, "synced");
+    clearInvoicesOfflineIfOnline();
     return invoice;
   },
 
@@ -338,6 +340,7 @@ export const invoicesOfflineService = {
     assertOnlineForAction();
     const invoice = await invoicesApi.createCreditNote(id, payload);
     await invoicesOfflineRepository.upsertInvoice(invoice, "synced");
+    clearInvoicesOfflineIfOnline();
     return invoice;
   },
 
@@ -345,6 +348,7 @@ export const invoicesOfflineService = {
     assertOnlineForAction();
     const invoice = await invoicesApi.recordPayment(id, payload);
     await invoicesOfflineRepository.upsertInvoice(invoice, "synced");
+    clearInvoicesOfflineIfOnline();
     return invoice;
   },
 
@@ -352,6 +356,7 @@ export const invoicesOfflineService = {
     assertOnlineForAction();
     const invoice = await invoicesApi.normalize(id, payload);
     await invoicesOfflineRepository.upsertInvoice(invoice, "synced");
+    clearInvoicesOfflineIfOnline();
     return invoice;
   },
 };

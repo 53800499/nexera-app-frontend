@@ -82,6 +82,10 @@ export function useNdfReferentiel(paysCode = "BJ") {
       queryClient.invalidateQueries({ queryKey: ["notes-frais", "categories"] }),
     refetchPolitiques: () =>
       queryClient.invalidateQueries({ queryKey: ["notes-frais", "politiques"] }),
+    refetchBaremesKm: () =>
+      queryClient.invalidateQueries({ queryKey: ["notes-frais", "baremes-km"] }),
+    refetchBaremesPerDiem: () =>
+      queryClient.invalidateQueries({ queryKey: ["notes-frais", "baremes-per-diem"] }),
     isLoading:
       categoriesQuery.isLoading ||
       baremesKmQuery.isLoading ||

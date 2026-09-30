@@ -4,8 +4,24 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { fiscaliteApi } from "../services/fiscaliteApi.service";
 import type { TaxContribuable, TaxExerciceFiscal } from "../types/fiscalite.types";
+import {
+  LiasseFiscaleIcon,
+  PrinterIcon,
+  SparklesIcon,
+  SignatureIcon,
+  RocketSendIcon,
+} from "./FiscaliteIcons";
+import { ChevronLeftIcon, DocsIcon } from "@/icons";
+import { useActionFeedback, useToast } from "@/shared/components/feedback";
+import { useFiscalitePdf } from "../pdf";
+import { FormErrorAlert, useFormError } from "./FormErrorAlert";
 
 export const LiasseFiscaleView: React.FC = () => {
+  const { confirm, showResult } = useActionFeedback();
+  const toast = useToast();
+  const { isExporting, exportLiasse } = useFiscalitePdf();
+  const { error: liasseError, captureError: captureLiasseError, clearError: clearLiasseError } = useFormError();
+
   const [contribuable, setContribuable] = useState<TaxContribuable | null>(null);
   const [exercices, setExercices] = useState<TaxExerciceFiscal[]>([]);
   const [selectedExId, setSelectedExId] = useState<string>("");
@@ -57,12 +73,19 @@ export const LiasseFiscaleView: React.FC = () => {
   const handleGenererLiasse = async () => {
     if (!selectedExId) return;
     setActionLoading(true);
+    clearLiasseError();
     try {
       const res = await fiscaliteApi.genererLiasse(selectedExId, systemeComptable);
       setLiasseData(res);
-      alert("Liasse fiscale annuelle générée avec succès.");
+      await showResult({
+        variant: "success",
+        title: "Liasse Fiscale Compilée ✓",
+        message: "La liasse fiscale annuelle SYSCOHADA a été générée avec succès. Les états financiers (Bilan, Compte de Résultat, Tableau des Flux et Notes annexes) ainsi que le calcul de l'IS sont prêts pour la revue et le visa du cabinet.",
+        closeLabel: "Examiner la Liasse",
+      });
     } catch (err: any) {
-      alert(err.message || "Erreur de génération de la liasse");
+      captureLiasseError(err);
+      toast.error("Erreur de génération", err.message || "Erreur de génération de la liasse");
     } finally {
       setActionLoading(false);
     }
@@ -70,14 +93,30 @@ export const LiasseFiscaleView: React.FC = () => {
 
   const handleValiderCabinet = async () => {
     if (!liasseData?.id) return;
-    if (!confirm("Apposer le visa et la signature électronique de l'expert-comptable (Espace Cabinet M6) ?")) return;
+    const confirmed = await confirm({
+      title: "Apposer le visa de l'expert-comptable ?",
+      message:
+        "Cette signature électronique engage la responsabilité du cabinet (M6) et certifie la régularité et sincérité des comptes annuels présentés dans la liasse.",
+      confirmLabel: "Signer & Apposer le Visa",
+      cancelLabel: "Annuler",
+      variant: "warning",
+    });
+    if (!confirmed) return;
+
     setActionLoading(true);
+    clearLiasseError();
     try {
       const res = await fiscaliteApi.validerLiasseCabinet(liasseData.id);
       setLiasseData(res);
-      alert("Liasse visée et validée par le Cabinet d'expertise comptable.");
+      await showResult({
+        variant: "success",
+        title: "Visa Cabinet Apposé ✓",
+        message: "La liasse fiscale a été officiellement visée et certifiée par le Cabinet d'expertise comptable (M6). Vous pouvez maintenant procéder au dépôt officiel auprès de la DGI.",
+        closeLabel: "Continuer",
+      });
     } catch (err: any) {
-      alert(err.message || "Erreur validation cabinet");
+      captureLiasseError(err);
+      toast.error("Erreur validation cabinet", err.message || "Impossible de valider la liasse");
     } finally {
       setActionLoading(false);
     }
@@ -85,14 +124,30 @@ export const LiasseFiscaleView: React.FC = () => {
 
   const handleDeposerLiasse = async () => {
     if (!liasseData?.id) return;
-    if (!confirm("Confirmer le dépôt officiel de la liasse fiscale auprès de la DGI ?")) return;
+    const confirmed = await confirm({
+      title: "Confirmer le dépôt officiel auprès de la DGI ?",
+      message:
+        "Le dépôt officiel transmet définitivement la liasse SYSCOHADA aux serveurs de la Direction Générale des Impôts. Un accusé de télédéclaration sera émis.",
+      confirmLabel: "Confirmer le dépôt officiel",
+      cancelLabel: "Annuler",
+      variant: "warning",
+    });
+    if (!confirmed) return;
+
     setActionLoading(true);
+    clearLiasseError();
     try {
       const res = await fiscaliteApi.deposerLiasse(liasseData.id);
       setLiasseData(res);
-      alert("Liasse fiscale déposée officiellement avec accusé d'enregistrement.");
+      await showResult({
+        variant: "success",
+        title: "Liasse Fiscale Déposée Officiellement ✓",
+        message: "La liasse SYSCOHADA a été transmise avec succès aux serveurs de la Direction Générale des Impôts. Un accusé de télédéclaration a été émis. Conservez ce justificatif de dépôt légal.",
+        closeLabel: "Parfait",
+      });
     } catch (err: any) {
-      alert(err.message || "Erreur dépôt liasse");
+      captureLiasseError(err);
+      toast.error("Erreur de dépôt", err.message || "Impossible de déposer la liasse auprès de la DGI");
     } finally {
       setActionLoading(false);
     }
@@ -111,8 +166,8 @@ export const LiasseFiscaleView: React.FC = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 dark:border-gray-800 pb-5">
         <div>
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 font-bold text-lg">
-              📑
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 font-bold">
+              <LiasseFiscaleIcon className="h-5 w-5" />
             </span>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               Liasse Fiscale Annuelle (SYSCOHADA Révisé)
@@ -123,20 +178,19 @@ export const LiasseFiscaleView: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/fiscalite"
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-          >
-            ← Tableau de Bord
-          </Link>
           <button
-            onClick={() => window.print()}
-            className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300 transition"
+            type="button"
+            onClick={() => liasseData && exportLiasse(liasseData, contribuable, "download")}
+            disabled={!liasseData || isExporting}
+            className="inline-flex items-center gap-2 rounded-lg border border-purple-300 bg-purple-50 px-4 py-2 text-sm font-medium text-purple-800 hover:bg-purple-100 dark:border-purple-700 dark:bg-purple-950/40 dark:text-purple-300 transition shadow-sm disabled:opacity-50"
           >
-            🖨 Imprimer la Liasse
+            <DocsIcon className="h-4 w-4 shrink-0 text-purple-700 dark:text-purple-300" />
+            <span>{isExporting ? "Exportation..." : "Liasse Fiscale (PDF)"}</span>
           </button>
         </div>
       </div>
+
+      <FormErrorAlert error={liasseError} onClose={clearLiasseError} />
 
       {/* Sélecteur d'exercice & Système comptable */}
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-800/80 flex flex-wrap items-center justify-between gap-4">
@@ -177,9 +231,10 @@ export const LiasseFiscaleView: React.FC = () => {
           <button
             onClick={handleGenererLiasse}
             disabled={actionLoading || !selectedExId}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 shadow-sm transition"
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 shadow-sm transition"
           >
-            ⚡ Générer / Actualiser la Liasse
+            <SparklesIcon className="h-4 w-4 shrink-0" />
+            <span>Générer / Actualiser la Liasse</span>
           </button>
         </div>
       </div>
@@ -203,13 +258,12 @@ export const LiasseFiscaleView: React.FC = () => {
                   Liasse Fiscale — Gestion {liasseData.exercice?.dateDebut ? new Date(liasseData.exercice.dateDebut).getFullYear() : "2026"}
                 </span>
                 <span
-                  className={`px-3 py-0.5 rounded-full text-xs font-bold ${
-                    liasseData.statut === "DEPOSEE"
+                  className={`px-3 py-0.5 rounded-full text-xs font-bold ${liasseData.statut === "DEPOSEE"
                       ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
                       : liasseData.statut === "VALIDEE_CABINET"
-                      ? "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300"
-                      : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                  }`}
+                        ? "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300"
+                        : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                    }`}
                 >
                   {liasseData.statut === "VALIDEE_CABINET" ? "VISÉE PAR CABINET (M6)" : liasseData.statut}
                 </span>
@@ -219,14 +273,15 @@ export const LiasseFiscaleView: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {liasseData.statut === "BROUILLON" && (
                 <button
                   onClick={handleValiderCabinet}
                   disabled={actionLoading}
-                  className="rounded-lg bg-purple-700 px-4 py-2 text-xs font-medium text-white hover:bg-purple-800 transition shadow-sm"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-purple-700 px-4 py-2 text-xs font-medium text-white hover:bg-purple-800 transition shadow-sm"
                 >
-                  ✍ Visa &amp; Validation Cabinet (M6)
+                  <SignatureIcon className="h-4 w-4 shrink-0" />
+                  <span>Visa &amp; Validation Cabinet (M6)</span>
                 </button>
               )}
 
@@ -234,11 +289,32 @@ export const LiasseFiscaleView: React.FC = () => {
                 <button
                   onClick={handleDeposerLiasse}
                   disabled={actionLoading}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700 transition shadow-sm"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700 transition shadow-sm"
                 >
-                  🚀 Télétransmettre / Déposer à la DGI
+                  <RocketSendIcon className="h-4 w-4 shrink-0" />
+                  <span>Télétransmettre / Déposer à la DGI</span>
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => exportLiasse(liasseData, contribuable, "download")}
+                disabled={isExporting}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
+                title="Télécharger la liasse financière complète en PDF"
+              >
+                <DocsIcon className="h-3.5 w-3.5 text-purple-600" />
+                <span>{isExporting ? "Export..." : "Télécharger PDF"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => exportLiasse(liasseData, contribuable, "preview")}
+                disabled={isExporting}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
+                title="Aperçu dans un nouvel onglet"
+              >
+                <span>Aperçu</span>
+              </button>
             </div>
           </div>
 

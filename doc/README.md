@@ -31,6 +31,7 @@ La documentation est structurée selon les standards de l'ingénierie logicielle
 
 ### 📂 Dossiers Spécialisés & Décisions d'Architecture
 
+- 🧠 **Logique Métier & Calculs UI** : [`logique-metier/README.md`](./logique-metier/README.md) (Guide des calculs financiers, règles d'action, décompte RH, stocks et Zod).
 - 🎨 **Architecture d'Interface** : [`architecture/architecture.md`](./architecture/architecture.md) (Flux de données frontend, diagrammes de composants, arborescence des routes Next.js).
 - 💾 **Modèle de Données Local** : [`database/data-model.md`](./database/data-model.md) (Schéma IndexedDB Dexie pour le mode déconnecté, state stores Zustand).
 - 🚢 **Procédures de Déploiement** : [`deployment/deployment.md`](./deployment/deployment.md) (Build de production, compression, variables d'environnement).

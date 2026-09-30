@@ -4,14 +4,27 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { fiscaliteApi } from "../services/fiscaliteApi.service";
 import type { TaxContribuable, TaxDeclarationTva } from "../types/fiscalite.types";
+import { PercentBadgeIcon, CreditCardIcon } from "./FiscaliteIcons";
+import { ChevronLeftIcon, PlusIcon, CheckCircleIcon, DocsIcon } from "@/icons";
+import { useActionFeedback, useToast } from "@/shared/components/feedback";
+import { useFiscalitePdf } from "../pdf";
+import { FormErrorAlert, useFormError } from "./FormErrorAlert";
 
 export const TvaDeclarationsView: React.FC = () => {
+  const { confirm, showResult } = useActionFeedback();
+  const toast = useToast();
+  const { isExporting, exportTva } = useFiscalitePdf();
+
   const [contribuable, setContribuable] = useState<TaxContribuable | null>(null);
   const [declarations, setDeclarations] = useState<TaxDeclarationTva[]>([]);
   const [selectedDec, setSelectedDec] = useState<TaxDeclarationTva | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Gestion des erreurs de formulaire
+  const { error: declarationError, captureError: captureDeclarationError, clearError: clearDeclarationError } = useFormError();
+  const { error: ligneError, captureError: captureLigneError, clearError: clearLigneError } = useFormError();
 
   // Formulaire nouvelle déclaration
   const [newPeriode, setNewPeriode] = useState("2026-03");
@@ -60,6 +73,7 @@ export const TvaDeclarationsView: React.FC = () => {
   const handleCreateDeclaration = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contribuable) return;
+    clearDeclarationError();
     setActionLoading(true);
     try {
       await fiscaliteApi.createDeclarationTva({
@@ -70,8 +84,12 @@ export const TvaDeclarationsView: React.FC = () => {
       });
       setIsCreating(false);
       await loadData();
+      toast.success(
+        "Déclaration créée",
+        `La déclaration TVA pour la période ${newPeriode} a été initialisée.`
+      );
     } catch (err: any) {
-      alert(err.message || "Erreur lors de la création de la déclaration.");
+      captureDeclarationError(err);
     } finally {
       setActionLoading(false);
     }
@@ -80,6 +98,7 @@ export const TvaDeclarationsView: React.FC = () => {
   const handleAddLigne = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedDec) return;
+    clearLigneError();
     setActionLoading(true);
     try {
       const base = Number(ligneBaseHt) || 0;
@@ -93,36 +112,74 @@ export const TvaDeclarationsView: React.FC = () => {
       setSelectedDec(updated);
       setShowAddLigne(false);
       await loadData();
+      toast.success(
+        "Ligne ajoutée",
+        "La ligne de TVA a été ajoutée avec succès au calcul."
+      );
     } catch (err: any) {
-      alert(err.message || "Erreur lors de l'ajout de la ligne.");
+      captureLigneError(err);
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleValider = async (id: string) => {
-    if (!confirm("Confirmer la validation de cette déclaration de TVA ?")) return;
+    const confirmed = await confirm({
+      title: "Valider la déclaration de TVA",
+      message:
+        "Confirmez-vous la validation définitive de cette déclaration de TVA ? Cette action verrouille les montants calculés pour cette période.",
+      confirmLabel: "Valider la déclaration",
+      variant: "warning",
+    });
+    if (!confirmed) return;
+
     setActionLoading(true);
     try {
       await fiscaliteApi.validerDeclarationTva(id);
       await handleSelectDec(id);
       await loadData();
+      await showResult({
+        variant: "success",
+        title: "Déclaration TVA Validée ✓",
+        message: "La déclaration de TVA a été validée et verrouillée. Si une TVA nette est due, vous pouvez maintenant procéder au règlement auprès de la DGI.",
+        closeLabel: "Compris",
+      });
     } catch (err: any) {
-      alert(err.message || "Erreur de validation");
+      toast.error(
+        "Erreur de validation",
+        err.message || "Impossible de valider la déclaration de TVA."
+      );
     } finally {
       setActionLoading(false);
     }
   };
 
   const handlePayer = async (id: string) => {
-    if (!confirm("Enregistrer le paiement effectif auprès de la DGI ?")) return;
+    const confirmed = await confirm({
+      title: "Enregistrer le paiement DGI",
+      message:
+        "Confirmez-vous l'enregistrement du règlement effectif de la TVA due auprès du Trésor Public / DGI ?",
+      confirmLabel: "Confirmer le paiement",
+      variant: "default",
+    });
+    if (!confirmed) return;
+
     setActionLoading(true);
     try {
       await fiscaliteApi.marquerPayeeTva(id);
       await handleSelectDec(id);
       await loadData();
+      await showResult({
+        variant: "success",
+        title: "Paiement TVA Enregistré ✓",
+        message: "Le règlement de la TVA nette due a été enregistré avec succès. La déclaration est désormais marquée PAYEE. Conservez votre reçu de paiement DGI.",
+        closeLabel: "OK",
+      });
     } catch (err: any) {
-      alert(err.message || "Erreur enregistrement paiement");
+      toast.error(
+        "Erreur d'enregistrement",
+        err.message || "Impossible d'enregistrer le paiement."
+      );
     } finally {
       setActionLoading(false);
     }
@@ -141,8 +198,8 @@ export const TvaDeclarationsView: React.FC = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 dark:border-gray-800 pb-5">
         <div>
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 font-bold text-lg">
-              %
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 font-bold">
+              <PercentBadgeIcon className="h-5 w-5" />
             </span>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               Déclarations de TVA (Taxe sur la Valeur Ajoutée)
@@ -153,17 +210,12 @@ export const TvaDeclarationsView: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/fiscalite"
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-          >
-            ← Tableau de Bord
-          </Link>
           <button
             onClick={() => setIsCreating(true)}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 shadow-sm transition"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 shadow-sm transition"
           >
-            + Nouvelle Déclaration Périodique
+            <PlusIcon className="h-4 w-4 shrink-0" />
+            <span>Nouvelle Déclaration Périodique</span>
           </button>
         </div>
       </div>
@@ -208,24 +260,22 @@ export const TvaDeclarationsView: React.FC = () => {
                   <div
                     key={d.id}
                     onClick={() => handleSelectDec(d.id)}
-                    className={`cursor-pointer rounded-xl border p-4 transition ${
-                      isSelected
+                    className={`cursor-pointer rounded-xl border p-4 transition ${isSelected
                         ? "border-amber-500 bg-amber-50/40 shadow-sm dark:border-amber-500 dark:bg-amber-950/20"
                         : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-800 dark:bg-gray-800/80"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-gray-900 dark:text-white text-base">
                         Période {d.periode}
                       </span>
                       <span
-                        className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
-                          d.statut === "PAYEE"
+                        className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${d.statut === "PAYEE"
                             ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
                             : d.statut === "VALIDEE"
-                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
-                            : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                        }`}
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                          }`}
                       >
                         {d.statut}
                       </span>
@@ -241,9 +291,8 @@ export const TvaDeclarationsView: React.FC = () => {
                         {isCredit ? "Crédit reportable :" : "Net à payer :"}
                       </span>
                       <span
-                        className={`font-bold ${
-                          isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-gray-900 dark:text-white"
-                        }`}
+                        className={`font-bold ${isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-gray-900 dark:text-white"
+                          }`}
                       >
                         {formatCurrency(Math.abs(d.tvaNetteDue))}
                       </span>
@@ -275,16 +324,18 @@ export const TvaDeclarationsView: React.FC = () => {
                       <>
                         <button
                           onClick={() => setShowAddLigne(true)}
-                          className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
                         >
-                          + Ajouter Ligne
+                          <PlusIcon className="h-3.5 w-3.5 shrink-0" />
+                          <span>Ajouter Ligne</span>
                         </button>
                         <button
                           onClick={() => handleValider(selectedDec.id)}
                           disabled={actionLoading}
-                          className="rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition shadow-sm"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition shadow-sm"
                         >
-                          ✓ Valider la déclaration
+                          <CheckCircleIcon className="h-3.5 w-3.5 shrink-0" />
+                          <span>Valider la déclaration</span>
                         </button>
                       </>
                     )}
@@ -293,11 +344,32 @@ export const TvaDeclarationsView: React.FC = () => {
                       <button
                         onClick={() => handlePayer(selectedDec.id)}
                         disabled={actionLoading}
-                        className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition shadow-sm"
+                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition shadow-sm"
                       >
-                        💳 Marquer comme payée à la DGI
+                        <CreditCardIcon className="h-4 w-4 shrink-0" />
+                        <span>Marquer comme payée à la DGI</span>
                       </button>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => exportTva(selectedDec, contribuable, "download")}
+                      disabled={isExporting}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
+                      title="Télécharger la déclaration officielle e-TVA en PDF"
+                    >
+                      <DocsIcon className="h-3.5 w-3.5 text-teal-600" />
+                      <span>{isExporting ? "Export..." : "Déclaration (PDF)"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => exportTva(selectedDec, contribuable, "open")}
+                      disabled={isExporting}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
+                      title="Ouvrir l'aperçu PDF dans un nouvel onglet"
+                    >
+                      <span>Aperçu</span>
+                    </button>
                   </div>
                 </div>
 
@@ -322,21 +394,19 @@ export const TvaDeclarationsView: React.FC = () => {
                     </p>
                   </div>
                   <div
-                    className={`rounded-lg p-3.5 ${
-                      selectedDec.tvaNetteDue < 0
+                    className={`rounded-lg p-3.5 ${selectedDec.tvaNetteDue < 0
                         ? "bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800"
                         : "bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800"
-                    }`}
+                      }`}
                   >
                     <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">
                       {selectedDec.tvaNetteDue < 0 ? "Crédit Reportable" : "TVA Nette Due"}
                     </p>
                     <p
-                      className={`text-lg font-bold mt-1 ${
-                        selectedDec.tvaNetteDue < 0
+                      className={`text-lg font-bold mt-1 ${selectedDec.tvaNetteDue < 0
                           ? "text-emerald-700 dark:text-emerald-300"
                           : "text-amber-800 dark:text-amber-300"
-                      }`}
+                        }`}
                     >
                       {formatCurrency(Math.abs(selectedDec.tvaNetteDue))}
                     </p>
@@ -406,7 +476,7 @@ export const TvaDeclarationsView: React.FC = () => {
       {/* Modal Création Déclaration */}
       {isCreating && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
               Créer une déclaration de TVA
             </h3>
@@ -459,10 +529,13 @@ export const TvaDeclarationsView: React.FC = () => {
                 </span>
               </div>
 
+              {/* Alerte d'erreur instructive */}
+              <FormErrorAlert error={declarationError} onClose={clearDeclarationError} />
+
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
                 <button
                   type="button"
-                  onClick={() => setIsCreating(false)}
+                  onClick={() => { setIsCreating(false); clearDeclarationError(); }}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300"
                 >
                   Annuler
@@ -470,9 +543,9 @@ export const TvaDeclarationsView: React.FC = () => {
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white hover:bg-amber-700 shadow-sm"
+                  className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white hover:bg-amber-700 shadow-sm disabled:opacity-60"
                 >
-                  Créer la Déclaration
+                  {actionLoading ? "Création..." : "Créer la Déclaration"}
                 </button>
               </div>
             </form>
@@ -483,7 +556,7 @@ export const TvaDeclarationsView: React.FC = () => {
       {/* Modal Ajout Ligne */}
       {showAddLigne && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
               Ajouter une ligne à la déclaration
             </h3>
@@ -532,10 +605,13 @@ export const TvaDeclarationsView: React.FC = () => {
                 </p>
               </div>
 
+              {/* Alerte d'erreur instructive */}
+              <FormErrorAlert error={ligneError} onClose={clearLigneError} />
+
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
                 <button
                   type="button"
-                  onClick={() => setShowAddLigne(false)}
+                  onClick={() => { setShowAddLigne(false); clearLigneError(); }}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300"
                 >
                   Annuler
@@ -543,9 +619,9 @@ export const TvaDeclarationsView: React.FC = () => {
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white hover:bg-amber-700 shadow-sm"
+                  className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white hover:bg-amber-700 shadow-sm disabled:opacity-60"
                 >
-                  Ajouter à la Déclaration
+                  {actionLoading ? "Ajout..." : "Ajouter à la Déclaration"}
                 </button>
               </div>
             </form>

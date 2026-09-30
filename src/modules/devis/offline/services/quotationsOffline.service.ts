@@ -1,5 +1,5 @@
 import { DEFAULT_CURRENCY } from "@/shared/constants/currencies";
-import { isOfflineError } from "@/shared/core/OfflineError";
+import { OfflineError, isOfflineError } from "@/shared/core/OfflineError";
 import { isBrowserOnline } from "@/shared/hooks/useNetworkStatus";
 import { withTimeout } from "@/shared/lib/withTimeout";
 import { crmOfflineRepository } from "@/modules/crm/offline/services/crmOfflineRepository";
@@ -199,8 +199,8 @@ async function readWithOfflineFallback<T>(
 }
 
 function assertOnlineForAction() {
-  if (isOfflineMode()) {
-    throw new Error(OFFLINE_ACTION_ERROR);
+  if (!isBrowserOnline()) {
+    throw new OfflineError(OFFLINE_ACTION_ERROR);
   }
 }
 

@@ -52,6 +52,30 @@ export function CatalogItemsTable({ items, canManage }: Props) {
         item.taxRate ? `${item.taxRate.name} (${item.taxRate.rate}%)` : "—",
     },
     {
+      key: "stock",
+      header: "Stock dispo",
+      render: (item) =>
+        item.itemType === "product" ? (
+          <Link
+            href={`/stock/articles/${item.id}`}
+            className="group flex items-center gap-1.5"
+            title="Gérer dans le module Stocks"
+          >
+            <span
+              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${
+                (item.stockQuantity ?? 0) > 0
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                  : "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400"
+              }`}
+            >
+              {item.stockQuantity ?? 0} {item.unit}
+            </span>
+          </Link>
+        ) : (
+          <span className="text-xs text-gray-400">—</span>
+        ),
+    },
+    {
       key: "status",
       header: "Statut",
       render: (item) => <CatalogItemStatusBadge isArchived={item.isArchived} />,

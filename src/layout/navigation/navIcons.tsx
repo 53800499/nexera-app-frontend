@@ -14,6 +14,7 @@ import {
   TaskIcon,
   UserIcon,
 } from "@/icons";
+import { TaxBadgeIcon } from "@/modules/fiscalite";
 import type { NavIconKey } from "./types";
 
 export const NAV_ICONS: Record<NavIconKey, React.ReactNode> = {
@@ -29,4 +30,5 @@ export const NAV_ICONS: Record<NavIconKey, React.ReactNode> = {
   plug: <PlugInIcon />,
   user: <UserIcon />,
   lock: <LockIcon />,
+  tax: <TaxBadgeIcon />,
 };

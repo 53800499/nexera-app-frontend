@@ -52,6 +52,30 @@ export function CatalogItemDetailsCard({ item }: Props) {
         <Field label="Remise max.">
           {item.maxDiscountPct != null ? `${item.maxDiscountPct}%` : "—"}
         </Field>
+        {item.itemType === "product" ? (
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              Disponibilité Stock
+            </p>
+            <div className="mt-1 flex items-center gap-2">
+              <span
+                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                  (item.stockQuantity ?? 0) > 0
+                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                    : "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400"
+                }`}
+              >
+                {item.stockQuantity ?? 0} {item.unit}
+              </span>
+              <a
+                href={`/stock/articles/${item.id}`}
+                className="text-xs font-medium text-brand-600 hover:text-brand-700 hover:underline dark:text-brand-400"
+              >
+                Gérer en stock →
+              </a>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {item.description ? (

@@ -106,6 +106,7 @@ export interface TaxRegimeImposition {
   seuilChiffreAffairesMax?: number;
   obligationComptable: string;
   dateDebutValidite: string;
+  dateFinValidite?: string;
 }
 
 export interface TaxParametrePays {
@@ -119,7 +120,9 @@ export interface TaxParametrePays {
   valeurNumerique?: number | null;
   valeurTexte?: string | null;
   unite?: string;
+  sourceReglementaireId?: string;
   dateDebutValidite: string;
+  dateFinValidite?: string;
   sourceReglementaire?: TaxSourceReglementaire;
 }
 

@@ -17,6 +17,12 @@ import type {
   AdjustSoldeCongePayload,
   RhSoldeToutCompte,
   RhBulletinPaie,
+  RhBaremeIts,
+  RhBaremeItsTranche,
+  RhTauxChargeSociale,
+  RhBaremeAvantageNature,
+  RhParametrePays,
+  SimulationFiscalResult,
 } from "../types/rh.types";
 
 function normalizeArray<T>(res: any): T[] {
@@ -30,19 +36,144 @@ export const rhApi = {
   getDashboardSummary: () =>
     authorizedFetch<RhDashboardSummary>("/rh/dashboard"),
 
-  // ---------------- RÉFÉRENTIEL ----------------
+  // ---------------- RÉFÉRENTIEL & BARÈMES FISCAUX ----------------
   listPays: async () => {
     const res = await authorizedFetch<any>("/rh/referentiel/pays");
     return normalizeArray<RhPays>(res);
   },
-  listTaxBrackets: async (paysCode = "BJ") => {
-    const res = await authorizedFetch<any>(`/rh/referentiel/baremes-its?paysCode=${paysCode}`);
-    return normalizeArray<any>(res);
+
+  // Barèmes ITS
+  listTaxBrackets: async (paysCode = "BJ", includeExpired = true) => {
+    const res = await authorizedFetch<any>(
+      `/rh/referentiel/baremes-its?paysCode=${paysCode}&includeExpired=${includeExpired}`,
+    );
+    return normalizeArray<RhBaremeIts>(res);
   },
-  listSocialCharges: async (paysCode = "BJ") => {
-    const res = await authorizedFetch<any>(`/rh/referentiel/charges-sociales?paysCode=${paysCode}`);
-    return normalizeArray<any>(res);
+  getBaremeItsById: (id: string) =>
+    authorizedFetch<RhBaremeIts>(`/rh/referentiel/baremes-its/${id}`),
+  createBaremeIts: (payload: any) =>
+    authorizedFetch<RhBaremeIts>("/rh/referentiel/baremes-its", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateBaremeIts: (id: string, payload: any) =>
+    authorizedFetch<RhBaremeIts>(`/rh/referentiel/baremes-its/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteBaremeIts: (id: string) =>
+    authorizedFetch<any>(`/rh/referentiel/baremes-its/${id}`, {
+      method: "DELETE",
+    }),
+  duplicateBaremeIts: (id: string, payload: { nouveauLibelle: string; nouvelleDateDebut: string; nouvelleDateFin?: string }) =>
+    authorizedFetch<RhBaremeIts>(`/rh/referentiel/baremes-its/${id}/dupliquer`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  // Tranches du barème ITS
+  addBaremeTranche: (baremeId: string, payload: any) =>
+    authorizedFetch<RhBaremeItsTranche>(`/rh/referentiel/baremes-its/${baremeId}/tranches`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateBaremeTranche: (trancheId: string, payload: any) =>
+    authorizedFetch<RhBaremeItsTranche>(`/rh/referentiel/baremes-its/tranches/${trancheId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteBaremeTranche: (trancheId: string) =>
+    authorizedFetch<any>(`/rh/referentiel/baremes-its/tranches/${trancheId}`, {
+      method: "DELETE",
+    }),
+  replaceBaremeTranches: (baremeId: string, payload: { tranches: any[] }) =>
+    authorizedFetch<RhBaremeIts>(`/rh/referentiel/baremes-its/${baremeId}/tranches`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
+  // Cotisations Sociales & Patronales (CNSS, VPS)
+  listSocialCharges: async (paysCode = "BJ", includeInactive = false) => {
+    const res = await authorizedFetch<any>(
+      `/rh/referentiel/charges-sociales?paysCode=${paysCode}&includeInactive=${includeInactive}`,
+    );
+    return normalizeArray<RhTauxChargeSociale>(res);
   },
+  getSocialChargeById: (id: string) =>
+    authorizedFetch<RhTauxChargeSociale>(`/rh/referentiel/charges-sociales/${id}`),
+  createSocialCharge: (payload: any) =>
+    authorizedFetch<RhTauxChargeSociale>("/rh/referentiel/charges-sociales", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateSocialCharge: (id: string, payload: any) =>
+    authorizedFetch<RhTauxChargeSociale>(`/rh/referentiel/charges-sociales/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteSocialCharge: (id: string) =>
+    authorizedFetch<any>(`/rh/referentiel/charges-sociales/${id}`, {
+      method: "DELETE",
+    }),
+
+  // Avantages en Nature (CGI Bénin Art. 123)
+  listAvantagesNature: async (paysCode = "BJ") => {
+    const res = await authorizedFetch<any>(`/rh/referentiel/avantages-nature?paysCode=${paysCode}`);
+    return normalizeArray<RhBaremeAvantageNature>(res);
+  },
+  createAvantageNature: (payload: any) =>
+    authorizedFetch<RhBaremeAvantageNature>("/rh/referentiel/avantages-nature", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateAvantageNature: (id: string, payload: any) =>
+    authorizedFetch<RhBaremeAvantageNature>(`/rh/referentiel/avantages-nature/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteAvantageNature: (id: string) =>
+    authorizedFetch<any>(`/rh/referentiel/avantages-nature/${id}`, {
+      method: "DELETE",
+    }),
+
+  // Paramètres Légaux & Seuils Nationaux
+  listCountryParams: async (paysCode = "BJ") => {
+    const res = await authorizedFetch<any>(`/rh/referentiel/parametres?paysCode=${paysCode}`);
+    return normalizeArray<RhParametrePays>(res);
+  },
+  createCountryParam: (payload: any) =>
+    authorizedFetch<RhParametrePays>("/rh/referentiel/parametres", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateCountryParam: (id: string, payload: any) =>
+    authorizedFetch<RhParametrePays>(`/rh/referentiel/parametres/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteCountryParam: (id: string) =>
+    authorizedFetch<any>(`/rh/referentiel/parametres/${id}`, {
+      method: "DELETE",
+    }),
+
+  // Simulateur Fiscal & Social en direct
+  simulateFiscalCalculation: (payload: {
+    salaireBrut?: number;
+    salaireNetImposable?: number;
+    baremeItsId?: string;
+    paysCode?: string;
+    mois?: number;
+    inclureCnss?: boolean;
+    inclureVps?: boolean;
+    inclureOrtb?: boolean;
+    tauxVps?: number;
+  }) =>
+    authorizedFetch<SimulationFiscalResult>("/rh/referentiel/simulateur-fiscal", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  // Jours fériés & Conventions
   listHolidays: async (paysCode = "BJ", annee = 2026) => {
     const res = await authorizedFetch<any>(`/rh/referentiel/jours-feries?paysCode=${paysCode}&annee=${annee}`);
     return normalizeArray<any>(res);

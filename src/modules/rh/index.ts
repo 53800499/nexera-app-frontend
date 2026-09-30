@@ -12,6 +12,7 @@ export { default as SoldeToutComptePage } from "./pages/SoldeToutComptePage";
 export { default as DeclarationsFiscalesPage } from "./pages/DeclarationsFiscalesPage";
 export { default as EcrituresComptablesPaiePage } from "./pages/EcrituresComptablesPaiePage";
 export { default as ParametresRhPage } from "./pages/ParametresRhPage";
+export * from "./components/BaremesFiscauxParamView";
 
 // Hooks
 export * from "./hooks/useRhAccess";

@@ -53,10 +53,28 @@ export const fiscaliteApi = {
     secteurActivite?: string;
     tauxDefaut?: number;
     dateDebutValidite: string;
+    dateFinValidite?: string;
   }) =>
     authorizedFetch<TaxBareme>("/fiscalite/referentiel/baremes", {
       method: "POST",
       body: JSON.stringify(data),
+    }),
+
+  updateBareme: (baremeId: string, data: Partial<TaxBareme>) =>
+    authorizedFetch<TaxBareme>(`/fiscalite/referentiel/baremes/${baremeId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  duplicateBareme: (baremeId: string, dateDebutValidite?: string) =>
+    authorizedFetch<TaxBareme>(`/fiscalite/referentiel/baremes/${baremeId}/dupliquer`, {
+      method: "POST",
+      body: JSON.stringify({ dateDebutValidite }),
+    }),
+
+  deleteBareme: (baremeId: string) =>
+    authorizedFetch<{ success: boolean; message: string }>(`/fiscalite/referentiel/baremes/${baremeId}`, {
+      method: "DELETE",
     }),
 
   validerBareme: (baremeId: string, aNecessiteRecalculRetroactif = false) =>
@@ -85,6 +103,17 @@ export const fiscaliteApi = {
       body: JSON.stringify(data),
     }),
 
+  updateSource: (sourceId: string, data: Partial<TaxSourceReglementaire>) =>
+    authorizedFetch<TaxSourceReglementaire>(`/fiscalite/referentiel/sources/${sourceId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteSource: (sourceId: string) =>
+    authorizedFetch<{ success: boolean; message: string }>(`/fiscalite/referentiel/sources/${sourceId}`, {
+      method: "DELETE",
+    }),
+
   qualifierSource: (sourceId: string, data: { statutVeille: string; resume?: string }) =>
     authorizedFetch<TaxSourceReglementaire>(`/fiscalite/referentiel/sources/${sourceId}/qualifier`, {
       method: "PUT",
@@ -96,10 +125,44 @@ export const fiscaliteApi = {
     return normalizeArray<TaxParametrePays>(res);
   },
 
+  createParametre: (data: Partial<TaxParametrePays>) =>
+    authorizedFetch<TaxParametrePays>("/fiscalite/referentiel/parametres", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateParametre: (paramId: string, data: Partial<TaxParametrePays>) =>
+    authorizedFetch<TaxParametrePays>(`/fiscalite/referentiel/parametres/${paramId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteParametre: (paramId: string) =>
+    authorizedFetch<{ success: boolean; message: string }>(`/fiscalite/referentiel/parametres/${paramId}`, {
+      method: "DELETE",
+    }),
+
   listRegimes: async (paysCode = "BJ") => {
     const res = await authorizedFetch<any>(`/fiscalite/referentiel/regimes?paysCode=${paysCode}`);
     return normalizeArray<TaxRegimeImposition>(res);
   },
+
+  createRegime: (data: Partial<TaxRegimeImposition>) =>
+    authorizedFetch<TaxRegimeImposition>("/fiscalite/referentiel/regimes", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateRegime: (regimeId: string, data: Partial<TaxRegimeImposition>) =>
+    authorizedFetch<TaxRegimeImposition>(`/fiscalite/referentiel/regimes/${regimeId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteRegime: (regimeId: string) =>
+    authorizedFetch<{ success: boolean; message: string }>(`/fiscalite/referentiel/regimes/${regimeId}`, {
+      method: "DELETE",
+    }),
 
   // ---------------- CONTRIBUABLE ----------------
   getMonProfil: () =>
@@ -240,6 +303,36 @@ export const fiscaliteApi = {
       body: JSON.stringify(data),
     }),
 
+  createDeclarationGenerique: (data: {
+    taxContribuableId: string;
+    taxTypeId: string;
+    periodeOuExercice: string;
+    baseImposable?: number;
+    montantCalcule: number;
+    dateLimiteLegale: string;
+    libelleLigne?: string;
+  }) => fiscaliteApi.creerDeclarationGenerique(data),
+
+  validerDeclarationGenerique: (id: string) =>
+    authorizedFetch<TaxDeclarationGenerique>(`/fiscalite/autres-taxes/declarations/${id}/valider`, {
+      method: "PUT",
+    }),
+
+  declarerDeclarationGenerique: (id: string) =>
+    authorizedFetch<TaxDeclarationGenerique>(`/fiscalite/autres-taxes/declarations/${id}/declarer`, {
+      method: "PUT",
+    }),
+
+  marquerPayeeDeclarationGenerique: (id: string) =>
+    authorizedFetch<TaxDeclarationGenerique>(`/fiscalite/autres-taxes/declarations/${id}/payer`, {
+      method: "PUT",
+    }),
+
+  supprimerDeclarationGenerique: (id: string) =>
+    authorizedFetch<{ success: boolean; message: string }>(`/fiscalite/autres-taxes/declarations/${id}`, {
+      method: "DELETE",
+    }),
+
   // ---------------- LIASSE FISCALE ----------------
   getLiasse: (exerciceId: string) =>
     authorizedFetch<any>(`/fiscalite/liasse-fiscale/exercice/${exerciceId}`),
@@ -316,6 +409,15 @@ export const fiscaliteApi = {
       body: JSON.stringify(data),
     }),
 
+  createControle: (data: {
+    taxContribuableId: string;
+    typeControle: string;
+    dateAvisVerification?: string;
+    periodeControleeDebut?: string;
+    periodeControleeFin?: string;
+    serviceEnCharge?: string;
+  }) => fiscaliteApi.creerControle(data),
+
   notifierRedressement: (controleId: string, data: {
     taxTypeId: string;
     exerciceOuPeriodeConcerne: string;
@@ -344,4 +446,12 @@ export const fiscaliteApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  createRecours: (data: {
+    taxContribuableId: string;
+    redressementId?: string;
+    typeRecours: string;
+    dateDepot: string;
+    objet: string;
+  }) => fiscaliteApi.introduireRecours(data),
 };

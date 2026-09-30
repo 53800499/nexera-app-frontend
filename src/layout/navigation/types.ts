@@ -12,7 +12,8 @@ export type NavIconKey =
   | "chart"
   | "plug"
   | "user"
-  | "lock";
+  | "lock"
+  | "tax";
 
 export type NavItemConfig<T = NavPermissions> = {
   id: string;

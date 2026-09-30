@@ -103,10 +103,10 @@ export const MAIN_NAV_CONFIG: NavItemConfig[] = [
       { name: "Paramètres & Politiques", path: "/notes-frais/parametres" },
     ],
   },
-  /* {
+  {
     id: "fiscalite",
     name: "Fiscalité",
-    iconKey: "file",
+    iconKey: "tax",
     path: "/fiscalite",
     canAccess: (p) => p.fiscalite,
     subItems: [
@@ -121,7 +121,7 @@ export const MAIN_NAV_CONFIG: NavItemConfig[] = [
       { name: "Contrôles & Contentieux", path: "/fiscalite/controles" },
       { name: "Veille & Référentiel", path: "/fiscalite/veille" },
     ],
-  }, */
+  },
   {
     id: "relances",
     name: "Relances",

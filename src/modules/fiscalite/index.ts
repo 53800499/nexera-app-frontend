@@ -10,3 +10,4 @@ export * from "./components/LiasseFiscaleView";
 export * from "./components/FecExportView";
 export * from "./components/ControlesContentieuxView";
 export * from "./components/VeilleReferentielView";
+export * from "./components/FiscaliteIcons";

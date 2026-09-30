@@ -52,15 +52,20 @@ export const MesDepensesView: React.FC = () => {
   const [arrivee, setArrivee] = useState("Porto-Novo");
   const [distanceKm, setDistanceKm] = useState<number>(35);
   const [puissanceFiscale, setPuissanceFiscale] = useState<number>(6);
+  const [typeVehiculeKm, setTypeVehiculeKm] = useState<"VOITURE" | "MOTO">("VOITURE");
+  const [calculatedBaremeKmInfo, setCalculatedBaremeKmInfo] = useState<string>("");
+  const [appliedBaremeKmId, setAppliedBaremeKmId] = useState<string>("");
 
   // Per Diem State
   const [nombreJours, setNombreJours] = useState<number>(1);
-  const [zoneGeo, setZoneGeo] = useState("Cotonou et Grand Nokoué");
+  const [zoneGeo, setZoneGeo] = useState("Cotonou & Grand Nokoué (Littoral / Atlantique)");
+  const [calculatedPerDiemInfo, setCalculatedPerDiemInfo] = useState<string>("");
+  const [appliedBaremePerDiemId, setAppliedBaremePerDiemId] = useState<string>("");
 
   // OCR Simulator
   const handleOcrScan = async (fileUrl: string) => {
     try {
-      const res = await scannerJustificatif({ fichierUrl: fileUrl, typeFichier: "IMAGE" });
+      const res: any = await scannerJustificatif({ fichierUrl: fileUrl, typeFichier: "IMAGE" });
       setMontantTtc(res.montantTtc);
       setMontantTva(res.montantTva);
       setTauxTva(res.tauxTva);
@@ -81,11 +86,15 @@ export const MesDepensesView: React.FC = () => {
       const res = await ndfApi.calculerIndemniteKm({
         distanceKm,
         puissanceFiscale,
-        typeVehicule: "VOITURE",
+        typeVehicule: typeVehiculeKm,
         paysCode: "BJ",
       });
       setMontantTtc(res.montantTotal);
-      setFournisseur(`Trajet ${depart} → ${arrivee} (${distanceKm} km)`);
+      setAppliedBaremeKmId(res.baremeKilometriqueId);
+      setCalculatedBaremeKmInfo(
+        `${res.tauxParKm} FCFA/km selon barème officiel Bénin 2026 (${res.texteReference || "CGI Bénin 2026"})`,
+      );
+      setFournisseur(`Trajet ${depart} → ${arrivee} (${distanceKm} km, ${puissanceFiscale} CV)`);
     } catch (err) {
       console.error(err);
     }
@@ -99,7 +108,11 @@ export const MesDepensesView: React.FC = () => {
         paysCode: "BJ",
       });
       setMontantTtc(res.montantTotal);
-      setFournisseur(`Per Diem ${zoneGeo} (${nombreJours} j)`);
+      setAppliedBaremePerDiemId(res.baremePerDiemId);
+      setCalculatedPerDiemInfo(
+        `${formatCurrency(res.montantJour)}/j • Restauration: ${res.couvreRestauration ? "Oui" : "Non"} • Hébergement: ${res.couvreHebergement ? "Oui" : "Non"}`,
+      );
+      setFournisseur(`Mission ${res.zoneGeographique} (${nombreJours} ${nombreJours > 1 ? "jours" : "jour"})`);
     } catch (err) {
       console.error(err);
     }
@@ -123,21 +136,34 @@ export const MesDepensesView: React.FC = () => {
     };
 
     if (typeSaisie === "KILOMETRIQUE" && baremesKm.length > 0) {
-      const bKm = baremesKm[0];
+      const matchedBareme =
+        baremesKm.find((b) => b.id === appliedBaremeKmId) ||
+        baremesKm.find(
+          (b) =>
+            b.typeVehicule === typeVehiculeKm &&
+            puissanceFiscale >= b.puissanceFiscaleMin &&
+            (b.puissanceFiscaleMax == null || puissanceFiscale <= (b.puissanceFiscaleMax ?? Infinity)),
+        ) ||
+        baremesKm[0];
+
       payload.depenseKilometrique = {
         trajetDepart: depart,
         trajetArrivee: arrivee,
         distanceKm: Number(distanceKm),
         puissanceFiscaleVehicule: Number(puissanceFiscale),
-        baremeKilometriqueId: bKm.id,
+        baremeKilometriqueId: matchedBareme.id,
       };
     }
 
     if (typeSaisie === "PER_DIEM" && baremesPerDiem.length > 0) {
-      const bPd = baremesPerDiem[0];
+      const matchedBareme =
+        baremesPerDiem.find((b) => b.id === appliedBaremePerDiemId) ||
+        baremesPerDiem.find((b) => b.zoneGeographique === zoneGeo) ||
+        baremesPerDiem[0];
+
       payload.depensePerDiem = {
         nombreJours: Number(nombreJours),
-        baremePerDiemId: bPd.id,
+        baremePerDiemId: matchedBareme.id,
       };
     }
 
@@ -254,10 +280,40 @@ export const MesDepensesView: React.FC = () => {
                       {new Date(dep.dateDepense).toLocaleDateString("fr-FR")}
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                      {dep.categorieDepense?.libelle || "Frais"}
+                      <div className="flex items-center gap-1.5">
+                        {dep.depenseKilometrique ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                            <IconCar className="size-3" />
+                            Indemnité Km
+                          </span>
+                        ) : dep.depensePerDiem ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            <IconHotel className="size-3" />
+                            Per Diem
+                          </span>
+                        ) : (
+                          <span>{dep.categorieDepense?.libelle || "Frais"}</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
-                      {dep.fournisseurLibelle || "—"}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col">
+                        <span className="text-gray-900 dark:text-white font-medium">
+                          {dep.fournisseurLibelle || "—"}
+                        </span>
+                        {dep.depenseKilometrique && (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-brand-600 dark:text-brand-400">
+                            <IconCar className="size-3 shrink-0" />
+                            {dep.depenseKilometrique.trajetDepart} → {dep.depenseKilometrique.trajetArrivee} ({dep.depenseKilometrique.distanceKm} km • {dep.depenseKilometrique.puissanceFiscaleVehicule} CV)
+                          </span>
+                        )}
+                        {dep.depensePerDiem && (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+                            <IconHotel className="size-3 shrink-0" />
+                            Mission forfaitaire : {dep.depensePerDiem.nombreJours} {dep.depensePerDiem.nombreJours > 1 ? "jours" : "jour"}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
                       {formatCurrency(dep.montantTtc)}
@@ -465,99 +521,139 @@ export const MesDepensesView: React.FC = () => {
               </div>
 
               {typeSaisie === "KILOMETRIQUE" ? (
-                <div className="grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-800/50">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Départ
-                    </label>
-                    <input
-                      type="text"
-                      value={depart}
-                      onChange={(e) => setDepart(e.target.value)}
-                      className="mt-1 w-full rounded border border-gray-300 p-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                    />
+                <div className="space-y-3 rounded-lg bg-gray-50 p-3.5 dark:bg-gray-800/50">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Type de Véhicule
+                      </label>
+                      <select
+                        value={typeVehiculeKm}
+                        onChange={(e: any) => setTypeVehiculeKm(e.target.value)}
+                        className="mt-1 w-full rounded border border-gray-300 p-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      >
+                        <option value="VOITURE">Voiture Particulière</option>
+                        <option value="MOTO">Moto / 2 Roues</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Puissance Fiscale (CV)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={puissanceFiscale}
+                        onChange={(e) => setPuissanceFiscale(Number(e.target.value))}
+                        className="mt-1 w-full rounded border border-gray-300 p-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Ville de Départ
+                      </label>
+                      <input
+                        type="text"
+                        value={depart}
+                        onChange={(e) => setDepart(e.target.value)}
+                        placeholder="Ex: Cotonou"
+                        className="mt-1 w-full rounded border border-gray-300 p-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Ville d'Arrivée
+                      </label>
+                      <input
+                        type="text"
+                        value={arrivee}
+                        onChange={(e) => setArrivee(e.target.value)}
+                        placeholder="Ex: Porto-Novo"
+                        className="mt-1 w-full rounded border border-gray-300 p-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Distance Parcourue (km)
+                      </label>
+                      <input
+                        type="number"
+                        min={0.1}
+                        step={0.1}
+                        value={distanceKm}
+                        onChange={(e) => setDistanceKm(Number(e.target.value))}
+                        className="mt-1 w-full rounded border border-gray-300 p-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Arrivée
-                    </label>
-                    <input
-                      type="text"
-                      value={arrivee}
-                      onChange={(e) => setArrivee(e.target.value)}
-                      className="mt-1 w-full rounded border border-gray-300 p-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Distance (km)
-                    </label>
-                    <input
-                      type="number"
-                      value={distanceKm}
-                      onChange={(e) => setDistanceKm(Number(e.target.value))}
-                      className="mt-1 w-full rounded border border-gray-300 p-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Puissance (CV)
-                    </label>
-                    <input
-                      type="number"
-                      value={puissanceFiscale}
-                      onChange={(e) => setPuissanceFiscale(Number(e.target.value))}
-                      className="mt-1 w-full rounded border border-gray-300 p-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <button
-                      type="button"
-                      onClick={handleCalculerKm}
-                      className="w-full rounded bg-gray-200 py-1 text-xs font-semibold text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200"
-                    >
-                      Calculer indemnité kilométrique (Barème Bénin 2026)
-                    </button>
-                  </div>
+
+                  {calculatedBaremeKmInfo && (
+                    <div className="rounded border border-brand-200 bg-brand-50/70 p-2 text-[11px] font-medium text-brand-900 dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-300">
+                      ✓ {calculatedBaremeKmInfo}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleCalculerKm}
+                    className="w-full rounded bg-brand-500 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 shadow transition"
+                  >
+                    Calculer indemnité kilométrique (Barème Bénin 2026)
+                  </button>
                 </div>
               ) : typeSaisie === "PER_DIEM" ? (
-                <div className="grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-800/50">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Nombre de jours
-                    </label>
-                    <input
-                      type="number"
-                      value={nombreJours}
-                      onChange={(e) => setNombreJours(Number(e.target.value))}
-                      className="mt-1 w-full rounded border border-gray-300 p-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                    />
+                <div className="space-y-3 rounded-lg bg-gray-50 p-3.5 dark:bg-gray-800/50">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Nombre de jours de mission
+                      </label>
+                      <input
+                        type="number"
+                        min={0.5}
+                        step={0.5}
+                        value={nombreJours}
+                        onChange={(e) => setNombreJours(Number(e.target.value))}
+                        className="mt-1 w-full rounded border border-gray-300 p-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Zone Géographique de Mission
+                      </label>
+                      <select
+                        value={zoneGeo}
+                        onChange={(e) => {
+                          setZoneGeo(e.target.value);
+                          const matched = baremesPerDiem.find((b) => b.zoneGeographique === e.target.value);
+                          if (matched) {
+                            setAppliedBaremePerDiemId(matched.id);
+                          }
+                        }}
+                        className="mt-1 w-full rounded border border-gray-300 p-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      >
+                        {baremesPerDiem.map((b) => (
+                          <option key={b.id} value={b.zoneGeographique}>
+                            {b.zoneGeographique} ({formatCurrency(b.montantJour)}/j)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Zone Géographique
-                    </label>
-                    <select
-                      value={zoneGeo}
-                      onChange={(e) => setZoneGeo(e.target.value)}
-                      className="mt-1 w-full rounded border border-gray-300 p-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                    >
-                      {baremesPerDiem.map((b) => (
-                        <option key={b.id} value={b.zoneGeographique}>
-                          {b.zoneGeographique} ({formatCurrency(b.montantJour)}/j)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <button
-                      type="button"
-                      onClick={handleCalculerPerDiem}
-                      className="w-full rounded bg-gray-200 py-1 text-xs font-semibold text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200"
-                    >
-                      Calculer forfait journalier
-                    </button>
-                  </div>
+
+                  {calculatedPerDiemInfo && (
+                    <div className="rounded border border-emerald-200 bg-emerald-50/70 p-2 text-[11px] font-medium text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                      ✓ {calculatedPerDiemInfo}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleCalculerPerDiem}
+                    className="w-full rounded bg-emerald-600 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow transition"
+                  >
+                    Calculer forfait journalier Per Diem
+                  </button>
                 </div>
               ) : null}
 

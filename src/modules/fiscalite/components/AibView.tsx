@@ -4,8 +4,14 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { fiscaliteApi } from "../services/fiscaliteApi.service";
 import type { TaxContribuable, TaxRetenueAib } from "../types/fiscalite.types";
+import { WithholdingTaxIcon, PrinterIcon } from "./FiscaliteIcons";
+import { ChevronLeftIcon, DocsIcon } from "@/icons";
+import { useFiscalitePdf } from "../pdf";
+import { FormErrorAlert, useFormError } from "./FormErrorAlert";
 
 export const AibView: React.FC = () => {
+  const { isExporting, exportAib } = useFiscalitePdf();
+  const { error: simError, captureError: captureSimError, clearError: clearSimError } = useFormError();
   const [contribuable, setContribuable] = useState<TaxContribuable | null>(null);
   const [retenues, setRetenues] = useState<TaxRetenueAib[]>([]);
   const [recap, setRecap] = useState<any>(null);
@@ -13,8 +19,12 @@ export const AibView: React.FC = () => {
 
   // Simulateur AIB
   const [simBase, setSimBase] = useState<number>(5000000);
-  const [simNature, setSimNature] = useState<string>("PRESTATION_SERVICES");
+  const [simNature, setSimNature] = useState<string>("PRESTATION_SERVICE_IFU");
   const [simResult, setSimResult] = useState<any>(null);
+
+  // Filtres et recherche
+  const [filterSens, setFilterSens] = useState<"ALL" | "SUBIE" | "OPERE">("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const loadData = async () => {
     setIsLoading(true);
@@ -39,17 +49,19 @@ export const AibView: React.FC = () => {
   useEffect(() => {
     loadData();
     // Simulateur initial
-    handleSimulate(5000000, "PRESTATION_SERVICES");
+    handleSimulate(5000000, "PRESTATION_SERVICE_IFU");
   }, []);
 
   const handleSimulate = async (base: number, nature: string) => {
+    clearSimError();
     try {
       const res = await fiscaliteApi.simulerAib({
         base,
         natureOperation: nature,
       });
       setSimResult(res);
-    } catch (e) {
+    } catch (e: any) {
+      captureSimError(e);
       console.error(e);
     }
   };
@@ -61,14 +73,31 @@ export const AibView: React.FC = () => {
       maximumFractionDigits: 0,
     }).format(val || 0);
 
+  const countSubies = retenues.filter((r) => r.natureAib ? r.natureAib === "SUBIE" : (r.imputableIs ?? true)).length;
+  const countOperes = retenues.filter((r) => r.natureAib ? r.natureAib === "OPERE" : !(r.imputableIs ?? true)).length;
+
+  const filteredRetenues = retenues.filter((r) => {
+    const isSubie = r.natureAib ? r.natureAib === "SUBIE" : (r.imputableIs ?? true);
+    if (filterSens === "SUBIE" && !isSubie) return false;
+    if (filterSens === "OPERE" && isSubie) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchNom = (r.tiersNom || "").toLowerCase().includes(q);
+      const matchIfu = (r.tiersIfu || "").toLowerCase().includes(q);
+      const matchNature = (r.natureOperation || "").toLowerCase().includes(q);
+      if (!matchNom && !matchIfu && !matchNature) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 dark:border-gray-800 pb-5">
         <div>
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 font-bold text-lg">
-              AIB
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 font-bold">
+              <WithholdingTaxIcon className="h-5 w-5" />
             </span>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               AIB &amp; Retenues à la Source
@@ -79,17 +108,12 @@ export const AibView: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/fiscalite"
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-          >
-            ← Tableau de Bord
-          </Link>
           <button
             onClick={() => window.print()}
-            className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300 transition"
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300 transition shadow-sm"
           >
-            🖨 Imprimer Récapitulatif
+            <PrinterIcon className="h-4 w-4 shrink-0" />
+            <span>Imprimer Récapitulatif</span>
           </button>
         </div>
       </div>
@@ -141,6 +165,8 @@ export const AibView: React.FC = () => {
             Simulateur de Retenue AIB
           </h2>
 
+          <FormErrorAlert error={simError} onClose={clearSimError} />
+
           <div>
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
               Nature de l&apos;opération
@@ -153,9 +179,10 @@ export const AibView: React.FC = () => {
               }}
               className="w-full rounded-lg border border-gray-300 p-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white"
             >
-              <option value="PRESTATION_SERVICES">Prestations de services (5%)</option>
-              <option value="VENTE_BIENS">Vente / Achat de marchandises (1%)</option>
-              <option value="NON_IMMATRICULE">Fournisseur non-immatriculé (5%)</option>
+              <option value="PRESTATION_SERVICE_IFU">Prestations de services – Fournisseur IFU (5%)</option>
+              <option value="ACHAT_COMMERCIAL_IFU">Achat de marchandises – Fournisseur IFU (1%)</option>
+              <option value="ACHAT_NON_IMMATRICULE">Fournisseur non-immatriculé (5%)</option>
+              <option value="IMPORTATION">Importation (1%)</option>
             </select>
           </div>
 
@@ -203,22 +230,83 @@ export const AibView: React.FC = () => {
 
         {/* Tableau des Retenues */}
         <div className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-800/80 space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-3">
-            <h2 className="text-base font-bold text-gray-900 dark:text-white">
-              Registre des Retenues AIB Opérées &amp; Subies
-            </h2>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-              {retenues.length} ligne(s)
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-100 dark:border-gray-700 pb-3">
+            <div>
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                Registre des Retenues AIB Opérées &amp; Subies
+              </h2>
+              <p className="text-xs text-gray-500">
+                {filteredRetenues.length} sur {retenues.length} ligne(s) affichée(s)
+              </p>
+            </div>
+
+            {/* Filtres par sens */}
+            <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-700/60 p-1 rounded-lg text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setFilterSens("ALL")}
+                className={`px-2.5 py-1 rounded-md transition ${
+                  filterSens === "ALL"
+                    ? "bg-white text-gray-900 dark:bg-gray-800 dark:text-white shadow-sm"
+                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900"
+                }`}
+              >
+                Toutes ({retenues.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterSens("SUBIE")}
+                className={`px-2.5 py-1 rounded-md transition ${
+                  filterSens === "SUBIE"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900"
+                }`}
+              >
+                Subies ({countSubies})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterSens("OPERE")}
+                className={`px-2.5 py-1 rounded-md transition ${
+                  filterSens === "OPERE"
+                    ? "bg-amber-600 text-white shadow-sm"
+                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900"
+                }`}
+              >
+                Opérées ({countOperes})
+              </button>
+            </div>
+          </div>
+
+          {/* Recherche */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher par Tiers, IFU, ou nature d'opération..."
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs placeholder-gray-400 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1"
+              >
+                Effacer
+              </button>
+            )}
           </div>
 
           {isLoading ? (
             <div className="flex h-48 items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-600 border-t-transparent" />
             </div>
-          ) : retenues.length === 0 ? (
+          ) : filteredRetenues.length === 0 ? (
             <div className="py-12 text-center text-sm text-gray-500 dark:text-gray-400 border border-dashed rounded-xl">
-              Aucune retenue AIB enregistrée. Les événements d&apos;achats et de ventes avec retenue s&apos;afficheront ici automatiquement.
+              {searchQuery || filterSens !== "ALL"
+                ? "Aucune retenue ne correspond aux critères de filtre sélectionnés."
+                : "Aucune retenue AIB enregistrée. Les événements d'achats et de ventes avec retenue s'afficheront ici automatiquement."}
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
@@ -231,10 +319,11 @@ export const AibView: React.FC = () => {
                     <th className="px-3 py-2.5 text-right font-semibold text-gray-600 dark:text-gray-300">Base Brut</th>
                     <th className="px-3 py-2.5 text-right font-semibold text-gray-600 dark:text-gray-300">Montant AIB</th>
                     <th className="px-3 py-2.5 text-center font-semibold text-gray-600 dark:text-gray-300">Statut</th>
+                    <th className="px-3 py-2.5 text-center font-semibold text-gray-600 dark:text-gray-300">Attestation</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60 bg-white dark:bg-gray-800/60">
-                  {retenues.map((r) => {
+                  {filteredRetenues.map((r) => {
                     const isSubie = r.natureAib ? r.natureAib === "SUBIE" : (r.imputableIs ?? true);
                     return (
                       <tr key={r.id}>
@@ -276,6 +365,29 @@ export const AibView: React.FC = () => {
                           <span className="text-[11px] px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                             {r.statut || r.periodeDeclarative || "VALIDE"}
                           </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => exportAib(r, contribuable, "download")}
+                              disabled={isExporting}
+                              className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 shadow-sm"
+                              title="Télécharger l'attestation de retenue AIB en PDF"
+                            >
+                              <DocsIcon className="h-3 w-3 text-amber-600" />
+                              <span>Attestation</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => exportAib(r, contribuable, "preview")}
+                              disabled={isExporting}
+                              className="inline-flex items-center rounded border border-gray-200 bg-white px-1.5 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                              title="Aperçu dans un nouvel onglet"
+                            >
+                              <span>Aperçu</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

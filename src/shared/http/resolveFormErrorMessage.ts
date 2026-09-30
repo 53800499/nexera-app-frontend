@@ -1,6 +1,7 @@
 import { ApiValidationError } from "@/shared/core/ApiValidationError";
 import { AppError } from "@/shared/core/AppError";
 import { isOfflineError } from "@/shared/core/OfflineError";
+import { isBrowserOnline } from "@/shared/hooks/useNetworkStatus";
 
 const BUSINESS_MESSAGE_PATTERNS: { pattern: RegExp; message: string }[] = [
   {
@@ -46,7 +47,8 @@ const BUSINESS_MESSAGE_PATTERNS: { pattern: RegExp; message: string }[] = [
       "Ce document est expiré et ne peut plus être envoyé ni modifié.",
   },
   {
-    pattern: /offline|connexion requise|network|fetch failed|failed to fetch/i,
+    pattern:
+      /^(offline|connexion requise|network error|failed to fetch)$|err_internet_disconnected/i,
     message:
       "Connexion requise. Vérifiez votre réseau ou réessayez une fois en ligne.",
   },
@@ -251,6 +253,23 @@ function humanizeBusinessMessage(message: string): string {
   const trimmed = message.trim();
   if (!trimmed) return message;
 
+  // Si c'est du JSON brut retourné par l'API externe DGI (RFC 7235 / Unauthorized)
+  if (
+    trimmed.includes("tools.ietf.org/html/rfc7235") ||
+    (trimmed.includes("Unauthorized") && trimmed.includes("{"))
+  ) {
+    return "Authentification DGI refusée (401 Non autorisé). Votre clé API e-MECeF est invalide ou n'est pas autorisée pour votre NIM / IFU. Vérifiez vos accès dans Paramètres → Facturation e-MECeF.";
+  }
+
+  // Préserver les messages spécifiques de certification e-MECeF / DGI pour éviter de les masquer en erreur réseau
+  if (/e-?mecef|dgi|sygmef|certification fiscale|normalisation fiscale/i.test(trimmed)) {
+    // Correction de l'affichage si une date future était annotée "expiré"
+    return trimmed.replace(
+      /\(jeton expiré le (\d{2}\/\d{2}\/(?:202[6-9]|20[3-9]\d)[^)]*)\)/gi,
+      "(clé valide jusqu'au $1)",
+    );
+  }
+
   for (const { pattern, message: text } of BUSINESS_MESSAGE_PATTERNS) {
     if (pattern.test(trimmed)) return text;
   }
@@ -271,7 +290,9 @@ export function resolveFormErrorMessage(error: unknown): string {
   }
 
   if (isOfflineError(error)) {
-    return "Connexion requise. Vérifiez votre réseau ou réessayez une fois en ligne.";
+    return isBrowserOnline()
+      ? "Le serveur est temporairement inaccessible. Vérifiez votre connexion ou réessayez dans quelques instants."
+      : "Connexion requise. Vérifiez votre réseau ou réessayez une fois en ligne.";
   }
 
   if (error instanceof AppError) {

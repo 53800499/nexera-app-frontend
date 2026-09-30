@@ -81,10 +81,43 @@ export const ndfApi = {
     return normalizeArray<NdfBaremeKilometrique>(res);
   },
 
+  createBaremeKm: (data: {
+    paysCode?: string;
+    puissanceFiscaleMin: number;
+    puissanceFiscaleMax?: number | null;
+    typeVehicule?: string;
+    tauxParKm: number;
+    deviseCode?: string;
+    dateDebutValidite: string;
+    dateFinValidite?: string | null;
+    texteReference?: string;
+  }) =>
+    authorizedFetch<NdfBaremeKilometrique>("/notes-frais/referentiel/baremes-km", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateBaremeKm: (id: string, data: Partial<NdfBaremeKilometrique>) =>
+    authorizedFetch<NdfBaremeKilometrique>(`/notes-frais/referentiel/baremes-km/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteBaremeKm: (id: string) =>
+    authorizedFetch<{ success: boolean }>(`/notes-frais/referentiel/baremes-km/${id}`, {
+      method: "DELETE",
+    }),
+
+  seedBaremesKmOfficielBenin: () =>
+    authorizedFetch<NdfBaremeKilometrique[]>("/notes-frais/referentiel/baremes-km/seed-officiel-benin", {
+      method: "POST",
+    }),
+
   calculerIndemniteKm: (data: { distanceKm: number; puissanceFiscale: number; typeVehicule?: string; paysCode?: string }) =>
     authorizedFetch<{
       distanceKm: number;
       puissanceFiscale: number;
+      typeVehicule?: string;
       tauxParKm: number;
       deviseCode: string;
       montantTotal: number;
@@ -99,6 +132,38 @@ export const ndfApi = {
     const res = await authorizedFetch<any>(`/notes-frais/referentiel/baremes-per-diem?paysCode=${paysCode}`);
     return normalizeArray<NdfBaremePerDiem>(res);
   },
+
+  createBaremePerDiem: (data: {
+    paysCode?: string;
+    zoneGeographique: string;
+    categorieProfessionnelleLibelle?: string;
+    montantJour: number;
+    deviseCode?: string;
+    couvreHebergement?: boolean;
+    couvreRestauration?: boolean;
+    dateDebutValidite: string;
+    dateFinValidite?: string | null;
+  }) =>
+    authorizedFetch<NdfBaremePerDiem>("/notes-frais/referentiel/baremes-per-diem", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateBaremePerDiem: (id: string, data: Partial<NdfBaremePerDiem>) =>
+    authorizedFetch<NdfBaremePerDiem>(`/notes-frais/referentiel/baremes-per-diem/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteBaremePerDiem: (id: string) =>
+    authorizedFetch<{ success: boolean }>(`/notes-frais/referentiel/baremes-per-diem/${id}`, {
+      method: "DELETE",
+    }),
+
+  seedBaremesPerDiemOfficielBenin: () =>
+    authorizedFetch<NdfBaremePerDiem[]>("/notes-frais/referentiel/baremes-per-diem/seed-officiel-benin", {
+      method: "POST",
+    }),
 
   calculerPerDiem: (data: { nombreJours: number; zoneGeographique: string; paysCode?: string }) =>
     authorizedFetch<{

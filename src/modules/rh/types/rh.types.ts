@@ -661,3 +661,150 @@ export interface RhDashboardSummary {
     parDepartement: Array<{ departementId: string; libelle: string; count: number }>;
   };
 }
+
+// =========================================================================
+// BARÈMES FISCAUX, SOCIALES & SIMULATION
+// =========================================================================
+
+export type RhItsCalculationMode = "PROGRESSIF_PAR_TRANCHE" | "TAUX_UNIQUE" | "QUOTIENT_FAMILIAL";
+export type RhAssiettePeriodicity = "MENSUELLE" | "ANNUELLE";
+export type RhAssietteType = "SALAIRE_BRUT" | "SALAIRE_BRUT_PLAFONNE" | "SALAIRE_NET_IMPOSABLE" | "NET_A_PAYER" | "FORFAIT";
+export type RhSocialChargeShare = "SALARIALE" | "PATRONALE" | "MIXTE";
+export type RhBenefitInKindType = "LOGEMENT" | "VEHICULE" | "NOURRITURE" | "DOMESTIQUE" | "EAU_ELECTRICITE" | "TELEPHONE" | "AUTRE";
+export type RhCountryParamValueType = "NOMBRE" | "TEXTE" | "BOOLEEN" | "DATE" | "JSON";
+
+export interface RhBaremeItsTranche {
+  id: string;
+  baremeItsId: string;
+  numeroTranche: number;
+  limiteInferieure: number;
+  limiteSuperieure: number | null;
+  taux: number;
+  montantDeductionFixe: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RhBaremeIts {
+  id: string;
+  paysCode: string;
+  codeImpot: string;
+  libelle: string;
+  modeCalcul: RhItsCalculationMode;
+  periodiciteAssiette: RhAssiettePeriodicity;
+  dateDebutValidite: string;
+  dateFinValidite?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  tranches?: RhBaremeItsTranche[];
+  pays?: {
+    codeIso2: string;
+    libelle: string;
+    deviseCode: string;
+  };
+}
+
+export interface RhTauxChargeSociale {
+  id: string;
+  paysCode: string;
+  code: string;
+  libelle: string;
+  typeAssiette: RhAssietteType;
+  partSalariale: RhSocialChargeShare;
+  tauxSalarial: number;
+  tauxPatronal: number;
+  montantFixe?: number | null;
+  plafondMensuel?: number | null;
+  plancherMensuel?: number | null;
+  organismeCollecteur?: string | null;
+  dateDebutValidite: string;
+  dateFinValidite?: string | null;
+  actif: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RhBaremeAvantageNature {
+  id: string;
+  paysCode: string;
+  typeAvantage: RhBenefitInKindType;
+  tauxPourcentage?: number | null;
+  montantFixe?: number | null;
+  description?: string | null;
+  conditionsJson?: any;
+  dateDebutValidite: string;
+  dateFinValidite?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RhParametrePays {
+  id: string;
+  paysCode: string;
+  codeParametre: string;
+  libelle: string;
+  typeValeur: RhCountryParamValueType;
+  valeurTexte?: string | null;
+  valeurNumerique?: number | null;
+  valeurDate?: string | null;
+  valeurJson?: any;
+  dateDebutValidite: string;
+  dateFinValidite?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SimulationFiscalResult {
+  simulationDate: string;
+  baremeApplique: {
+    id: string;
+    libelle: string;
+    paysCode: string;
+    modeCalcul: string;
+  };
+  parametres: {
+    salaireBrut: number;
+    salaireNetImposable: number;
+    mois: number;
+    inclureCnss: boolean;
+    inclureVps: boolean;
+    inclureOrtb: boolean;
+    tauxVps: number;
+  };
+  decompositionIts: {
+    tranches: Array<{
+      numeroTranche: number;
+      limiteInferieure: number;
+      limiteSuperieure: number | null;
+      taux: number;
+      baseTaxable: number;
+      impotTranche: number;
+    }>;
+    totalIts: number;
+    tauxEffectifMoyen: number;
+  };
+  cotisationsSalariales: {
+    cnss: number;
+    tauxCnss: number;
+  };
+  redevanceOrtb: {
+    montant: number;
+    exoneree: boolean;
+    motif: string | null;
+  };
+  chargesPatronales: {
+    vps: number;
+    tauxVps: number;
+    cnss: number;
+    tauxCnssPatronale: number;
+    totalPatronal: number;
+  };
+  recapitulatif: {
+    salaireBrut: number;
+    totalRetenuesSalariales: number;
+    salaireNetEstime: number;
+    totalChargesPatronales: number;
+    coutGlobalEmployeur: number;
+  };
+}
+

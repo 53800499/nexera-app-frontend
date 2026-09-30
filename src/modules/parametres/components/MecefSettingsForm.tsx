@@ -26,6 +26,7 @@ export function MecefSettingsForm({
   const [apiUrl, setApiUrl] = useState(config.mecefApiUrl || config.apiUrl || "");
   const [apiKey, setApiKey] = useState("");
   const [nim, setNim] = useState(config.mecefNim || config.nim || "");
+  const [emitterIfu, setEmitterIfu] = useState(config.emitterIfu || "");
   const [environment, setEnvironment] = useState<"sandbox" | "production">(
     config.mecefEnvironment || config.environment || "sandbox",
   );
@@ -39,6 +40,7 @@ export function MecefSettingsForm({
   useEffect(() => {
     setApiUrl(config.mecefApiUrl || config.apiUrl || "");
     setNim(config.mecefNim || config.nim || "");
+    setEmitterIfu(config.emitterIfu || "");
     setEnvironment(config.mecefEnvironment || config.environment || "sandbox");
     setAutoNormalize(config.mecefAutoNormalize ?? config.autoNormalize ?? false);
   }, [config]);
@@ -51,6 +53,7 @@ export function MecefSettingsForm({
     const payload: UpdateMecefConfigPayload = {
       mecefApiUrl: apiUrl.trim() || undefined,
       mecefNim: nim.trim() || undefined,
+      emitterIfu: emitterIfu.trim() || undefined,
       mecefEnvironment: environment,
       mecefAutoNormalize: autoNormalize,
     };
@@ -156,18 +159,33 @@ export function MecefSettingsForm({
             </div>
 
             <div>
-              <Label>NIM (Numéro d'Identification Machine)</Label>
+              <Label>IFU de votre entreprise (13 chiffres)</Label>
               <Input
                 type="text"
-                value={nim}
-                onChange={(e) => setNim(e.target.value)}
-                placeholder="ex. MC01000001 ou SFE01000001"
+                value={emitterIfu}
+                onChange={(e) => setEmitterIfu(e.target.value)}
+                placeholder="ex. 3201912345678"
+                maxLength={13}
                 disabled={readOnly || isSubmitting}
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Le numéro attribué à votre entreprise par la DGI.
+                L'Identifiant Fiscal Unique officiel de votre entreprise attribué par la DGI Bénin.
               </p>
             </div>
+          </div>
+
+          <div>
+            <Label>NIM (Numéro d'Identification Machine)</Label>
+            <Input
+              type="text"
+              value={nim}
+              onChange={(e) => setNim(e.target.value)}
+              placeholder="ex. MC01000001 ou SFE01000001"
+              disabled={readOnly || isSubmitting}
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Le numéro attribué à votre entreprise ou point de vente par la DGI.
+            </p>
           </div>
 
           <div>
@@ -176,11 +194,11 @@ export function MecefSettingsForm({
               type="text"
               value={apiUrl}
               onChange={(e) => setApiUrl(e.target.value)}
-              placeholder="https://ebf.impots.bj/api"
+              placeholder="https://sygmef.impots.bj/emcf/api"
               disabled={readOnly || isSubmitting}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              L'URL de base du point de terminaison e-MECeF (ex. <code>https://ebf.impots.bj/api</code>).
+              L'URL de base du point de terminaison e-MECeF (ex. <code>https://sygmef.impots.bj/emcf/api</code>).
             </p>
           </div>
 

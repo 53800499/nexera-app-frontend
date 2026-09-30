@@ -19,7 +19,7 @@ const FIELD_PATTERNS: { pattern: RegExp; field: string; label: string }[] = [
   { pattern: /\btenantName\b|nom de l'entreprise|nom du cabinet|raison sociale/i, field: "tenantName", label: "Nom de l'organisation" },
   { pattern: /\btenantType\b|type d'organisation/i, field: "tenantType", label: "Type d'organisation" },
   { pattern: /\bacceptTerms\b|conditions générales/i, field: "acceptTerms", label: "Conditions générales" },
-  { pattern: /\btoken\b|jeton de réinitialisation/i, field: "token", label: "Jeton de réinitialisation" },
+  { pattern: /\b(resetToken|passwordResetToken)\b|^token$|jeton de réinitialisation/i, field: "token", label: "Jeton de réinitialisation" },
   { pattern: /\broleIds\b/i, field: "roleIds", label: "Rôles" },
   { pattern: /\broleId\b/i, field: "roleIds", label: "Rôle" },
   { pattern: /\bpermissionIds\b/i, field: "permissionIds", label: "Permissions" },
@@ -283,6 +283,10 @@ function inferFieldFromMessage(raw: string): string | null {
   if (/\blastName\b|nom de famille/i.test(raw)) return "lastName";
   if (/\broleIds?\b/i.test(raw) || /\broles?\b/i.test(raw)) return "roleIds";
 
+  if (/e-?mecef|dgi|sygmef|certification fiscale|normalisation fiscale/i.test(raw)) {
+    return null;
+  }
+
   const match = FIELD_PATTERNS.find(({ pattern }) => pattern.test(raw));
   return match?.field ?? null;
 }
@@ -290,6 +294,11 @@ function inferFieldFromMessage(raw: string): string | null {
 function conciseValidationMessage(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "Champ invalide";
+
+  // Préserver intacts les messages explicites de certification e-MECeF / DGI
+  if (/e-?mecef|dgi|sygmef|certification fiscale|normalisation fiscale/i.test(trimmed)) {
+    return trimmed;
+  }
 
   for (const { pattern, message } of FULL_MESSAGE_TRANSLATIONS) {
     if (pattern.test(trimmed)) return message;

@@ -193,12 +193,23 @@ export function TenantSettingsForm({
             </>
           )}
           <div data-form-field="siret">
-            <Label>SIRET</Label>
-            <Input {...register("siret")} disabled={readOnly} />
+            <Label>SIRET / Registre de commerce</Label>
+            <Input
+              placeholder="ex: RB/COT/20 B 12345"
+              {...register("siret")}
+              disabled={readOnly}
+            />
           </div>
           <div data-form-field="vatNumber">
-            <Label>N° TVA</Label>
-            <Input {...register("vatNumber")} disabled={readOnly} />
+            <Label>N° IFU (Identifiant Fiscal Unique / TVA)</Label>
+            <Input
+              placeholder="ex: 3201912345678 (13 chiffres)"
+              {...register("vatNumber")}
+              disabled={readOnly}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Identifiant officiel à 13 chiffres requis pour la normalisation e-MECeF (DGI Bénin).
+            </p>
           </div>
           <div>
             <Label>RCS / immatriculation</Label>

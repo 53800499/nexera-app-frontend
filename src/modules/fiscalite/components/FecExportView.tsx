@@ -4,8 +4,15 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { fiscaliteApi } from "../services/fiscaliteApi.service";
 import type { FecExportResult, TaxContribuable } from "../types/fiscalite.types";
+import { FileAuditIcon } from "./FiscaliteIcons";
+import { ChevronLeftIcon, DownloadIcon } from "@/icons";
+import { useActionFeedback, useToast } from "@/shared/components/feedback";
+import { FormErrorAlert, useFormError } from "./FormErrorAlert";
 
 export const FecExportView: React.FC = () => {
+  const toast = useToast();
+  const { showResult } = useActionFeedback();
+  const { error: fecError, captureError: captureFecError, clearError: clearFecError } = useFormError();
   const [contribuable, setContribuable] = useState<TaxContribuable | null>(null);
   const [dateCloture, setDateCloture] = useState("2026-12-31");
   const [separateur, setSeparateur] = useState<"POINT_VIRGULE" | "TABULATION">("POINT_VIRGULE");
@@ -24,6 +31,7 @@ export const FecExportView: React.FC = () => {
     e.preventDefault();
     if (!contribuable?.id) return;
     setIsLoading(true);
+    clearFecError();
     try {
       const res = await fiscaliteApi.genererFec(contribuable.id, {
         dateCloture,
@@ -31,8 +39,19 @@ export const FecExportView: React.FC = () => {
         formatFichier,
       });
       setResultat(res);
+      const audit = res.auditConformite;
+      const isConforme = audit ? audit.conforme : true;
+      const nbLignes = audit?.nombreLignes ?? (res.lignes?.length || 0);
+      const totalDebit = audit?.totalDebit ?? 0;
+      await showResult({
+        variant: "success",
+        title: "Fichier FEC Généré avec Succès ✓",
+        message: `Le fichier "${res.nomFichier}" a été compilé conformément à l'Arrêté 1085-C (${isConforme ? "Écritures conformes" : "Attention aux anomalies détectées"}). Il regroupe ${nbLignes} ligne(s) d'écritures pour un total de ${formatCurrency(totalDebit)}.`,
+        closeLabel: "Examiner l'Audit",
+      });
     } catch (err: any) {
-      alert(err.message || "Erreur lors de la génération du fichier FEC");
+      captureFecError(err);
+      toast.error("Génération FEC", err.message || "Erreur lors de la génération du fichier FEC");
     } finally {
       setIsLoading(false);
     }
@@ -64,8 +83,8 @@ export const FecExportView: React.FC = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 dark:border-gray-800 pb-5">
         <div>
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 font-bold text-lg">
-              ⚡
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 font-bold">
+              <FileAuditIcon className="h-5 w-5" />
             </span>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               Export FEC — Fichier des Écritures Comptables (Arrêté 1085-C)
@@ -76,12 +95,6 @@ export const FecExportView: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/fiscalite"
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-          >
-            ← Tableau de Bord
-          </Link>
         </div>
       </div>
 
@@ -101,6 +114,8 @@ export const FecExportView: React.FC = () => {
           <h2 className="text-base font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-700 pb-3">
             Paramètres du Fichier FEC
           </h2>
+
+          <FormErrorAlert error={fecError} onClose={clearFecError} />
 
           <form onSubmit={handleGenererFec} className="space-y-4">
             <div>
@@ -150,22 +165,20 @@ export const FecExportView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setFormatFichier("CSV")}
-                  className={`rounded-lg border p-2 text-center text-xs font-medium transition ${
-                    formatFichier === "CSV"
+                  className={`rounded-lg border p-2 text-center text-xs font-medium transition ${formatFichier === "CSV"
                       ? "border-amber-600 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
                       : "border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-400"
-                  }`}
+                    }`}
                 >
                   .CSV (Tableur)
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormatFichier("TXT")}
-                  className={`rounded-lg border p-2 text-center text-xs font-medium transition ${
-                    formatFichier === "TXT"
+                  className={`rounded-lg border p-2 text-center text-xs font-medium transition ${formatFichier === "TXT"
                       ? "border-amber-600 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
                       : "border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-400"
-                  }`}
+                    }`}
                 >
                   .TXT (Fichier plat)
                 </button>
@@ -194,11 +207,10 @@ export const FecExportView: React.FC = () => {
                       {resultat.nomFichier}
                     </span>
                     <span
-                      className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                        resultat.auditConformite.conforme
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${resultat.auditConformite.conforme
                           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
                           : "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
-                      }`}
+                        }`}
                     >
                       {resultat.auditConformite.conforme ? "CONFORME ARRÊTÉ 1085-C" : "ANOMALIES DÉTECTÉES"}
                     </span>
@@ -212,7 +224,8 @@ export const FecExportView: React.FC = () => {
                   onClick={handleDownload}
                   className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm transition"
                 >
-                  <span>⬇ Télécharger le Fichier</span>
+                  <DownloadIcon className="h-4 w-4 shrink-0" />
+                  <span>Télécharger le Fichier</span>
                 </button>
               </div>
 
@@ -231,19 +244,17 @@ export const FecExportView: React.FC = () => {
                   </p>
                 </div>
                 <div
-                  className={`rounded-lg p-3.5 ${
-                    resultat.auditConformite.ecart === 0
+                  className={`rounded-lg p-3.5 ${resultat.auditConformite.ecart === 0
                       ? "bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800"
                       : "bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800"
-                  }`}
+                    }`}
                 >
                   <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">Écart Débit - Crédit</p>
                   <p
-                    className={`text-lg font-bold mt-1 ${
-                      resultat.auditConformite.ecart === 0
+                    className={`text-lg font-bold mt-1 ${resultat.auditConformite.ecart === 0
                         ? "text-emerald-700 dark:text-emerald-300"
                         : "text-rose-700 dark:text-rose-300"
-                    }`}
+                      }`}
                   >
                     {formatCurrency(resultat.auditConformite.ecart)}
                   </p>
