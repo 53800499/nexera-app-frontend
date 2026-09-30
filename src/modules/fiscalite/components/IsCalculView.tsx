@@ -8,12 +8,19 @@ import { CalculatorIcon, SyncIcon } from "./FiscaliteIcons";
 import { ChevronLeftIcon, PlusIcon, CheckCircleIcon, DocsIcon } from "@/icons";
 import { useActionFeedback, useToast } from "@/shared/components/feedback";
 import { useFiscalitePdf } from "../pdf";
+import { FiscalitePdfPreviewModal } from "./FiscalitePdfPreviewModal";
 import { FormErrorAlert, useFormError } from "./FormErrorAlert";
 
 export const IsCalculView: React.FC = () => {
   const { confirm, showResult } = useActionFeedback();
   const toast = useToast();
-  const { isExporting, exportIs } = useFiscalitePdf();
+  const {
+    isExporting,
+    preview,
+    closePreview,
+    previewIs,
+    downloadIs,
+  } = useFiscalitePdf();
 
   const [contribuable, setContribuable] = useState<TaxContribuable | null>(null);
   const [exercices, setExercices] = useState<TaxExerciceFiscal[]>([]);
@@ -387,22 +394,22 @@ export const IsCalculView: React.FC = () => {
 
                     <button
                       type="button"
-                      onClick={() => exportIs(selectedEx, contribuable, "download")}
-                      disabled={isExporting}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
-                      title="Télécharger le bordereau de calcul IS officiel en PDF"
+                      onClick={() => selectedEx && previewIs(selectedEx, contribuable)}
+                      disabled={isExporting || !selectedEx}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-sm"
+                      title="Aperçu avant impression du bordereau officiel d'IS"
                     >
                       <DocsIcon className="h-3.5 w-3.5 text-amber-600" />
-                      <span>{isExporting ? "Export..." : "Bordereau IS (PDF)"}</span>
+                      <span>Aperçu</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => exportIs(selectedEx, contribuable, "preview")}
-                      disabled={isExporting}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
-                      title="Aperçu du bordereau IS dans un nouvel onglet"
+                      onClick={() => selectedEx && downloadIs(selectedEx, contribuable)}
+                      disabled={isExporting || !selectedEx}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-sm"
+                      title="Télécharger le bordereau de calcul IS officiel en PDF"
                     >
-                      <span>Aperçu</span>
+                      <span>{isExporting ? "Export..." : "Bordereau IS (PDF)"}</span>
                     </button>
                   </div>
                 </div>
@@ -758,6 +765,9 @@ export const IsCalculView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de prévisualisation et impression PDF intégré */}
+      <FiscalitePdfPreviewModal preview={preview} onClose={closePreview} />
     </div>
   );
 };

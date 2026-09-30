@@ -13,12 +13,14 @@ import { IsBordereauPdfDocument } from "./IsBordereauPdfDocument";
 import { LiasseFiscalePdfDocument } from "./LiasseFiscalePdfDocument";
 import { CalendrierFiscalPdfDocument } from "./CalendrierFiscalPdfDocument";
 import { AibAttestationPdfDocument } from "./AibAttestationPdfDocument";
+import { AibRecapPdfDocument } from "./AibRecapPdfDocument";
 import {
   createPdfPreviewUrl,
   downloadPdfBlob,
   openPdfBlob,
 } from "@/shared/pdf/pdfBlob";
 import { sanitizePdfFileName } from "./fiscalitePdfFormat";
+import type { FiscalitePdfPreviewState } from "../components/FiscalitePdfPreviewModal";
 
 // 1. Déclaration de TVA
 export async function generateTvaDeclarationPdfBlob(
@@ -165,4 +167,152 @@ export async function openAibAttestationPdf(
 ): Promise<void> {
   const blob = await generateAibAttestationPdfBlob(retenue, contribuable);
   openPdfBlob(blob);
+}
+
+// 6. Récapitulatif AIB consolidé
+export async function generateAibRecapPdfBlob(
+  retenues: TaxRetenueAib[],
+  recap?: {
+    totalSubi?: number;
+    totalOpere?: number;
+    nombreRetenues?: number;
+  } | null,
+  contribuable?: TaxContribuable | null
+): Promise<Blob> {
+  return pdf(
+    <AibRecapPdfDocument
+      retenues={retenues}
+      recap={recap}
+      contribuable={contribuable}
+    />
+  ).toBlob();
+}
+
+export async function downloadAibRecapPdf(
+  retenues: TaxRetenueAib[],
+  recap?: {
+    totalSubi?: number;
+    totalOpere?: number;
+    nombreRetenues?: number;
+  } | null,
+  contribuable?: TaxContribuable | null
+): Promise<void> {
+  const annee = new Date().getFullYear();
+  const blob = await generateAibRecapPdfBlob(retenues, recap, contribuable);
+  downloadPdfBlob(blob, `Recapitulatif_AIB_Gestion_${annee}.pdf`);
+}
+
+export async function openAibRecapPdf(
+  retenues: TaxRetenueAib[],
+  recap?: {
+    totalSubi?: number;
+    totalOpere?: number;
+    nombreRetenues?: number;
+  } | null,
+  contribuable?: TaxContribuable | null
+): Promise<void> {
+  const blob = await generateAibRecapPdfBlob(retenues, recap, contribuable);
+  openPdfBlob(blob);
+}
+
+// -------------------------------------------------------------
+// Builders d'état pour la modale d'aperçu intégré (meilleure UX)
+// -------------------------------------------------------------
+
+export async function buildTvaDeclarationPreviewState(
+  declaration: TaxDeclarationTva,
+  contribuable?: TaxContribuable | null
+): Promise<FiscalitePdfPreviewState> {
+  const blob = await generateTvaDeclarationPdfBlob(declaration, contribuable);
+  const fileName = `Declaration_TVA_${sanitizePdfFileName(declaration.periode)}.pdf`;
+  return {
+    blob,
+    url: createPdfPreviewUrl(blob),
+    fileName,
+    title: "Déclaration de TVA (e-TVA)",
+    subtitle: `Période : ${declaration.periode} • Date limite légale : ${declaration.dateLimiteLegale}`,
+  };
+}
+
+export async function buildIsBordereauPreviewState(
+  exercice: TaxExerciceFiscal,
+  contribuable?: TaxContribuable | null
+): Promise<FiscalitePdfPreviewState> {
+  const annee = exercice.dateDebut.substring(0, 4);
+  const blob = await generateIsBordereauPdfBlob(exercice, contribuable);
+  const fileName = `Bordereau_IS_Exercice_${sanitizePdfFileName(annee)}.pdf`;
+  return {
+    blob,
+    url: createPdfPreviewUrl(blob),
+    fileName,
+    title: "Bordereau d'Acomptes & Liquidation de l'IS",
+    subtitle: `Exercice Fiscal : ${annee} • Statut : ${exercice.statut}`,
+  };
+}
+
+export async function buildLiasseFiscalePreviewState(
+  liasse: TaxLiasseFiscale,
+  contribuable?: TaxContribuable | null
+): Promise<FiscalitePdfPreviewState> {
+  const blob = await generateLiasseFiscalePdfBlob(liasse, contribuable);
+  const fileName = `Liasse_Fiscale_SYSCOHADA_${sanitizePdfFileName(liasse.id.substring(0, 8))}.pdf`;
+  return {
+    blob,
+    url: createPdfPreviewUrl(blob),
+    fileName,
+    title: "Liasse Fiscale Annuelle (SYSCOHADA Révisé)",
+    subtitle: `Système : ${liasse.typeSystemeComptable || "Normal"} • Visa Cabinet : ${liasse.valideParCabinet ? "Certifié" : "En attente"}`,
+  };
+}
+
+export async function buildCalendrierFiscalPreviewState(
+  echeances: TaxEcheance[],
+  contribuable?: TaxContribuable | null
+): Promise<FiscalitePdfPreviewState> {
+  const annee = new Date().getFullYear();
+  const blob = await generateCalendrierFiscalPdfBlob(echeances, contribuable);
+  const fileName = `Echeancier_Fiscal_${annee}.pdf`;
+  return {
+    blob,
+    url: createPdfPreviewUrl(blob),
+    fileName,
+    title: "Calendrier & Échéancier Fiscal Consolidé",
+    subtitle: `Gestion ${annee} • ${echeances.length} obligations fiscales référencées`,
+  };
+}
+
+export async function buildAibAttestationPreviewState(
+  retenue: TaxRetenueAib,
+  contribuable?: TaxContribuable | null
+): Promise<FiscalitePdfPreviewState> {
+  const blob = await generateAibAttestationPdfBlob(retenue, contribuable);
+  const fileName = `Attestation_Retenue_AIB_${sanitizePdfFileName(retenue.id.substring(0, 8))}.pdf`;
+  return {
+    blob,
+    url: createPdfPreviewUrl(blob),
+    fileName,
+    title: "Attestation de Retenue à la Source (AIB)",
+    subtitle: `Bénéficiaire : ${retenue.tiersNom || "Tiers"} • Taux : ${retenue.tauxApplique ?? retenue.taux ?? 1}%`,
+  };
+}
+
+export async function buildAibRecapPreviewState(
+  retenues: TaxRetenueAib[],
+  recap?: {
+    totalSubi?: number;
+    totalOpere?: number;
+    nombreRetenues?: number;
+  } | null,
+  contribuable?: TaxContribuable | null
+): Promise<FiscalitePdfPreviewState> {
+  const annee = new Date().getFullYear();
+  const blob = await generateAibRecapPdfBlob(retenues, recap, contribuable);
+  const fileName = `Recapitulatif_AIB_Gestion_${annee}.pdf`;
+  return {
+    blob,
+    url: createPdfPreviewUrl(blob),
+    fileName,
+    title: "État Récapitulatif des Retenues AIB",
+    subtitle: `Exercice ${annee} • ${retenues.length} opérations enregistrées`,
+  };
 }

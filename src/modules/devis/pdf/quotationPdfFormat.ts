@@ -5,6 +5,19 @@ export function formatPdfDate(value?: string | null) {
   return new Date(value).toLocaleDateString("fr-FR");
 }
 
+export function formatPdfDateTime(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return "—";
+  const datePart = date.toLocaleDateString("fr-FR");
+  const timePart = date.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  return `${datePart} à ${timePart}`;
+}
+
 export function formatPdfMoney(value: number, currency: string = DEFAULT_CURRENCY) {
   const formatted = new Intl.NumberFormat("fr-FR", {
     style: "currency",

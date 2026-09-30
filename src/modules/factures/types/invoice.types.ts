@@ -88,10 +88,18 @@ export type InvoiceLine = {
 export type InvoicePayment = {
   id: string;
   amount: number;
-  paymentMethod: PaymentMethod;
-  paymentDate: string;
+  paymentMethod?: PaymentMethod | string;
+  paymentDate?: string;
   reference?: string | null;
   notes?: string | null;
+  createdAt?: string;
+  payment?: {
+    id?: string;
+    amount?: number;
+    paymentMethod?: PaymentMethod | string;
+    paymentDate?: string;
+    reference?: string | null;
+  } | null;
 };
 
 export type InvoiceCreditNoteRef = {

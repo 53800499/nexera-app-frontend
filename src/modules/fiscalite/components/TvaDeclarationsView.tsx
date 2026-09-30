@@ -8,12 +8,19 @@ import { PercentBadgeIcon, CreditCardIcon } from "./FiscaliteIcons";
 import { ChevronLeftIcon, PlusIcon, CheckCircleIcon, DocsIcon } from "@/icons";
 import { useActionFeedback, useToast } from "@/shared/components/feedback";
 import { useFiscalitePdf } from "../pdf";
+import { FiscalitePdfPreviewModal } from "./FiscalitePdfPreviewModal";
 import { FormErrorAlert, useFormError } from "./FormErrorAlert";
 
 export const TvaDeclarationsView: React.FC = () => {
   const { confirm, showResult } = useActionFeedback();
   const toast = useToast();
-  const { isExporting, exportTva } = useFiscalitePdf();
+  const {
+    isExporting,
+    preview,
+    closePreview,
+    previewTva,
+    downloadTva,
+  } = useFiscalitePdf();
 
   const [contribuable, setContribuable] = useState<TaxContribuable | null>(null);
   const [declarations, setDeclarations] = useState<TaxDeclarationTva[]>([]);
@@ -353,22 +360,22 @@ export const TvaDeclarationsView: React.FC = () => {
 
                     <button
                       type="button"
-                      onClick={() => exportTva(selectedDec, contribuable, "download")}
+                      onClick={() => previewTva(selectedDec, contribuable)}
                       disabled={isExporting}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
-                      title="Télécharger la déclaration officielle e-TVA en PDF"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-sm"
+                      title="Aperçu avant impression de la déclaration e-TVA"
                     >
                       <DocsIcon className="h-3.5 w-3.5 text-teal-600" />
-                      <span>{isExporting ? "Export..." : "Déclaration (PDF)"}</span>
+                      <span>Aperçu</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => exportTva(selectedDec, contribuable, "open")}
+                      onClick={() => downloadTva(selectedDec, contribuable)}
                       disabled={isExporting}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
-                      title="Ouvrir l'aperçu PDF dans un nouvel onglet"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-sm"
+                      title="Télécharger la déclaration officielle e-TVA en PDF"
                     >
-                      <span>Aperçu</span>
+                      <span>{isExporting ? "Export..." : "Déclaration (PDF)"}</span>
                     </button>
                   </div>
                 </div>
@@ -628,6 +635,9 @@ export const TvaDeclarationsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de prévisualisation et impression PDF intégré */}
+      <FiscalitePdfPreviewModal preview={preview} onClose={closePreview} />
     </div>
   );
 };

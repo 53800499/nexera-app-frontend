@@ -11,3 +11,5 @@ export * from "./components/FecExportView";
 export * from "./components/ControlesContentieuxView";
 export * from "./components/VeilleReferentielView";
 export * from "./components/FiscaliteIcons";
+export * from "./components/FiscalitePdfPreviewModal";
+export * from "./pdf";

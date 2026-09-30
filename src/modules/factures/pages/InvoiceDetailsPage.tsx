@@ -55,8 +55,11 @@ import {
   isInvoiceTerminal,
 } from "../utils/invoiceStatusRules";
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("fr-FR");
+function formatDate(value?: string | Date | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("fr-FR");
 }
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -65,6 +68,16 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash: "Espèces",
   card: "Carte",
   other: "Autre",
+  WIRE: "Virement",
+  CHECK: "Chèque",
+  CASH: "Espèces",
+  CARD: "Carte",
+  OTHER: "Autre",
+  VIREMENT: "Virement",
+  CHEQUE: "Chèque",
+  ESPECES: "Espèces",
+  CARTE: "Carte",
+  MOBILE_MONEY: "Mobile Money",
 };
 
 const lineColumns = (currency: string): DataTableColumn<InvoiceLine>[] => [
@@ -141,6 +154,14 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
   const lines = invoice?.lines ?? [];
   const invoiceReminders = invoiceRemindersQuery.data ?? [];
 
+  const existingCreditsTotal = (creditNotes ?? [])
+    .filter((c: any) => c.status !== "cancelled")
+    .reduce((sum: number, c: any) => sum + (c.totalTtc ?? 0), 0);
+  const maxCreditAmount = Math.max(
+    0,
+    (invoice?.totalTtc ?? 0) - existingCreditsTotal,
+  );
+
   const handlePreview = () => {
     if (!invoice) return;
     void runAction({
@@ -177,8 +198,8 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
   const createCreditNote = async () => {
     setCreditAmountError(null);
 
-    if (creditAmount !== "" && creditAmount > invoice!.amountDue) {
-      const message = `Le montant ne peut pas dépasser le reste dû (${invoice!.amountDue.toFixed(2)} ${invoice!.currency}).`;
+    if (creditAmount !== "" && creditAmount > maxCreditAmount) {
+      const message = `Le montant ne peut pas dépasser le montant maximal autorisé (${formatMoney(maxCreditAmount, invoice!.currency)}).`;
       setCreditAmountError(message);
       void showResult({
         variant: "error",
@@ -188,15 +209,15 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
       return;
     }
 
-    const payload =
-      creditAmount !== "" && creditAmount > 0
-        ? { amountTtc: creditAmount }
-        : {};
+    const isPartial = creditAmount !== "" && creditAmount > 0;
+    const payload = isPartial ? { amountTtc: creditAmount } : {};
 
     await runAction({
       confirm: {
-        title: "Créer un avoir ?",
-        message: "Un nouvel avoir sera généré à partir de cette facture.",
+        title: isPartial ? "Créer un avoir partiel ?" : "Créer un avoir total ?",
+        message: isPartial
+          ? `Un avoir partiel de ${formatMoney(creditAmount, invoice!.currency)} sera généré.`
+          : `Un avoir total de ${formatMoney(maxCreditAmount, invoice!.currency)} sera généré pour annuler cette facture.`,
         confirmLabel: "Créer l'avoir",
         variant: "warning",
       },
@@ -468,16 +489,39 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
 
             {showCreditForm && canManageInvoices && canCreateCreditNote(status) ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
-                <h2 className="mb-3 font-medium">Nouvel avoir</h2>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="font-medium text-amber-900 dark:text-amber-200">
+                      Créer un avoir
+                    </h2>
+                    <p className="text-xs text-amber-700/80 dark:text-amber-300/80">
+                      Montant maximal créditable :{" "}
+                      <span className="font-semibold">
+                        {formatMoney(maxCreditAmount, invoice.currency)}
+                      </span>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreditForm(false);
+                      setCreditAmount("");
+                      setCreditAmountError(null);
+                    }}
+                    className="text-xs font-medium text-amber-800 underline hover:text-amber-950 dark:text-amber-300"
+                  >
+                    Fermer
+                  </button>
+                </div>
                 <div className="flex flex-wrap items-end gap-3">
-                  <div className="min-w-[200px]" data-form-field="amountTtc">
-                    <Label>Montant TTC (optionnel)</Label>
+                  <div className="min-w-[260px] flex-1" data-form-field="amountTtc">
+                    <Label>Montant TTC (optionnel pour un avoir partiel)</Label>
                     <Input
                       type="number"
                       min={0.01}
-                      max={invoice.amountDue}
+                      max={maxCreditAmount}
                       step="0.01"
-                      placeholder={`Max ${invoice.amountDue}`}
+                      placeholder={`Laisser vide pour avoir total (${formatMoney(maxCreditAmount, invoice.currency)})`}
                       value={creditAmount}
                       error={Boolean(creditAmountError)}
                       onChange={(event) => {
@@ -494,17 +538,22 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
                         {creditAmountError}
                       </p>
                     ) : (
-                      <p className="mt-1 text-xs text-gray-500">
-                        Laissez vide pour un avoir total basé sur les lignes.
+                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                        {creditAmount !== "" && creditAmount > 0
+                          ? `Avoir partiel de ${formatMoney(creditAmount, invoice.currency)}`
+                          : `Laissez vide pour générer un avoir total annulant l'ensemble des lignes (${formatMoney(maxCreditAmount, invoice.currency)}).`}
                       </p>
                     )}
                   </div>
                   <button
                     type="button"
                     onClick={() => void createCreditNote()}
-                    className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+                    disabled={maxCreditAmount <= 0}
+                    className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
                   >
-                    Confirmer
+                    {creditAmount !== "" && creditAmount > 0
+                      ? "Confirmer l'avoir partiel"
+                      : `Confirmer l'avoir total (${formatMoney(maxCreditAmount, invoice.currency)})`}
                   </button>
                 </div>
               </div>
@@ -803,24 +852,39 @@ export default function InvoiceDetailsPage({ id }: { id: string }) {
                 </div>
                 <div className="p-4">
                   <ul className="space-y-2 text-sm">
-                    {payments.map((payment) => (
-                      <li
-                        key={payment.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-800"
-                      >
-                        <div>
-                          <p className="font-medium">
-                            {formatMoney(payment.amount, invoice.currency)}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {formatDate(payment.paymentDate)} —{" "}
-                            {PAYMENT_METHOD_LABELS[payment.paymentMethod] ??
-                              payment.paymentMethod}
-                            {payment.reference ? ` — ${payment.reference}` : ""}
-                          </p>
-                        </div>
-                      </li>
-                    ))}
+                    {payments.map((payment) => {
+                      const rawDate =
+                        payment.paymentDate ||
+                        payment.payment?.paymentDate ||
+                        payment.createdAt;
+                      const rawMethod =
+                        payment.paymentMethod || payment.payment?.paymentMethod;
+                      const methodLabel = rawMethod
+                        ? (PAYMENT_METHOD_LABELS[rawMethod] ??
+                          PAYMENT_METHOD_LABELS[String(rawMethod).toLowerCase()] ??
+                          rawMethod)
+                        : null;
+                      const ref =
+                        payment.reference ?? payment.payment?.reference ?? null;
+
+                      return (
+                        <li
+                          key={payment.id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-800"
+                        >
+                          <div>
+                            <p className="font-medium">
+                              {formatMoney(payment.amount, invoice.currency)}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {formatDate(rawDate)}
+                              {methodLabel ? ` — ${methodLabel}` : ""}
+                              {ref ? ` — ${ref}` : ""}
+                            </p>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               </div>

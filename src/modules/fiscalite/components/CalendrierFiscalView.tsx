@@ -8,12 +8,19 @@ import { CalendarIcon, SyncIcon } from "./FiscaliteIcons";
 import { ChevronLeftIcon, CheckCircleIcon, DocsIcon } from "@/icons";
 import { useActionFeedback, useToast } from "@/shared/components/feedback";
 import { useFiscalitePdf } from "../pdf";
+import { FiscalitePdfPreviewModal } from "./FiscalitePdfPreviewModal";
 import { FormErrorAlert, useFormError } from "./FormErrorAlert";
 
 export const CalendrierFiscalView: React.FC = () => {
   const { confirm, showResult } = useActionFeedback();
   const toast = useToast();
-  const { isExporting, exportCalendrier } = useFiscalitePdf();
+  const {
+    isExporting,
+    preview,
+    closePreview,
+    previewCalendrier,
+    downloadCalendrier,
+  } = useFiscalitePdf();
   const { error: calError, captureError: captureCalError, clearError: clearCalError } = useFormError();
 
   const [contribuable, setContribuable] = useState<TaxContribuable | null>(null);
@@ -141,11 +148,21 @@ export const CalendrierFiscalView: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            onClick={() => exportCalendrier(echeances, contribuable, "download")}
+            onClick={() => previewCalendrier(echeances, contribuable)}
             disabled={isExporting || echeances.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-sm disabled:opacity-50"
+            title="Aperçu avant impression de l'échéancier fiscal"
           >
             <DocsIcon className="h-4 w-4 text-amber-600" />
+            <span>Aperçu</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => downloadCalendrier(echeances, contribuable)}
+            disabled={isExporting || echeances.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300 transition shadow-sm disabled:opacity-50"
+            title="Télécharger l'échéancier officiel en PDF"
+          >
             <span>{isExporting ? "Exportation..." : "Échéancier (PDF)"}</span>
           </button>
           <button
@@ -207,11 +224,10 @@ export const CalendrierFiscalView: React.FC = () => {
             <button
               key={st}
               onClick={() => setFilterStatut(st)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                filterStatut === st
-                  ? "bg-amber-600 text-white shadow-sm"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-              }`}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${filterStatut === st
+                ? "bg-amber-600 text-white shadow-sm"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                }`}
             >
               {st === "ALL" && "Toutes les échéances"}
               {st === "A_DECLARER" && "À Déclarer"}
@@ -290,13 +306,12 @@ export const CalendrierFiscalView: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                          e.statut === "PAYEE"
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-                            : isLate
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${e.statut === "PAYEE"
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                          : isLate
                             ? "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
                             : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                        }`}
+                          }`}
                       >
                         {isLate ? "EN RETARD" : e.statut}
                       </span>
@@ -319,6 +334,9 @@ export const CalendrierFiscalView: React.FC = () => {
           </table>
         </div>
       )}
+
+      {/* Modal de prévisualisation et impression PDF intégré */}
+      <FiscalitePdfPreviewModal preview={preview} onClose={closePreview} />
     </div>
   );
 };

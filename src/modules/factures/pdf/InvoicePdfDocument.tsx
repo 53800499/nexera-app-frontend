@@ -11,6 +11,7 @@ import {
 import {
   formatCompanyAddress,
   formatPdfDate,
+  formatPdfDateTime,
   formatPdfMoney,
 } from "@/modules/devis/pdf/quotationPdfFormat";
 import {
@@ -51,7 +52,7 @@ function createStyles(primaryColor: string) {
     companyName: { fontSize: 14, fontWeight: "bold", marginBottom: 4 },
     companyLine: { fontSize: 9, color: "#6b7280", marginBottom: 2 },
     docTitle: {
-      fontSize: 22,
+      fontSize: 20,
       fontWeight: "bold",
       color: primaryColor,
       textAlign: "right",
@@ -109,8 +110,67 @@ function createStyles(primaryColor: string) {
       fontWeight: "bold",
       fontSize: 11,
     },
+    mecefBox: {
+      marginTop: 14,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: "#16a34a",
+      borderRadius: 4,
+      backgroundColor: "#f0fdf4",
+      overflow: "hidden",
+    },
+    mecefHeader: {
+      backgroundColor: "#15803d",
+      paddingVertical: 4.5,
+      paddingHorizontal: 8,
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    mecefHeaderText: {
+      color: "#ffffff",
+      fontSize: 8,
+      fontWeight: "bold",
+      textAlign: "center",
+      letterSpacing: 0.5,
+    },
+    mecefBody: {
+      flexDirection: "row",
+      padding: 8,
+      gap: 12,
+      alignItems: "center",
+    },
+    mecefQrCode: {
+      width: 68,
+      height: 68,
+      borderRadius: 2,
+    },
+    mecefInfo: {
+      flex: 1,
+    },
+    mecefRow: {
+      flexDirection: "row",
+      marginBottom: 2.5,
+    },
+    mecefLabel: {
+      width: "42%",
+      fontSize: 7.5,
+      fontWeight: "bold",
+      color: "#15803d",
+    },
+    mecefValue: {
+      width: "58%",
+      fontSize: 7.5,
+      color: "#1f2937",
+    },
+    mecefCodeValue: {
+      width: "58%",
+      fontSize: 7.5,
+      fontWeight: "bold",
+      color: "#0f172a",
+    },
     notes: {
-      marginTop: 16,
+      marginTop: 14,
       padding: 10,
       backgroundColor: "#f9fafb",
       fontSize: 9,
@@ -138,11 +198,13 @@ function groupTaxByRate(ctx: InvoicePdfContext) {
   return [...buckets.entries()].sort(([a], [b]) => a - b);
 }
 
-function invoicePdfTitle(invoiceType: string) {
+function invoicePdfTitle(invoiceType: string, isNormalized?: boolean) {
   const type = normalizeInvoiceType(invoiceType);
-  if (type === "credit_note") return "AVOIR";
-  if (type === "proforma") return "PROFORMA";
-  return "FACTURE";
+  if (type === "credit_note") {
+    return isNormalized ? "FACTURE D'AVOIR NORMALISÉE" : "AVOIR";
+  }
+  if (type === "proforma") return "FACTURE PROFORMA";
+  return isNormalized ? "FACTURE DE VENTE NORMALISÉE" : "FACTURE";
 }
 
 function previewWatermark(status: string, mode: InvoicePdfContext["mode"]) {
@@ -163,9 +225,15 @@ export function InvoicePdfDocument({ ctx }: { ctx: InvoicePdfContext }) {
   const totalHtAfterDiscount = subtotalHt - discountAmount;
   const taxByRate = groupTaxByRate(ctx);
   const watermark = previewWatermark(invoice.status, mode);
+  const isNormalized =
+    invoice.normalizationStatus === "normalized" &&
+    Boolean(invoice.mecefCode);
 
   return (
-    <Document title={`${invoicePdfTitle(invoice.invoiceType)} ${invoice.number}`} author={companyName}>
+    <Document
+      title={`${invoicePdfTitle(invoice.invoiceType, isNormalized)} ${invoice.number}`}
+      author={companyName}
+    >
       <Page size="A4" style={styles.page}>
         {watermark ? (
           <View style={styles.watermarkWrap}>
@@ -203,13 +271,24 @@ export function InvoicePdfDocument({ ctx }: { ctx: InvoicePdfContext }) {
           </View>
           <View>
             <Text style={styles.docTitle}>
-              {invoicePdfTitle(invoice.invoiceType)}
+              {invoicePdfTitle(invoice.invoiceType, isNormalized)}
             </Text>
             <Text style={styles.docNumber}>{invoice.number}</Text>
-            <Text style={[styles.docNumber, { marginTop: 2 }]}>
-              {invoiceTypeLabel(invoice.invoiceType)} —{" "}
-              {invoiceStatusLabel(invoice.status)}
-            </Text>
+            {isNormalized ? (
+              <Text
+                style={[
+                  styles.docNumber,
+                  { marginTop: 2, color: "#16a34a", fontWeight: "bold" },
+                ]}
+              >
+                Certifiée e-MECeF (DGI Bénin)
+              </Text>
+            ) : (
+              <Text style={[styles.docNumber, { marginTop: 2 }]}>
+                {invoiceTypeLabel(invoice.invoiceType)} —{" "}
+                {invoiceStatusLabel(invoice.status)}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -322,6 +401,23 @@ export function InvoicePdfDocument({ ctx }: { ctx: InvoicePdfContext }) {
             <Text>Total TTC</Text>
             <Text>{formatPdfMoney(invoice.totalTtc, currency)}</Text>
           </View>
+          {Boolean((invoice.mecefAibAmount ?? 0) > 0) && (
+            <>
+              <View style={styles.totalRow}>
+                <Text>Acompte AIB ({invoice.mecefAibType === "A" ? "1%" : "5%"})</Text>
+                <Text>+{formatPdfMoney(invoice.mecefAibAmount ?? 0, currency)}</Text>
+              </View>
+              <View style={[styles.totalRow, { fontWeight: "bold" }]}>
+                <Text>Net à payer (TTC + AIB)</Text>
+                <Text>
+                  {formatPdfMoney(
+                    invoice.totalTtc + (invoice.mecefAibAmount ?? 0),
+                    currency,
+                  )}
+                </Text>
+              </View>
+            </>
+          )}
           {invoice.amountPaid > 0 ? (
             <View style={styles.totalRow}>
               <Text>Déjà payé</Text>
@@ -335,6 +431,62 @@ export function InvoicePdfDocument({ ctx }: { ctx: InvoicePdfContext }) {
             </View>
           ) : null}
         </View>
+
+        {isNormalized ? (
+          <View style={styles.mecefBox}>
+            <View style={styles.mecefHeader}>
+              <Text style={styles.mecefHeaderText}>
+                FACTURE NORMALISÉE — DIRECTION GÉNÉRALE DES IMPÔTS (DGI BÉNIN)
+              </Text>
+            </View>
+            <View style={styles.mecefBody}>
+              {ctx.mecefQrCodeDataUrl ? (
+                <Image
+                  src={ctx.mecefQrCodeDataUrl}
+                  style={styles.mecefQrCode}
+                />
+              ) : null}
+              <View style={styles.mecefInfo}>
+                <View style={styles.mecefRow}>
+                  <Text style={styles.mecefLabel}>NIM (Machine) :</Text>
+                  <Text style={styles.mecefValue}>
+                    {invoice.mecefNim || "N/A"}
+                  </Text>
+                </View>
+                <View style={styles.mecefRow}>
+                  <Text style={styles.mecefLabel}>Compteurs (MC/TC) :</Text>
+                  <Text style={styles.mecefValue}>
+                    {invoice.mecefCounters || "N/A"}
+                  </Text>
+                </View>
+                <View style={styles.mecefRow}>
+                  <Text style={styles.mecefLabel}>Code MECeF (DGI) :</Text>
+                  <Text style={styles.mecefCodeValue}>
+                    {invoice.mecefCode || "—"}
+                  </Text>
+                </View>
+                <View style={styles.mecefRow}>
+                  <Text style={styles.mecefLabel}>Date & Heure certification :</Text>
+                  <Text style={styles.mecefValue}>
+                    {formatPdfDateTime(
+                      invoice.mecefNormalizedAt ?? invoice.issueDate,
+                    )}
+                  </Text>
+                </View>
+                {invoice.originalMecefCode ? (
+                  <View style={styles.mecefRow}>
+                    <Text style={styles.mecefLabel}>
+                      Facture d&apos;origine (MECeF) :
+                    </Text>
+                    <Text style={styles.mecefCodeValue}>
+                      {invoice.originalMecefCode}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          </View>
+        ) : null}
 
         {invoice.notes ? (
           <View style={styles.notes}>

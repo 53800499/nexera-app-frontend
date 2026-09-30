@@ -1,4 +1,5 @@
 import { pdf } from "@react-pdf/renderer";
+import QRCode from "qrcode";
 import type {
   PdfTemplate,
   TenantSettings,
@@ -9,6 +10,8 @@ import {
   createPdfPreviewUrl,
   downloadPdfBlob,
 } from "@/shared/pdf/pdfBlob";
+import { tokenStorage } from "@/modules/auth/services/tokenStorage.service";
+import { invoicesApi } from "../services/invoicesApi.service";
 import type { InvoiceDetail } from "../types/invoice.types";
 import { InvoicePdfDocument } from "./InvoicePdfDocument";
 import type { InvoicePdfContext, InvoicePdfMode } from "./invoicePdf.types";
@@ -50,11 +53,29 @@ export async function loadInvoicePdfContext(
       ? templateResult.value
       : options?.template ?? DEFAULT_TEMPLATE;
 
+  let mecefQrCodeDataUrl: string | null = null;
+  const isNormalized =
+    invoice.normalizationStatus === "normalized" &&
+    Boolean(invoice.mecefCode);
+
+  if (isNormalized && invoice.mecefQrCodeData) {
+    try {
+      mecefQrCodeDataUrl = await QRCode.toDataURL(invoice.mecefQrCodeData, {
+        errorCorrectionLevel: "M",
+        margin: 1,
+        width: 160,
+      });
+    } catch {
+      // fallback
+    }
+  }
+
   return {
     invoice,
     tenant,
     template,
     mode: options?.mode ?? "final",
+    mecefQrCodeDataUrl,
   };
 }
 
@@ -87,6 +108,22 @@ export async function downloadInvoicePdf(
     template?: PdfTemplate | null;
   },
 ) {
+  // Tentative de téléchargement du PDF officiel généré par le backend (avec signature DGI complète)
+  try {
+    const token = tokenStorage.getAccessToken();
+    const url = invoicesApi.pdfUrl(invoice.id);
+    const response = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (response.ok) {
+      const blob = await response.blob();
+      downloadPdfBlob(blob, invoicePdfFileName(invoice.number));
+      return;
+    }
+  } catch {
+    // fallback vers la génération côté client
+  }
+
   const blob = await buildInvoicePdfBlob(invoice, {
     ...options,
     mode: "final",

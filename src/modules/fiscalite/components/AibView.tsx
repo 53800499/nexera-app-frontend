@@ -5,12 +5,21 @@ import Link from "next/link";
 import { fiscaliteApi } from "../services/fiscaliteApi.service";
 import type { TaxContribuable, TaxRetenueAib } from "../types/fiscalite.types";
 import { WithholdingTaxIcon, PrinterIcon } from "./FiscaliteIcons";
-import { ChevronLeftIcon, DocsIcon } from "@/icons";
 import { useFiscalitePdf } from "../pdf";
+import { FiscalitePdfPreviewModal } from "./FiscalitePdfPreviewModal";
 import { FormErrorAlert, useFormError } from "./FormErrorAlert";
+import { DocsIcon } from "@/icons";
 
 export const AibView: React.FC = () => {
-  const { isExporting, exportAib } = useFiscalitePdf();
+  const {
+    isExporting,
+    preview,
+    closePreview,
+    previewAib,
+    downloadAib,
+    previewAibRecap,
+    downloadAibRecap,
+  } = useFiscalitePdf();
   const { error: simError, captureError: captureSimError, clearError: clearSimError } = useFormError();
   const [contribuable, setContribuable] = useState<TaxContribuable | null>(null);
   const [retenues, setRetenues] = useState<TaxRetenueAib[]>([]);
@@ -107,13 +116,26 @@ export const AibView: React.FC = () => {
             Acompte sur Impôt assis sur les Bénéfices (CGI Bénin 2026 Art. 130-133) • Taux 1% (achats biens/marchandises) ou 5% (prestations services) • Imputable sur l&apos;IS dû.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300 transition shadow-sm"
+            type="button"
+            onClick={() => previewAibRecap(retenues, recap, contribuable)}
+            disabled={isExporting || retenues.length === 0}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-sm disabled:opacity-50"
+            title="Aperçu avant impression du récapitulatif fiscal"
+          >
+            <DocsIcon className="h-4 w-4 shrink-0 text-amber-600" />
+            <span>Aperçu Récap</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => downloadAibRecap(retenues, recap, contribuable)}
+            disabled={isExporting || retenues.length === 0}
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300 transition shadow-sm disabled:opacity-50"
+            title="Télécharger le registre officiel AIB en PDF paysage"
           >
             <PrinterIcon className="h-4 w-4 shrink-0" />
-            <span>Imprimer Récapitulatif</span>
+            <span>{isExporting ? "Génération..." : "Télécharger PDF"}</span>
           </button>
         </div>
       </div>
@@ -370,7 +392,7 @@ export const AibView: React.FC = () => {
                           <div className="flex items-center justify-center gap-1.5">
                             <button
                               type="button"
-                              onClick={() => exportAib(r, contribuable, "download")}
+                              onClick={() => downloadAib(r, contribuable)}
                               disabled={isExporting}
                               className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 shadow-sm"
                               title="Télécharger l'attestation de retenue AIB en PDF"
@@ -380,10 +402,10 @@ export const AibView: React.FC = () => {
                             </button>
                             <button
                               type="button"
-                              onClick={() => exportAib(r, contribuable, "preview")}
+                              onClick={() => previewAib(r, contribuable)}
                               disabled={isExporting}
                               className="inline-flex items-center rounded border border-gray-200 bg-white px-1.5 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                              title="Aperçu dans un nouvel onglet"
+                              title="Aperçu avant impression"
                             >
                               <span>Aperçu</span>
                             </button>
@@ -398,6 +420,9 @@ export const AibView: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Modal de prévisualisation et impression PDF intégré */}
+      <FiscalitePdfPreviewModal preview={preview} onClose={closePreview} />
     </div>
   );
 };

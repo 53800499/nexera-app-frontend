@@ -8,4 +8,5 @@ export type InvoicePdfContext = {
   tenant: TenantSettings;
   template: PdfTemplate;
   mode: InvoicePdfMode;
+  mecefQrCodeDataUrl?: string | null;
 };

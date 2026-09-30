@@ -14,12 +14,19 @@ import {
 import { ChevronLeftIcon, DocsIcon } from "@/icons";
 import { useActionFeedback, useToast } from "@/shared/components/feedback";
 import { useFiscalitePdf } from "../pdf";
+import { FiscalitePdfPreviewModal } from "./FiscalitePdfPreviewModal";
 import { FormErrorAlert, useFormError } from "./FormErrorAlert";
 
 export const LiasseFiscaleView: React.FC = () => {
   const { confirm, showResult } = useActionFeedback();
   const toast = useToast();
-  const { isExporting, exportLiasse } = useFiscalitePdf();
+  const {
+    isExporting,
+    preview,
+    closePreview,
+    previewLiasse,
+    downloadLiasse,
+  } = useFiscalitePdf();
   const { error: liasseError, captureError: captureLiasseError, clearError: clearLiasseError } = useFormError();
 
   const [contribuable, setContribuable] = useState<TaxContribuable | null>(null);
@@ -177,14 +184,25 @@ export const LiasseFiscaleView: React.FC = () => {
             États financiers obligatoires • Système Normal ou SMT • Validation obligatoire par le Cabinet (M6) avant le 30 avril (CGI Bénin Art. 50).
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            onClick={() => liasseData && exportLiasse(liasseData, contribuable, "download")}
+            onClick={() => liasseData && previewLiasse(liasseData, contribuable)}
             disabled={!liasseData || isExporting}
-            className="inline-flex items-center gap-2 rounded-lg border border-purple-300 bg-purple-50 px-4 py-2 text-sm font-medium text-purple-800 hover:bg-purple-100 dark:border-purple-700 dark:bg-purple-950/40 dark:text-purple-300 transition shadow-sm disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-sm disabled:opacity-50"
+            title="Aperçu avant impression de la liasse fiscale SYSCOHADA"
           >
-            <DocsIcon className="h-4 w-4 shrink-0 text-purple-700 dark:text-purple-300" />
+            <DocsIcon className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400" />
+            <span>Aperçu</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => liasseData && downloadLiasse(liasseData, contribuable)}
+            disabled={!liasseData || isExporting}
+            className="inline-flex items-center gap-2 rounded-lg border border-purple-300 bg-purple-50 px-3.5 py-2 text-sm font-medium text-purple-800 hover:bg-purple-100 dark:border-purple-700 dark:bg-purple-950/40 dark:text-purple-300 transition shadow-sm disabled:opacity-50"
+            title="Télécharger la liasse fiscale SYSCOHADA en PDF officiel"
+          >
+            <PrinterIcon className="h-4 w-4 shrink-0" />
             <span>{isExporting ? "Exportation..." : "Liasse Fiscale (PDF)"}</span>
           </button>
         </div>
@@ -298,22 +316,22 @@ export const LiasseFiscaleView: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => exportLiasse(liasseData, contribuable, "download")}
+                onClick={() => previewLiasse(liasseData, contribuable)}
                 disabled={isExporting}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
-                title="Télécharger la liasse financière complète en PDF"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-sm"
+                title="Aperçu avant impression de la liasse fiscale"
               >
                 <DocsIcon className="h-3.5 w-3.5 text-purple-600" />
-                <span>{isExporting ? "Export..." : "Télécharger PDF"}</span>
+                <span>Aperçu</span>
               </button>
               <button
                 type="button"
-                onClick={() => exportLiasse(liasseData, contribuable, "preview")}
+                onClick={() => downloadLiasse(liasseData, contribuable)}
                 disabled={isExporting}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition"
-                title="Aperçu dans un nouvel onglet"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-sm"
+                title="Télécharger la liasse financière complète en PDF"
               >
-                <span>Aperçu</span>
+                <span>{isExporting ? "Export..." : "Télécharger PDF"}</span>
               </button>
             </div>
           </div>
@@ -384,6 +402,9 @@ export const LiasseFiscaleView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de prévisualisation et impression PDF intégré */}
+      <FiscalitePdfPreviewModal preview={preview} onClose={closePreview} />
     </div>
   );
 };
