@@ -188,7 +188,7 @@ const FULL_MESSAGE_TRANSLATIONS: { pattern: RegExp; message: string }[] = [
   },
   {
     pattern:
-      /user already exists|user with this email|email already|email.*already|already.*email|duplicate.*email|email.*taken|email.*registered|unique.*email|e11000.*email|compte existe déjà/i,
+      /user already exists|user with this email|email already|email.*already|already.*email|duplicate.*email|email.*taken|email.*registered|unique.*email|e11000.*email|compte utilisateur existe déjà/i,
     message: "Cette adresse e-mail est déjà utilisée par un autre compte. Connectez-vous ou utilisez une autre adresse.",
   },
   {
@@ -286,15 +286,15 @@ function inferFieldFromMessage(raw: string): string | null {
   if (/tenantName|nom de l'entreprise|nom du cabinet|raison sociale/i.test(raw)) return "tenantName";
   if (/tenantType|type d'organisation/i.test(raw)) return "tenantType";
   if (/acceptTerms|conditions générales/i.test(raw)) return "acceptTerms";
-  if (/role already exists|code already exists|duplicate.*code/i.test(raw)) return "code";
-  if (/user already exists|compte existe déjà/i.test(raw)) return "email";
+  if (/user already exists|compte utilisateur existe déjà/i.test(raw)) return "email";
+  if (/\b(compte.*existe déjà|numeroCompte|codeAuxiliaire|auxiliaire)\b/i.test(raw)) return "numeroCompte";
   if (/email|e-mail|courriel|adresse email/i.test(raw)) return "email";
   if (/\bpassword\b|mot de passe/i.test(raw)) return "password";
   if (/\bfirstName\b|prénom/i.test(raw)) return "firstName";
   if (/\blastName\b|nom de famille/i.test(raw)) return "lastName";
   if (/\broleIds?\b/i.test(raw) || /\broles?\b/i.test(raw)) return "roleIds";
 
-  if (/e-?mecef|dgi|sygmef|certification fiscale|normalisation fiscale/i.test(raw)) {
+  if (/e-?mecef|dgi|sygmef|certification fiscale|normalisation fiscale|compte.*existe déjà|syscohada|ef-\d+/i.test(raw)) {
     return null;
   }
 
@@ -306,8 +306,8 @@ function conciseValidationMessage(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "Champ invalide";
 
-  // Préserver intacts les messages explicites de certification e-MECeF / DGI
-  if (/e-?mecef|dgi|sygmef|certification fiscale|normalisation fiscale/i.test(trimmed)) {
+  // Préserver intacts les messages explicites de certification e-MECeF / DGI ou de comptabilité SYSCOHADA
+  if (/e-?mecef|dgi|sygmef|certification fiscale|normalisation fiscale|compte.*existe déjà|syscohada|ef-\d+/i.test(trimmed)) {
     return trimmed;
   }
 

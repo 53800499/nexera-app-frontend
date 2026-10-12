@@ -118,20 +118,34 @@ export const PlanComptableView: React.FC = () => {
 
   const handleCreateCompte = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newNumero || !newIntitule) return;
+    const cleanNum = newNumero.trim().replace(/[\s.-]/g, "");
+    const cleanInt = newIntitule.trim();
+    if (!cleanNum || !cleanInt) return;
+
+    const firstChar = parseInt(cleanNum.charAt(0), 10);
+    const classe = (!isNaN(firstChar) && firstChar >= 1 && firstChar <= 9 ? firstChar : 1) as ComptaClasse;
+
+    if (classe !== 4 && !/^\d+$/.test(cleanNum)) {
+      showResult({
+        variant: "error",
+        title: "Règle SYSCOHADA EF-002",
+        message: `Seuls les comptes de classe 4 (Tiers) peuvent comporter des lettres. Pour la classe ${classe}, utilisez uniquement des chiffres (ex: ${classe}01...).`,
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const classe = parseInt(newNumero.charAt(0), 10) as ComptaClasse;
       await comptabiliteApi.createCompte({
-        numero: newNumero,
-        intitule: newIntitule,
+        numero: cleanNum,
+        intitule: cleanInt,
         classe,
         sensAttendu: newSens,
         actif: true,
       });
       setShowAddModal(false);
-      const numCree = newNumero;
-      const intCree = newIntitule;
+      const numCree = cleanNum;
+      const intCree = cleanInt;
       setNewNumero("");
       setNewIntitule("");
       showResult({
@@ -139,7 +153,12 @@ export const PlanComptableView: React.FC = () => {
         title: "Compte créé",
         message: `Le compte ${numCree} - ${intCree} a été créé avec succès.`,
       });
-      chargerComptes();
+      if (classeActive !== 0 && classeActive !== classe) {
+        setClasseActive(classe);
+      } else {
+        chargerComptes();
+      }
+      setSearch("");
     } catch (err: any) {
       showResult({
         variant: "error",
@@ -430,80 +449,127 @@ export const PlanComptableView: React.FC = () => {
       </div>
 
       {/* Modal Créer un Compte */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl dark:bg-gray-900">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-              Ajouter un Compte Personnalisé
-            </h2>
-            <p className="mt-1 text-xs text-gray-500">
-              Conformément à l'AUDCIF, le compte doit respecter la racine de sa classe.
-            </p>
+      {showAddModal && (() => {
+        const cleanNum = newNumero.trim().replace(/[\s.-]/g, "");
+        const firstDigit = parseInt(cleanNum.charAt(0), 10);
+        const detectedClasse =
+          !isNaN(firstDigit) && firstDigit >= 1 && firstDigit <= 9 ? firstDigit : null;
+        const detectedClasseLabel = detectedClasse
+          ? CLASSES_SYSCOHADA.find((c) => c.classe === detectedClasse)?.libelle
+          : null;
+        const isDuplicateNumero =
+          cleanNum.length >= 2 && comptes.some((c) => c.numero === cleanNum);
+        const hasEF002Violation =
+          detectedClasse !== null && detectedClasse !== 4 && !/^\d*$/.test(cleanNum);
 
-            <form onSubmit={handleCreateCompte} className="mt-4 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                  Numéro de compte (ex: 411100, 601100)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newNumero}
-                  onChange={(e) => setNewNumero(e.target.value)}
-                  placeholder="Ex: 411100"
-                  className="mt-1 w-full rounded-lg border border-gray-300 p-2.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                />
-              </div>
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                Ajouter un Compte Personnalisé
+              </h2>
+              <p className="mt-1 text-xs text-gray-500">
+                Conformément à l&apos;AUDCIF, le compte doit respecter la racine de sa classe.
+              </p>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                  Intitulé du compte
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newIntitule}
-                  onChange={(e) => setNewIntitule(e.target.value)}
-                  placeholder="Ex: Clients zone UEMOA"
-                  className="mt-1 w-full rounded-lg border border-gray-300 p-2.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                />
-              </div>
+              <form onSubmit={handleCreateCompte} className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Numéro de compte (ex: 411100, 601100)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newNumero}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewNumero(val);
+                      const c = parseInt(val.trim().charAt(0), 10);
+                      if (c === 1 || c === 7) setNewSens("CREDITEUR");
+                      else if (c === 2 || c === 3 || c === 5 || c === 6) setNewSens("DEBITEUR");
+                    }}
+                    placeholder="Ex: 411100"
+                    className={`mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-gray-800 dark:text-white ${
+                      hasEF002Violation || isDuplicateNumero
+                        ? "border-amber-500 focus:border-amber-500"
+                        : "border-gray-300 dark:border-gray-700"
+                    }`}
+                  />
+                  {detectedClasseLabel && (
+                    <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+                      📂 {detectedClasseLabel}
+                    </p>
+                  )}
+                  {hasEF002Violation && (
+                    <p className="mt-1 rounded bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                      ⚠️ <strong>Règle AUDCIF EF-002 :</strong> Seule la classe 4 (Tiers) autorise des lettres (ex: 411CLI01). Les autres classes (1, 2, 3, 5, 6, 7, 8, 9) doivent comporter des chiffres uniquement.
+                    </p>
+                  )}
+                  {isDuplicateNumero && (
+                    <p className="mt-1 rounded bg-blue-50 p-2 text-xs text-blue-800 dark:bg-blue-950/40 dark:text-blue-300">
+                      ℹ️ Le compte <strong>{cleanNum}</strong> existe déjà dans votre plan comptable. S&apos;il a été désactivé, l&apos;enregistrement le réactivera.
+                    </p>
+                  )}
+                </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                  Sens attendu
-                </label>
-                <select
-                  value={newSens}
-                  onChange={(e: any) => setNewSens(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 p-2.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                >
-                  <option value="DEBITEUR">Débiteur (Actif / Charges)</option>
-                  <option value="CREDITEUR">Créditeur (Passif / Produits)</option>
-                  <option value="INDETERMINE">Indéterminé (Mixte)</option>
-                </select>
-              </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Intitulé du compte
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newIntitule}
+                    onChange={(e) => setNewIntitule(e.target.value)}
+                    placeholder="Ex: Clients zone UEMOA"
+                    className="mt-1 w-full rounded-lg border border-gray-300 p-2.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                </div>
 
-              <div className="mt-6 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-blue-500"
-                >
-                  {isSubmitting ? "Création..." : "Enregistrer"}
-                </button>
-              </div>
-            </form>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Sens attendu
+                  </label>
+                  <select
+                    value={newSens}
+                    onChange={(e: any) => setNewSens(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-300 p-2.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  >
+                    <option value="DEBITEUR">Débiteur (Actif / Charges)</option>
+                    <option value="CREDITEUR">Créditeur (Passif / Produits)</option>
+                    <option value="INDETERMINE">Indéterminé (Mixte)</option>
+                  </select>
+                </div>
+
+                <div className="rounded-lg bg-gray-50 p-2.5 text-xs text-gray-600 dark:bg-gray-800/60 dark:text-gray-400">
+                  <p className="font-semibold text-gray-700 dark:text-gray-300">💡 Guide SYSCOHADA :</p>
+                  <ul className="mt-1 list-inside list-disc space-y-0.5 text-[11px]">
+                    <li>Les 443 comptes standards (101, 212, 401, 411, 521...) sont déjà inclus.</li>
+                    <li>Pour un client ou fournisseur individuel, créez plutôt un <strong>Compte Auxiliaire</strong> rattaché à 411 ou 401 via l&apos;icône 👥.</li>
+                  </ul>
+                </div>
+
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || hasEF002Violation}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isSubmitting ? "Création..." : "Enregistrer"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Modal Détail Compte */}
       {detailCompte && (

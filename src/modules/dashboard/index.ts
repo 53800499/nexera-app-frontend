@@ -1,5 +1,14 @@
 export { default as CommercialDashboardPage } from "./pages/CommercialDashboardPage";
 export { default as CommercialReportsPage } from "./pages/CommercialReportsPage";
 export { AgedBalancePanel } from "./components/AgedBalancePanel";
+export { ExecutiveCockpitBanner } from "./components/ExecutiveCockpitBanner";
+export { DashboardPeriodPresets } from "./components/DashboardPeriodPresets";
+export { CockpitTabs } from "./components/CockpitTabs";
+export { ExecutiveKpiCard } from "./components/ExecutiveKpiCard";
+export { ExecutiveChartsSection } from "./components/ExecutiveChartsSection";
+export { OperationalActionRadar } from "./components/OperationalActionRadar";
+export { TopPerformersPanel } from "./components/TopPerformersPanel";
+export { ModuleEcosystemGrid } from "./components/ModuleEcosystemGrid";
 export { useCommercialDashboard } from "./hooks/useDashboard";
+export { useExecutiveAuxiliaryMetrics } from "./hooks/useExecutiveAuxiliaryMetrics";
 export type { CommercialDashboard, AgedBalanceBucket } from "./types/dashboard.types";
