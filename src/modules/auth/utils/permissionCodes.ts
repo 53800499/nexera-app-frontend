@@ -391,3 +391,85 @@ export function canManageFiscalite(user: any): boolean {
     "is.write",
   ]);
 }
+
+// ----------------------------------------------------
+// COMPTABILITÉ (M3 - SYSCOHADA)
+// ----------------------------------------------------
+
+export function canReadComptabilite(user: any): boolean {
+  if (!user) return false;
+  if (
+    user.role === "admin" ||
+    user.role === "dirigeant" ||
+    user.role === "comptable" ||
+    user.role === "expert_comptable" ||
+    user.roles?.includes("ADMIN") ||
+    user.roles?.includes("CEO") ||
+    user.roles?.includes("COMPTABLE") ||
+    user.roles?.includes("EXPERT_COMPTABLE") ||
+    user.roles?.includes("CABINET_ADMIN") ||
+    user.roles?.includes("CABINET_COLLABORATEUR") ||
+    user.workspace === "entreprise" ||
+    user.workspace === "cabinet"
+  ) {
+    return true;
+  }
+  return hasAnyPermissionCode(user, [
+    "compta.plan.read",
+    "compta.ecritures.read",
+    "compta.grandlivre.read",
+    "compta.balance.read",
+    "compta.etats.read",
+    "dashboard.read",
+  ]);
+}
+
+export function canManageComptabilite(user: any): boolean {
+  if (!user) return false;
+  if (
+    user.role === "admin" ||
+    user.role === "dirigeant" ||
+    user.role === "comptable" ||
+    user.roles?.includes("ADMIN") ||
+    user.roles?.includes("CEO") ||
+    user.roles?.includes("COMPTABLE") ||
+    user.roles?.includes("CABINET_ADMIN")
+  ) {
+    return true;
+  }
+  return hasAnyPermissionCode(user, [
+    "compta.plan.write",
+    "compta.ecritures.write",
+    "compta.lettrage.execute",
+    "compta.rapprochement.manage",
+  ]);
+}
+
+export function canValidateComptabilite(user: any): boolean {
+  if (!user) return false;
+  if (
+    user.role === "admin" ||
+    user.role === "dirigeant" ||
+    user.roles?.includes("ADMIN") ||
+    user.roles?.includes("CEO") ||
+    user.roles?.includes("CABINET_ADMIN")
+  ) {
+    return true;
+  }
+  return hasPermissionCode(user, "compta.ecritures.validate");
+}
+
+export function canCloseComptabilite(user: any): boolean {
+  if (!user) return false;
+  if (
+    user.role === "admin" ||
+    user.role === "dirigeant" ||
+    user.roles?.includes("ADMIN") ||
+    user.roles?.includes("CEO") ||
+    user.roles?.includes("CABINET_ADMIN")
+  ) {
+    return true;
+  }
+  return hasPermissionCode(user, "compta.cloture.execute");
+}
+

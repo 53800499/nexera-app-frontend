@@ -122,6 +122,17 @@ const FIELD_PATTERNS: { pattern: RegExp; field: string; label: string }[] = [
     field: "cabinetCircuitValidationId",
     label: "Circuit de validation",
   },
+  { pattern: /\bexerciceId\b/i, field: "exerciceId", label: "Exercice" },
+  { pattern: /\bperiodeId\b/i, field: "periodeId", label: "Période" },
+  { pattern: /\bjournalId\b/i, field: "journalId", label: "Journal" },
+  { pattern: /\bdateEcriture\b/i, field: "dateEcriture", label: "Date d'écriture" },
+  { pattern: /\b(refPiece|pieceRef)\b/i, field: "refPiece", label: "Référence de pièce" },
+  { pattern: /\bdatePiece\b/i, field: "datePiece", label: "Date de pièce" },
+  { pattern: /\bcompteId\b/i, field: "compteId", label: "Compte comptable" },
+  { pattern: /\bcompteAuxiliaireId\b/i, field: "compteAuxiliaireId", label: "Compte auxiliaire" },
+  { pattern: /\bmontantDebit\b/i, field: "montantDebit", label: "Montant débit" },
+  { pattern: /\bmontantCredit\b/i, field: "montantCredit", label: "Montant crédit" },
+  { pattern: /\blibelleLigne\b/i, field: "libelleLigne", label: "Libellé de la ligne" },
 ];
 
 function toMessageList(message: ApiErrorBody["message"]): string[] {
@@ -305,10 +316,11 @@ function conciseValidationMessage(raw: string): string {
   }
 
   const forbiddenProperty = trimmed.match(
-    /(?:property|propriété)\s+(\w+)\s+should not exist/i,
+    /(?:property|propriété|champ)\s+["']?([^"'\s]+)["']?\s+(?:should not exist|n'est pas autorisé)/i,
   );
   if (forbiddenProperty) {
-    const fieldName = forbiddenProperty[1];
+    const rawField = forbiddenProperty[1];
+    const fieldName = rawField.replace(/.*[\[.](\w+)[\].]?$/, "$1");
     return `${getFieldLabel(fieldName)} non accepté par l'API`;
   }
 

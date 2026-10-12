@@ -48,6 +48,8 @@ export type NavPermissions = {
   canManageNotesFrais: boolean;
   fiscalite: boolean;
   canManageFiscalite: boolean;
+  comptabilite: boolean;
+  canManageComptabilite: boolean;
   canManageClients: boolean;
   canManageCatalogue: boolean;
   canManageStock: boolean;
