@@ -41,6 +41,8 @@ export interface ComptaCompte {
   tenantId?: string;
   numero: string;
   intitule: string;
+  numeroCompte?: string;
+  libelle?: string;
   classe: ComptaClasse;
   sensAttendu: ComptaSensSolde;
   actif: boolean;

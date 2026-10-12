@@ -9,6 +9,7 @@ import type {
   ComptaFecExport,
   ComptaJournal,
   ComptaLettrage,
+  ComptaPeriode,
   ComptaRegleComptabilisation,
   ComptaReleveBancaire,
   EtatFinancierResponse,
